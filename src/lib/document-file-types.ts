@@ -56,6 +56,34 @@ export function isPdf(fileName: string) {
   return fileName.toLowerCase().endsWith(".pdf");
 }
 
+/** Slide decks, which get their own icon wherever a file is drawn. */
+export function isSlides(fileName: string) {
+  return /\.pptx?$/i.test(fileName);
+}
+
+/**
+ * Puts a file's extension back on a name that dropped it.
+ *
+ * Nothing records a document's type but its name — `isPdf` and `isSlides` read
+ * the extension, and the preview and the viewer follow them — so renaming
+ * `notes.pdf` to `Notes` would quietly turn a readable PDF into a file the app
+ * can only hand to the browser. A rename relabels a file; it does not convert
+ * one, so the extension travels with it.
+ *
+ * A name that already ends in the right extension is left alone, and a file
+ * that never had one has nothing to keep.
+ */
+export function keepExtension(previousName: string, nextName: string) {
+  const dot = previousName.lastIndexOf(".");
+  // `0` would be a leading dot: a hidden file, not an extension.
+  if (dot <= 0) return nextName;
+
+  const extension = previousName.slice(dot);
+  return nextName.toLowerCase().endsWith(extension.toLowerCase())
+    ? nextName
+    : `${nextName}${extension}`;
+}
+
 export function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   const units = ["KB", "MB", "GB"];

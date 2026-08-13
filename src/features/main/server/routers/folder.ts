@@ -113,6 +113,71 @@ export const FolderRouter = createTRPCRouter({
       return { id: folder.id };
     }),
 
+  /**
+   * Deletes a whole selection at once.
+   *
+   * The same rules as the single deletes, applied together: a folder takes its
+   * subtree with it, and storage is emptied before the rows are, so a failure
+   * leaves rows pointing at files rather than files nobody points at. One round
+   * trip, so a half-finished bulk delete cannot be caused by a dropped request
+   * partway down the list.
+   */
+  bulkRemove: protectedProcedure
+    .input(
+      z.object({
+        folderIds: z.array(z.string()),
+        documentIds: z.array(z.string()),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Ownership is settled here, once: everything below works from ids that
+      // came back from a `userId`-scoped read, and ids that are not the
+      // caller's simply fall out rather than erroring the whole batch.
+      const owned = await prisma.folder.findMany({
+        where: { id: { in: input.folderIds }, userId: ctx.userId },
+        select: { id: true },
+      });
+
+      const subtrees = await Promise.all(
+        owned.map((folder) => collectFolderIds(prisma, ctx.userId, folder.id)),
+      );
+      // Selecting a folder and something inside it is one delete, not two.
+      const folderIds = [...new Set(subtrees.flat())];
+
+      // Documents picked directly, plus everything living under a folder on the
+      // way out. An empty `in` matches nothing, so either half can be absent.
+      const documents = await prisma.document.findMany({
+        where: {
+          userId: ctx.userId,
+          OR: [
+            { id: { in: input.documentIds } },
+            { folderId: { in: folderIds } },
+          ],
+        },
+        select: { id: true, pdfUrl: true },
+      });
+
+      if (folderIds.length === 0 && documents.length === 0) {
+        return { folders: 0, documents: 0 };
+      }
+
+      await deleteUploadedFiles(documents.map((doc) => doc.pdfUrl));
+
+      await prisma.$transaction([
+        prisma.document.deleteMany({
+          where: {
+            userId: ctx.userId,
+            id: { in: documents.map((doc) => doc.id) },
+          },
+        }),
+        prisma.folder.deleteMany({
+          where: { userId: ctx.userId, id: { in: folderIds } },
+        }),
+      ]);
+
+      return { folders: folderIds.length, documents: documents.length };
+    }),
+
   move: protectedProcedure
     .input(z.object({ id: z.string(), newParentId: z.string().nullable() }))
     .mutation(async ({ ctx, input }) => {
@@ -154,6 +219,72 @@ export const FolderRouter = createTRPCRouter({
         where: { id: input.id },
         data: { parentId: input.newParentId },
       });
+    }),
+
+  /**
+   * Moves a whole selection into one folder.
+   *
+   * A folder that cannot legally land in the target — it *is* the target, or the
+   * target sits inside it — is skipped rather than failing the batch: the rest
+   * of a selection is still a perfectly good move, and the count comes back so
+   * the caller can say what was left behind.
+   */
+  bulkMove: protectedProcedure
+    .input(
+      z.object({
+        folderIds: z.array(z.string()),
+        documentIds: z.array(z.string()),
+        targetFolderId: z.string().nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (input.targetFolderId) {
+        const target = await prisma.folder.findFirst({
+          where: { id: input.targetFolderId, userId: ctx.userId },
+          select: { id: true },
+        });
+        if (!target)
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Target folder not found",
+          });
+      }
+
+      const owned = await prisma.folder.findMany({
+        where: { id: { in: input.folderIds }, userId: ctx.userId },
+        select: { id: true },
+      });
+
+      const movable: string[] = [];
+      for (const folder of owned) {
+        if (folder.id === input.targetFolderId) continue;
+        if (
+          input.targetFolderId &&
+          (await isDescendant(prisma, folder.id, input.targetFolderId))
+        ) {
+          continue;
+        }
+        movable.push(folder.id);
+      }
+
+      // `updateMany` is scoped by `userId`, so ids that are not the caller's
+      // match nothing instead of erroring — same shape as `bulkRemove`.
+      const [folders, documents] = await prisma.$transaction([
+        prisma.folder.updateMany({
+          where: { userId: ctx.userId, id: { in: movable } },
+          data: { parentId: input.targetFolderId },
+        }),
+        prisma.document.updateMany({
+          where: { userId: ctx.userId, id: { in: input.documentIds } },
+          data: { folderId: input.targetFolderId },
+        }),
+      ]);
+
+      return {
+        folders: folders.count,
+        documents: documents.count,
+        skipped: owned.length - movable.length,
+      };
     }),
 
   getContents: protectedProcedure
@@ -199,6 +330,39 @@ export const FolderRouter = createTRPCRouter({
       }
       return trail;
     }),
+
+  /**
+   * Everything the account owns, flat, for the search palette.
+   *
+   * Takes no query on purpose: one drive's worth of names is small enough to
+   * hand over once and filter in the browser, which keeps the palette instant
+   * and saves a round trip per keystroke. `pdfUrl` stays behind, as in
+   * `getContents` — the documents come back shaped like the ones the table
+   * renders, so the palette can hand them straight to `useOpenDocument`.
+   */
+  getAllItems: protectedProcedure.query(async ({ ctx }) => {
+    const [folders, documents] = await Promise.all([
+      prisma.folder.findMany({
+        where: { userId: ctx.userId },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true, parentId: true },
+      }),
+      prisma.document.findMany({
+        where: { userId: ctx.userId },
+        orderBy: { name: "asc" },
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          folderId: true,
+          isLocked: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+    ]);
+    return { folders, documents };
+  }),
 
   // For the "Move to..." folder picker — full tree, lightweight fields only
   getTree: protectedProcedure.query(async ({ ctx }) => {

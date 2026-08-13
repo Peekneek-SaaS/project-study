@@ -1,12 +1,24 @@
 // lib/stores/modal-store.ts
 import { create } from "zustand";
 
-/** What the delete modal is being asked to remove. */
-export interface DeleteTarget {
+/** A single drive row a modal is acting on. */
+export interface DriveItemTarget {
   kind: "document" | "folder";
   id: string;
-  /** Shown in the confirmation, and in the toast after the row is gone. */
+  /** Shown in the dialog, and in the toast once the row has changed. */
   name: string;
+}
+
+/** What the delete modal is being asked to remove. */
+export type DeleteTarget = DriveItemTarget;
+
+/** The row the rename modal is editing, carrying the name to start from. */
+export type RenameTarget = DriveItemTarget;
+
+/** The ticked rows the bulk delete is being asked to remove. */
+export interface DeleteSelection {
+  folderIds: string[];
+  documentIds: string[];
 }
 
 /** The document the preview overlay is showing. */
@@ -26,6 +38,8 @@ interface ModalPayloads {
   "upload-file": undefined;
   "create-folder": undefined;
   "delete-item": DeleteTarget;
+  "rename-item": RenameTarget;
+  "delete-items": DeleteSelection;
   "preview-document": PreviewTarget;
 }
 
@@ -67,6 +81,17 @@ export const selectIsOpen = (type: ModalType) => (state: ModalStore) =>
  */
 export const selectDeleteTarget = (state: ModalStore) =>
   state.type === "delete-item" ? (state.payload as DeleteTarget) : null;
+
+/**
+ * The row the rename modal should edit, or `null` when it is not the modal on
+ * screen. Guarded by `type` for the same reason as the delete target.
+ */
+export const selectRenameTarget = (state: ModalStore) =>
+  state.type === "rename-item" ? (state.payload as RenameTarget) : null;
+
+/** The ticked rows to remove, or `null` when the bulk delete is not on screen. */
+export const selectDeleteSelection = (state: ModalStore) =>
+  state.type === "delete-items" ? (state.payload as DeleteSelection) : null;
 
 /** The document to preview, or `null` when the overlay is not the modal on screen. */
 export const selectPreviewTarget = (state: ModalStore) =>

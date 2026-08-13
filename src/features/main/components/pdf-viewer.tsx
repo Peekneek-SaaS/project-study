@@ -2,21 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Document, Page, pdfjs } from "react-pdf";
+import { Document, Page } from "react-pdf";
 
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+// Imported for its side effect: pdf.js needs its worker before anything renders.
+import "@/features/main/lib/pdfjs-worker";
 import { cn } from "@/lib/utils";
-
-// Resolved through the bundler rather than a CDN, so the worker always matches
-// the `pdfjs-dist` version react-pdf was built against.
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url,
-).toString();
 
 /**
  * Pages kept mounted either side of the one being read.

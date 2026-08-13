@@ -8,10 +8,7 @@ import { Modal } from "@/components/modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  selectCurrentFolderId,
-  useDriveStore,
-} from "@/lib/stores/drive-store";
+import { selectCurrentFolderId, useDriveStore } from "@/lib/stores/drive-store";
 import { selectIsOpen, useModalStore } from "@/lib/stores/modal-store";
 import { useTRPC } from "@/trpc/client";
 

@@ -1,15 +1,19 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import { useDraggable } from "@dnd-kit/react";
-import { FileText, Play } from "lucide-react";
+import { FileLock, FileText, Play } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { DriveItemActions } from "@/features/main/components/drive-item-actions";
 import { DriveRowActions } from "@/features/main/components/drive-row-actions";
 import { DriveStatusBadge } from "@/features/main/components/drive-status-badge";
+import {
+  type SelectRow,
+  useDriveRowInteraction,
+} from "@/features/main/hooks/use-drive-row-interaction";
 import { useOpenDocument } from "@/features/main/hooks/use-open-document";
+import { SELECTED_ROW_CLASS } from "@/features/main/lib/drive-row-classes";
 import { formatDriveDate } from "@/features/main/lib/format-drive-date";
 import {
   DRAG_TYPE,
@@ -17,10 +21,25 @@ import {
   type DriveDocument,
   type DriveDragData,
 } from "@/features/main/types";
+import {
+  selectIsDocumentSelected,
+  useDriveSelectionStore,
+} from "@/lib/stores/drive-selection-store";
 import { cn } from "@/lib/utils";
 
-export function DriveDocumentRow({ doc }: { doc: DriveDocument }) {
+export function DriveDocumentRow({
+  doc,
+  onSelect,
+}: {
+  doc: DriveDocument;
+  onSelect: SelectRow;
+}) {
   const openDocument = useOpenDocument();
+
+  const isSelected = useDriveSelectionStore(selectIsDocumentSelected(doc.id));
+  const isDraggingSelection = useDriveSelectionStore(
+    (state) => state.isDraggingSelection,
+  );
 
   const { ref, isDragging } = useDraggable({
     id: dragId({ kind: "document", id: doc.id }),
@@ -30,32 +49,38 @@ export function DriveDocumentRow({ doc }: { doc: DriveDocument }) {
 
   const isReady = doc.status === "READY";
 
-  // dnd-kit calls preventDefault on the click that ends a drag, which stops the
-  // browser default but not React's handler — so track the gesture ourselves or
-  // dropping a document elsewhere would also open it.
-  const dragged = useRef(false);
-  useEffect(() => {
-    if (isDragging) dragged.current = true;
-  }, [isDragging]);
+  const rowProps = useDriveRowInteraction({
+    item: { kind: "document", id: doc.id },
+    isDragging,
+    onOpen: () => openDocument(doc),
+    onSelect,
+  });
 
   return (
     <TableRow
       ref={ref}
-      onPointerDown={() => {
-        dragged.current = false;
-      }}
-      onClick={() => {
-        if (isDragging || dragged.current) return;
-        openDocument(doc);
-      }}
+      {...rowProps}
+      aria-selected={isSelected}
+      data-state={isSelected ? "selected" : undefined}
       className={cn(
-        "cursor-grab",
-        isDragging && "cursor-grabbing opacity-40",
+        // `select-none` so double-clicking to open does not leave the file name
+        // highlighted underneath the preview.
+        "cursor-default select-none",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+        SELECTED_ROW_CLASS,
+        isDragging && "cursor-grabbing",
+        // Dimmed while held, and while the rest of the selection it belongs to
+        // is being carried somewhere.
+        (isDragging || (isSelected && isDraggingSelection)) && "opacity-40",
       )}
     >
       <TableCell>
         <div className="flex items-center gap-2">
-          <FileText className="size-4 shrink-0 text-muted-foreground" />
+          {doc.isLocked ? (
+            <FileLock className="size-4 shrink-0 text-muted-foreground" />
+          ) : (
+            <FileText className="size-4 shrink-0 text-muted-foreground" />
+          )}
           <span className="truncate">{doc.name}</span>
         </div>
       </TableCell>

@@ -1,8 +1,11 @@
 "use client";
 
+import { BulkDeleteModal } from "@/features/main/modal/bulk-delete-modal";
 import { CreateFolderModal } from "@/features/main/modal/create-folder-modal";
 import { DeleteModal } from "@/features/main/modal/delete-modal";
 import { DocumentPreviewModal } from "@/features/main/modal/document-preview-modal";
+import { RenameItemModal } from "@/features/main/modal/rename-item-modal";
+import { SearchModal } from "@/features/main/modal/search-modal";
 import { UploadModal } from "@/features/main/modal/upload-modal";
 
 /**
@@ -17,8 +20,12 @@ export function ModalProvider() {
     <>
       <UploadModal />
       <CreateFolderModal />
+      <RenameItemModal />
       <DeleteModal />
+      <BulkDeleteModal />
       <DocumentPreviewModal />
+      {/* Reads `useSearchStore` rather than `useModalStore` — see that store. */}
+      <SearchModal />
     </>
   );
 }

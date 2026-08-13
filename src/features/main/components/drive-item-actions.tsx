@@ -8,6 +8,7 @@ import {
   LockOpen,
   type LucideIcon,
   MoreVertical,
+  Pen,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -83,6 +84,7 @@ function lockItem(isLocked: boolean): MenuItemConfig {
 function documentItems(
   doc: DriveDocument,
   confirmDelete: () => void,
+  promptRename: () => void,
   openDocument: (doc: DriveDocument) => void,
 ): MenuItemConfig[] {
   return [
@@ -92,6 +94,11 @@ function documentItems(
       onSelect: () => openDocument(doc),
       // Nothing to open until the upload has landed.
       disabled: doc.status !== "READY",
+    },
+    {
+      icon: Pen,
+      label: "Edit name",
+      onSelect: promptRename,
     },
     lockItem(doc.isLocked),
     {
@@ -112,6 +119,7 @@ function documentItems(
 function folderItems(
   folder: DriveFolder,
   confirmDelete: () => void,
+  promptRename: () => void,
   openFolder: (folder: { id: string; name: string }) => void,
 ): MenuItemConfig[] {
   return [
@@ -119,6 +127,11 @@ function folderItems(
       icon: FolderOpen,
       label: "Open",
       onSelect: () => openFolder({ id: folder.id, name: folder.name }),
+    },
+    {
+      icon: Pen,
+      label: "Edit name",
+      onSelect: promptRename,
     },
     lockItem(folder.isLocked),
     {
@@ -141,19 +154,20 @@ export function DriveItemActions(props: DriveItemActionsProps) {
   const openFolder = useDriveStore((state) => state.openFolder);
   const openDocument = useOpenDocument();
 
-  // The confirmation lives in `ModalProvider`, so it outlives this row being
-  // re-rendered away by the refetch that follows the delete.
-  const confirmDelete = () =>
-    openModal("delete-item", {
-      kind: props.kind,
-      id: props.item.id,
-      name: props.item.name,
-    });
+  // Both dialogs live in `ModalProvider`, so they outlive this row being
+  // re-rendered away by the refetch that follows the delete or the rename.
+  const itemRef = {
+    kind: props.kind,
+    id: props.item.id,
+    name: props.item.name,
+  };
+  const confirmDelete = () => openModal("delete-item", itemRef);
+  const promptRename = () => openModal("rename-item", itemRef);
 
   const menuItems =
     props.kind === "document"
-      ? documentItems(props.item, confirmDelete, openDocument)
-      : folderItems(props.item, confirmDelete, openFolder);
+      ? documentItems(props.item, confirmDelete, promptRename, openDocument)
+      : folderItems(props.item, confirmDelete, promptRename, openFolder);
 
   return (
     <DropdownMenu>
@@ -167,7 +181,7 @@ export function DriveItemActions(props: DriveItemActionsProps) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-40" align="end">
-        <DropdownMenuGroup>
+        <DropdownMenuGroup className="space-y-1">
           {menuItems.map(
             ({ label, onSelect, variant, className, disabled, icon: Icon }) => (
               <DropdownMenuItem

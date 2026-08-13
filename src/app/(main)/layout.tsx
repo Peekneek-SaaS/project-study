@@ -9,6 +9,8 @@ import { Suspense } from "react";
 import { QueryErrorBoundary } from "@/components/query-error-boundary";
 import { Spinner } from "@/components/ui/spinner";
 import { cookies } from "next/headers";
+import MainBreadCrumbs from "@/features/main/components/main-breadcrumbs";
+import MainFooter from "@/features/main/components/main-footer";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -52,6 +54,7 @@ const MainLayout: React.FC<MainLayoutProps> = async ({ children }) => {
           </HydrateClient>
         </main>
       </SidebarInset>
+     
     </SidebarProvider>
   );
 };

@@ -4,6 +4,7 @@ import { useDroppable } from "@dnd-kit/react";
 import { CornerLeftUp, CornerUpLeft } from "lucide-react";
 
 import { TableCell, TableRow } from "@/components/ui/table";
+import { DROP_TARGET_ROW_CLASS } from "@/features/main/lib/drive-row-classes";
 import {
   DRAG_TYPE,
   DROPPABLE_ACCEPTS,
@@ -36,8 +37,10 @@ export function DriveParentRow({
       ref={ref}
       onClick={() => goToCrumb(parentFolderId)}
       className={cn(
-        "cursor-pointer text-muted-foreground",
-        isDropTarget && "bg-accent ring-1 ring-primary ring-inset",
+        // A way out rather than a row you can hold: one click, as with any
+        // other button on the page.
+        "cursor-pointer text-muted-foreground select-none",
+        isDropTarget && DROP_TARGET_ROW_CLASS,
       )}
     >
       <TableCell colSpan={4}>

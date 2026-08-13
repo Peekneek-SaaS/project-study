@@ -3,18 +3,12 @@
 import { useDraggable, useDroppable } from "@dnd-kit/react";
 import { Folder as FolderIcon, FolderLock } from "lucide-react";
 
-import { TableCell, TableRow } from "@/components/ui/table";
+import { DriveActionsShield } from "@/features/main/components/drive-actions-shield";
 import { DriveItemActions } from "@/features/main/components/drive-item-actions";
-import { DriveRowActions } from "@/features/main/components/drive-row-actions";
 import {
   type SelectRow,
   useDriveRowInteraction,
 } from "@/features/main/hooks/use-drive-row-interaction";
-import { formatDriveDate } from "@/features/main/lib/format-drive-date";
-import {
-  DROP_TARGET_ROW_CLASS,
-  SELECTED_ROW_CLASS,
-} from "@/features/main/lib/drive-row-classes";
 import {
   DRAG_TYPE,
   DROPPABLE_ACCEPTS,
@@ -31,7 +25,14 @@ import {
 import { useDriveStore } from "@/lib/stores/drive-store";
 import { cn } from "@/lib/utils";
 
-export function DriveFolderRow({
+/**
+ * A folder in grid view: a pill with its name and its menu.
+ *
+ * The same gestures as the row — click to select, double-click to open, hold to
+ * select on touch, drag to move — because they come from the same hook. Only
+ * the shape differs.
+ */
+export function DriveFolderCard({
   folder,
   onSelect,
 }: {
@@ -59,7 +60,7 @@ export function DriveFolderRow({
     data: { folderId: folder.id } satisfies DriveDropData,
   });
 
-  const rowProps = useDriveRowInteraction({
+  const cardProps = useDriveRowInteraction({
     item: { kind: "folder", id: folder.id },
     isDragging,
     onOpen: () => openFolder({ id: folder.id, name: folder.name }),
@@ -67,45 +68,36 @@ export function DriveFolderRow({
   });
 
   return (
-    <TableRow
+    <div
       ref={(node) => {
         dragRef(node);
         dropRef(node);
       }}
-      {...rowProps}
+      {...cardProps}
+      role="option"
       aria-selected={isSelected}
-      data-state={isSelected ? "selected" : undefined}
       className={cn(
-        // `select-none` so the double-click that opens a folder does not leave
-        // its name highlighted behind the folder you just walked into.
-        "cursor-default select-none",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
-        SELECTED_ROW_CLASS,
+        // The border is transparent until it is needed, so selecting a card
+        // outlines it without nudging the grid a pixel.
+        "flex select-none items-center gap-3 rounded-xl border border-transparent bg-muted/60 px-3 py-3 transition-colors",
+        "hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        isSelected && "border-primary bg-muted",
         isDragging && "cursor-grabbing",
-        // Dimmed while held, and while the rest of the selection it belongs to
-        // is being carried somewhere.
         (isDragging || (isSelected && isDraggingSelection)) && "opacity-40",
-        isDropTarget && !isDragging && DROP_TARGET_ROW_CLASS,
+        isDropTarget && !isDragging && "border-primary bg-accent",
       )}
     >
-      <TableCell>
-        <div className="flex items-center gap-2">
-          {folder.isLocked ? (
-            <FolderLock className="size-4 shrink-0 text-muted-foreground" />
-          ) : (
-            <FolderIcon className="size-4 shrink-0 text-muted-foreground" />
-          )}
-
-          <span className="truncate">{folder.name}</span>
-        </div>
-      </TableCell>
-      <TableCell />
-      <TableCell className="text-muted-foreground">
-        {formatDriveDate(folder.updatedAt)}
-      </TableCell>
-      <DriveRowActions>
+      {folder.isLocked ? (
+        <FolderLock className="size-5 shrink-0 text-foreground" />
+      ) : (
+        <FolderIcon className="size-5 shrink-0 fill-foreground text-foreground" />
+      )}
+      <span className="min-w-0 flex-1 truncate text-sm font-medium">
+        {folder.name}
+      </span>
+      <DriveActionsShield>
         <DriveItemActions kind="folder" item={folder} />
-      </DriveRowActions>
-    </TableRow>
+      </DriveActionsShield>
+    </div>
   );
 }

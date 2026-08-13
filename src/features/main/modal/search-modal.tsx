@@ -1,0 +1,213 @@
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { CornerDownLeft, FileText, Folder, LucideIcon } from "lucide-react";
+
+import {
+  Command,
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Kbd } from "@/components/ui/kbd";
+import { Spinner } from "@/components/ui/spinner";
+import { DriveStatusBadge } from "@/features/main/components/drive-status-badge";
+import { useOpenDocument } from "@/features/main/hooks/use-open-document";
+import { useDriveStore } from "@/lib/stores/drive-store";
+import { useSearchStore } from "@/lib/stores/search-store";
+import { useTRPC } from "@/trpc/client";
+
+interface SearchFolder {
+  id: string;
+  name: string;
+  parentId: string | null;
+}
+
+interface kbdItemsProps {
+  icon: LucideIcon | string;
+  label: string;
+}
+
+const kbdItems: kbdItemsProps[] = [
+  {
+    icon: CornerDownLeft,
+    label: "Open",
+  },
+  {
+    icon: "esc",
+    label: "Close",
+  },
+];
+
+/**
+ * A folder's ancestors, root first, including the folder itself.
+ *
+ * The whole tree is already on the client, so the trail is walked here rather
+ * than asked for — and the `seen` guard keeps a malformed chain from spinning
+ * forever, even though `folder.move` refuses to create one.
+ */
+function trailTo(folders: SearchFolder[], folderId: string | null) {
+  const byId = new Map(folders.map((folder) => [folder.id, folder]));
+  const trail: { id: string; name: string }[] = [];
+  const seen = new Set<string>();
+
+  let current = folderId ? byId.get(folderId) : undefined;
+  while (current && !seen.has(current.id)) {
+    seen.add(current.id);
+    trail.unshift({ id: current.id, name: current.name });
+    current = current.parentId ? byId.get(current.parentId) : undefined;
+  }
+
+  return trail;
+}
+
+/** Where an item lives, for the second line of its row. */
+const locationLabel = (trail: { name: string }[]) =>
+  trail.length === 0
+    ? "My files"
+    : trail.map((crumb) => crumb.name).join(" / ");
+
+/**
+ * Search across the whole drive.
+ *
+ * Every folder and document is fetched once and filtered by cmdk in the
+ * browser, so results appear as fast as they are typed. Selecting a folder
+ * navigates to it; selecting a document opens it the same way the table does.
+ */
+export function SearchModal() {
+  const isOpen = useSearchStore((state) => state.isOpen);
+  const query = useSearchStore((state) => state.query);
+  const setQuery = useSearchStore((state) => state.setQuery);
+  const closeSearch = useSearchStore((state) => state.close);
+
+  const openFolder = useDriveStore((state) => state.openFolder);
+  const goToCrumb = useDriveStore((state) => state.goToCrumb);
+  const openDocument = useOpenDocument();
+
+  const trpc = useTRPC();
+  // Nothing is fetched until the palette is asked for; after that the list is
+  // cached, so reopening it is instant.
+  const { data, isLoading } = useQuery({
+    ...trpc.folder.getAllItems.queryOptions(),
+    enabled: isOpen,
+  });
+
+  const folders = data?.folders ?? [];
+  const documents = data?.documents ?? [];
+
+  /**
+   * Search can land on a folder several levels down, so the breadcrumb trail is
+   * rebuilt from the root rather than appended to wherever the user happened to
+   * be — otherwise the crumbs would describe a path that was never walked.
+   */
+  const handleSelectFolder = (folderId: string) => {
+    const trail = trailTo(folders, folderId);
+    closeSearch();
+    goToCrumb(null);
+    for (const crumb of trail) openFolder(crumb);
+  };
+
+  const handleSelectDocument = (doc: (typeof documents)[number]) => {
+    // Closed first: the preview is a modal of its own, and stacking the palette
+    // over it traps focus in the one that is on its way out.
+    closeSearch();
+    openDocument(doc);
+  };
+
+  return (
+    <CommandDialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) closeSearch();
+      }}
+      title="Search"
+      description="Search your folders and files"
+      // Capped against the viewport rather than a pixel height, so a long
+      // drive never pushes the palette off-screen. `flex` replaces the
+      // dialog's own grid to let the list absorb the leftover space, and
+      // `gap-0` keeps the shortcut bar flush against it.
+      className="top-1/4 flex max-h-[50svh] flex-col gap-0 sm:max-w-xl"
+    >
+      {/*
+        `CommandDialog` here drops its children straight into the dialog, so the
+        cmdk root has to be supplied — without it the input has no context to
+        report into and nothing filters.
+      */}
+      <Command className="min-h-0 flex-1">
+        <CommandInput
+          placeholder="Search folders and files…"
+          value={query}
+          onValueChange={setQuery}
+        />
+        {/* `max-h-none` drops the component's own 18rem cap; the height now
+            comes from the dialog, and this is the only thing that scrolls. */}
+        <CommandList className="max-h-none min-h-0 flex-1">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Spinner />
+            </div>
+          ) : (
+            <CommandEmpty className="text-muted-foreground">
+              {query ? `Nothing matches “${query}”.` : "Nothing here yet."}
+            </CommandEmpty>
+          )}
+
+          {folders.length > 0 && (
+            <CommandGroup heading="Folders">
+              {folders.map((folder) => (
+                <CommandItem
+                  key={folder.id}
+                  value={`${folder.name} ${folder.id}`}
+                  onSelect={() => handleSelectFolder(folder.id)}
+                >
+                  <Folder className="text-muted-foreground" />
+                  <span className="truncate">{folder.name}</span>
+                  {/* <span className="ml-auto truncate pl-2 text-[0.625rem] text-muted-foreground ">
+                    {locationLabel(trailTo(folders, folder.parentId))}
+                  </span> */}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+
+          {documents.length > 0 && (
+            <CommandGroup heading="Files">
+              {documents.map((doc) => (
+                <CommandItem
+                  key={doc.id}
+                  value={`${doc.name} ${doc.id}`}
+                  // A document that is still uploading has nothing to open yet,
+                  // exactly as in the row menu.
+                  disabled={doc.status !== "READY"}
+                  onSelect={() => handleSelectDocument(doc)}
+                >
+                  <FileText className="text-muted-foreground" />
+                  <span className="truncate">{doc.name}</span>
+                  {/* <div className="ml-auto flex shrink-0 items-center gap-2 pl-2">
+                    <span className="truncate text-[0.625rem] text-muted-foreground">
+                      {locationLabel(trailTo(folders, doc.folderId))}
+                    </span>
+                    <DriveStatusBadge status={doc.status} />
+                  </div> */}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+        </CommandList>
+      </Command>
+
+      <div className="flex items-center justify-between gap-2 border-t px-3 py-2 text-xs text-muted-foreground">
+        {kbdItems.map(({ icon: Icon, label }) => (
+          <div className="flex items-center gap-2" key={label}>
+            {/* A string key is printed as-is ("esc"); anything else is a component. */}
+            <Kbd>{typeof Icon === "string" ? Icon : <Icon />}</Kbd>
+            <span>{label}</span>
+          </div>
+        ))}
+      </div>
+    </CommandDialog>
+  );
+}

@@ -38,11 +38,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useModalStore } from "@/lib/stores/modal-store";
+import CreateDropdown from "./create-dropdown";
 
 /** Matches `SheetContent`'s `duration-200` exit transition. */
 const SHEET_EXIT_MS = 200;
 
-interface MenuItemsProps {
+export interface MenuItemsProps {
   icon: LucideIcon;
   label: string;
   href?: string;
@@ -138,7 +139,7 @@ const MainSidebar = () => {
           </span>
           <SidebarTrigger className="ml-auto lg:hidden" />
         </div>
-        <DropdownMenu>
+        {/* <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -163,7 +164,12 @@ const MainSidebar = () => {
               )}
             </DropdownMenuGroup>
           </DropdownMenuContent>
-        </DropdownMenu>
+        </DropdownMenu> */}
+        <CreateDropdown
+          buttonLabel="New"
+          buttonIcon={<PlusIcon />}
+          buttonIconPosition="start"
+        />
       </SidebarHeader>
       {/* <div className="border-b border-dashed border-border" /> */}
       <SidebarContent>

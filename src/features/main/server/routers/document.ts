@@ -1,3 +1,4 @@
+import { keepExtension } from "@/lib/document-file-types";
 import { prisma } from "@/lib/prisma";
 import { deleteUploadedFiles } from "@/lib/uploadthing-server";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
@@ -29,6 +30,37 @@ export const DocumentRouter = createTRPCRouter({
       }
 
       return doc;
+    }),
+
+  /**
+   * Renames a document. The stored file is untouched — `name` is the drive's
+   * label for it, and the bytes are addressed by id.
+   *
+   * The extension is the exception: it is the only record of what the file
+   * actually is, so `keepExtension` puts it back rather than letting a rename
+   * turn a PDF into something nothing can preview. Enforced here rather than in
+   * the dialog because the name the database holds is the one everything else
+   * reads.
+   */
+  rename: protectedProcedure
+    .input(z.object({ id: z.string(), name: z.string().min(1).max(255) }))
+    .mutation(async ({ ctx, input }) => {
+      const doc = await prisma.document.findFirst({
+        where: { id: input.id, userId: ctx.userId },
+        select: { id: true, name: true },
+      });
+      if (!doc) throw new TRPCError({ code: "NOT_FOUND" });
+
+      // Selected rather than returned whole, as in `move`: `pdfUrl` never
+      // travels to the client. The name comes back because it may not be the
+      // one that was asked for.
+      return prisma.document.update({
+        where: { id: input.id },
+        // Not clamped back to the input's 255: the column is `text`, and
+        // trimming here would cut the extension straight back off again.
+        data: { name: keepExtension(doc.name, input.name) },
+        select: { id: true, name: true },
+      });
     }),
 
   remove: protectedProcedure
