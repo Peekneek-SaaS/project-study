@@ -4,6 +4,7 @@ import { useCallback } from "react";
 
 import type { DriveDocument } from "@/features/main/types";
 import { isPdf } from "@/lib/document-file-types";
+import { documentFilePath } from "@/lib/document-links";
 import { useModalStore } from "@/lib/stores/modal-store";
 
 /**
@@ -24,12 +25,12 @@ export function useOpenDocument() {
         openModal("preview-document", {
           id: doc.id,
           name: doc.name,
-          url: doc.pdfUrl,
+          url: documentFilePath(doc.id),
         });
         return;
       }
 
-      window.open(doc.pdfUrl, "_blank", "noopener,noreferrer");
+      window.open(documentFilePath(doc.id), "_blank", "noopener,noreferrer");
     },
     [openModal],
   );

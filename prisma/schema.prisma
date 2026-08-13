@@ -17,6 +17,8 @@ model Folder {
   parent Folder?  @relation("FolderTree", fields: [parentId], references: [id], onDelete: Cascade)
   children  Folder[] @relation("FolderTree")
   documents Document[]
+  isLocked Boolean @default(true)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -38,6 +40,8 @@ model Document {
   name      String
   pdfUrl    String
   status    DocumentStatus @default(UPLOADING)
+  isLocked Boolean @default(true)
+  
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
 

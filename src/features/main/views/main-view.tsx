@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 
-import { DriveErrorBoundary } from "@/features/main/components/drive-error-boundary";
+import { QueryErrorBoundary } from "@/components/query-error-boundary";
 import { DriveTableSkeleton } from "@/features/main/components/drive-table-skeleton";
 import { MainActions } from "@/features/main/components/main-actions";
 import { MainContent } from "@/features/main/components/main-content";
@@ -22,11 +22,11 @@ export function MainView() {
         Kept tight around the table: opening a folder changes the query key and
         re-suspends, and a boundary any higher would blank the toolbar too.
       */}
-      <DriveErrorBoundary>
+      <QueryErrorBoundary message="Something went wrong loading your files.">
         <Suspense fallback={<DriveTableSkeleton />}>
           <MainContent />
         </Suspense>
-      </DriveErrorBoundary>
+      </QueryErrorBoundary>
     </div>
   );
 }

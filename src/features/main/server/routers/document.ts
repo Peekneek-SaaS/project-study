@@ -5,6 +5,32 @@ import { TRPCError } from "@trpc/server";
 import z from "zod";
 
 export const DocumentRouter = createTRPCRouter({
+  /**
+   * A single document, for its preview page.
+   *
+   * Note what is *not* selected: `pdfUrl` stays on the server, and the client
+   * reaches the bytes through `/api/documents/[id]/file` instead.
+   */
+  getPreview: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const doc = await prisma.document.findFirst({
+        where: { id: input.id, userId: ctx.userId },
+        select: { id: true, name: true, status: true },
+      });
+
+      // Missing and not-yours give the same answer on purpose: which documents
+      // exist is not something a stranger gets to learn.
+      if (!doc) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "This document does not exist, or is not shared with you.",
+        });
+      }
+
+      return doc;
+    }),
+
   remove: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
@@ -43,9 +69,12 @@ export const DocumentRouter = createTRPCRouter({
           });
       }
 
+      // Selected rather than returned whole: the default row carries `pdfUrl`,
+      // and this response goes to the client.
       return prisma.document.update({
         where: { id: input.id },
         data: { folderId: input.newFolderId },
+        select: { id: true, folderId: true },
       });
     }),
 });

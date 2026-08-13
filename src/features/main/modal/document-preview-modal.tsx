@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import dynamic from "next/dynamic";
 import { ExternalLink, FileText, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -11,23 +10,9 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Spinner } from "@/components/ui/spinner";
+import { LazyPdfViewer } from "@/features/main/components/lazy-pdf-viewer";
+import { documentPreviewPath } from "@/lib/document-links";
 import { selectPreviewTarget, useModalStore } from "@/lib/stores/modal-store";
-
-// pdf.js reaches for browser APIs the moment it loads, and it is a large
-// dependency nobody who never opens a PDF should pay for.
-const PdfViewer = dynamic(
-  () =>
-    import("@/features/main/components/pdf-viewer").then((mod) => mod.PdfViewer),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex h-full items-center justify-center">
-        <Spinner />
-      </div>
-    ),
-  },
-);
 
 /**
  * Full-bleed PDF preview.
@@ -60,10 +45,10 @@ export function DocumentPreviewModal() {
           </DialogTitle>
           <Button variant="ghost" size="icon-sm" asChild>
             <a
-              href={item.url}
+              href={documentPreviewPath(item.id)}
               target="_blank"
               rel="noreferrer"
-              aria-label={`Open ${item.name} in a new tab`}
+              aria-label={`Open ${item.name} on its own page`}
             >
               <ExternalLink />
             </a>
@@ -83,7 +68,7 @@ export function DocumentPreviewModal() {
         </DialogDescription>
 
         <div className="min-h-0 flex-1 bg-muted/40">
-          <PdfViewer url={item.url} />
+          <LazyPdfViewer url={item.url} />
         </div>
       </DialogContent>
     </Dialog>

@@ -167,6 +167,18 @@ export const FolderRouter = createTRPCRouter({
         prisma.document.findMany({
           where: { userId: ctx.userId, folderId: input.folderId },
           orderBy: { name: "asc" },
+          // `pdfUrl` is deliberately absent: it is a public UploadThing URL,
+          // and it never leaves the server. The client addresses a document
+          // through our own routes instead — see `lib/document-links.ts`.
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            folderId: true,
+            isLocked: true,
+            createdAt: true,
+            updatedAt: true,
+          },
         }),
       ]);
       return { folders, documents };

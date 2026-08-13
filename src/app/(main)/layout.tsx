@@ -6,7 +6,7 @@ import MainSidebar from "@/features/main/components/main-sidebar";
 import MainHeader from "@/features/main/components/main-header";
 import { HydrateClient, prefetch, trpc } from "@/trpc/server";
 import { Suspense } from "react";
-import { DriveErrorBoundary } from "@/features/main/components/drive-error-boundary";
+import { QueryErrorBoundary } from "@/components/query-error-boundary";
 import { Spinner } from "@/components/ui/spinner";
 import { cookies } from "next/headers";
 
@@ -38,7 +38,7 @@ const MainLayout: React.FC<MainLayoutProps> = async ({ children }) => {
               Route-level safety net. The drive draws its own tighter boundaries
               around the table, so this one only catches whatever escapes them.
             */}
-            <DriveErrorBoundary>
+            <QueryErrorBoundary message="Something went wrong loading your files.">
               <Suspense
                 fallback={
                   <div className="flex flex-1 items-center justify-center py-16">
@@ -48,7 +48,7 @@ const MainLayout: React.FC<MainLayoutProps> = async ({ children }) => {
               >
                 {children}
               </Suspense>
-            </DriveErrorBoundary>
+            </QueryErrorBoundary>
           </HydrateClient>
         </main>
       </SidebarInset>

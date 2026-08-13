@@ -4,6 +4,8 @@ import {
   FileSearch,
   FolderOpen,
   Link2,
+  Lock,
+  LockOpen,
   type LucideIcon,
   MoreVertical,
   Trash2,
@@ -20,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useOpenDocument } from "@/features/main/hooks/use-open-document";
 import type { DriveDocument, DriveFolder } from "@/features/main/types";
+import { documentPreviewPath } from "@/lib/document-links";
 import { useDriveStore } from "@/lib/stores/drive-store";
 import { useModalStore } from "@/lib/stores/modal-store";
 
@@ -31,7 +34,8 @@ interface MenuItemConfig {
    * `DropdownMenuItem`'s own variants — anything else is not a style the menu
    * knows how to render.
    */
-  variant?: "default" | "destructive";
+  variant?: "default" | "destructive" | "success";
+  className?: string;
   disabled?: boolean;
 }
 
@@ -39,14 +43,42 @@ type DriveItemActionsProps =
   | { kind: "document"; item: DriveDocument }
   | { kind: "folder"; item: DriveFolder };
 
-const copyLink = async (url: string) => {
+/**
+ * Copies the document's preview page, not its storage URL — the page is the
+ * shareable thing, and it checks who is asking. Nobody can open it but the
+ * owner yet, so this is a link you can hold onto rather than one you can hand out.
+ */
+const copyPreviewLink = async (documentId: string) => {
   try {
-    await navigator.clipboard.writeText(url);
+    await navigator.clipboard.writeText(
+      new URL(documentPreviewPath(documentId), window.location.origin).href,
+    );
     toast.success("Link copied");
   } catch {
     toast.error("Could not copy the link");
   }
 };
+
+/**
+ * A read-out of `isLocked`, not a switch: selecting it does nothing until
+ * unlocking is actually wired up. Both states are rendered so the row reads the
+ * same either way — locked in emerald, unlocked muted.
+ */
+function lockItem(isLocked: boolean): MenuItemConfig {
+  return isLocked
+    ? {
+        icon: Lock,
+        label: "Locked",
+        onSelect: () => {},
+        variant: "success",
+      }
+    : {
+        icon: LockOpen,
+        label: "Unlocked",
+        onSelect: () => {},
+        className: "text-muted-foreground *:[svg]:text-muted-foreground",
+      };
+}
 
 function documentItems(
   doc: DriveDocument,
@@ -61,10 +93,11 @@ function documentItems(
       // Nothing to open until the upload has landed.
       disabled: doc.status !== "READY",
     },
+    lockItem(doc.isLocked),
     {
       icon: Link2,
       label: "Copy link",
-      onSelect: () => void copyLink(doc.pdfUrl),
+      onSelect: () => void copyPreviewLink(doc.id),
       disabled: doc.status !== "READY",
     },
     {
@@ -87,6 +120,7 @@ function folderItems(
       label: "Open",
       onSelect: () => openFolder({ id: folder.id, name: folder.name }),
     },
+    lockItem(folder.isLocked),
     {
       icon: Trash2,
       label: "Delete",
@@ -134,17 +168,20 @@ export function DriveItemActions(props: DriveItemActionsProps) {
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-40" align="end">
         <DropdownMenuGroup>
-          {menuItems.map(({ label, onSelect, variant, disabled, icon: Icon }) => (
-            <DropdownMenuItem
-              key={label}
-              variant={variant}
-              disabled={disabled}
-              onSelect={onSelect}
-            >
-              <Icon />
-              <span>{label}</span>
-            </DropdownMenuItem>
-          ))}
+          {menuItems.map(
+            ({ label, onSelect, variant, className, disabled, icon: Icon }) => (
+              <DropdownMenuItem
+                key={label}
+                variant={variant}
+                className={className}
+                disabled={disabled}
+                onSelect={onSelect}
+              >
+                <Icon />
+                <span>{label}</span>
+              </DropdownMenuItem>
+            ),
+          )}
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
