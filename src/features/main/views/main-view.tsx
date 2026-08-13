@@ -9,6 +9,7 @@ import { readDriveViewCookie } from "@/features/main/lib/read-drive-view-cookie"
 import CreateDropdown from "../components/create-dropdown";
 import { ChevronDown } from "lucide-react";
 import MainViewType from "../components/main-view-type";
+import MainBreadCrumbs from "../components/main-breadcrumbs";
 
 export async function MainView() {
   // The remembered layout, so the first paint is already the right one. The
@@ -16,13 +17,13 @@ export async function MainView() {
   const serverView = await readDriveViewCookie();
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4">
+    <div className="flex flex-1 flex-col gap-6 p-4 relative">
       <div className="flex items-center justify-between gap-3">
         <CreateDropdown
           buttonLabel="My Files"
           buttonIconPosition="end"
           buttonIcon={<ChevronDown />}
-          buttonVariant="outline"
+          buttonVariant="ghost"
           className="text-lg"
         />
         <MainViewType serverView={serverView} />
@@ -33,6 +34,9 @@ export async function MainView() {
           <MainContent serverView={serverView} />
         </Suspense>
       </QueryErrorBoundary>
+      <div className="absolute bottom-0 inset-x-0 bg-muted p-3 m-2 rounded-lg shadow-sm ring-1 ring-sidebar-border">
+        <MainBreadCrumbs />
+      </div>
     </div>
   );
 }
