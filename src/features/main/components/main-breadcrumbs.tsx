@@ -12,9 +12,8 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Separator } from "@/components/ui/separator";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useDriveStore } from "@/lib/stores/drive-store";
+import { Button } from "@/components/ui/button";
 
 /** The route whose breadcrumbs continue into the drive's folder trail. */
 const DRIVE_ROUTE = "/main";
@@ -73,7 +72,7 @@ const MainBreadCrumbs = () => {
   }, [goToCrumb, pathName, trail]);
 
   return (
-    <div className="flex items-center gap-2 ">
+    <div className="flex items-center gap-2 absolute bottom-0 inset-x-0 bg-muted p-3 m-2 rounded-lg shadow-sm ring-1 ring-sidebar-border dark:bg-transparent">
       <Breadcrumb>
         <BreadcrumbList>
           {crumbs.map((crumb, index) => {
@@ -99,13 +98,12 @@ const MainBreadCrumbs = () => {
                           {crumb.label}
                         </Link>
                       ) : (
-                        <button
-                          type="button"
+                        <Button
                           onClick={crumb.onSelect}
                           className="max-w-48 cursor-pointer truncate"
                         >
                           {crumb.label}
-                        </button>
+                        </Button>
                       )}
                     </BreadcrumbLink>
                   )}

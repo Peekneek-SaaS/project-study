@@ -17,7 +17,7 @@ export async function MainView() {
   const serverView = await readDriveViewCookie();
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 relative">
+    <div className="flex flex-1 flex-col gap-2 p-4 relative">
       <div className="flex items-center justify-between gap-3">
         <CreateDropdown
           buttonLabel="My Files"
@@ -34,9 +34,8 @@ export async function MainView() {
           <MainContent serverView={serverView} />
         </Suspense>
       </QueryErrorBoundary>
-      <div className="absolute bottom-0 inset-x-0 bg-muted p-3 m-2 rounded-lg shadow-sm ring-1 ring-sidebar-border">
-        <MainBreadCrumbs />
-      </div>
+
+      <MainBreadCrumbs />
     </div>
   );
 }

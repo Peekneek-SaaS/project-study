@@ -124,7 +124,7 @@ const MainSidebar = () => {
   ];
 
   return (
-    <Sidebar collapsible="icon" variant="floating">
+    <Sidebar collapsible="icon" variant="inset">
       <SidebarHeader className="flex flex-col gap-4 pt-4">
         <div className="flex items-center gap-2 pl-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:pl-0">
           {/* <Image
@@ -137,7 +137,7 @@ const MainSidebar = () => {
           <span className="group-data-[collapsible=icon]:hidden font-semibold text-lg tracking-tighter text-foreground">
             Study
           </span>
-          <SidebarTrigger className="ml-auto lg:hidden" />
+          <SidebarTrigger className="ml-auto md:hidden" />
         </div>
         {/* <DropdownMenu>
           <DropdownMenuTrigger asChild>

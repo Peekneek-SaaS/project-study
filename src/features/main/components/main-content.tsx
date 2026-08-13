@@ -29,6 +29,15 @@ import {
 } from "@/lib/stores/drive-view-store";
 import { useModalStore } from "@/lib/stores/modal-store";
 import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export function MainContent({ serverView }: { serverView: DriveViewType }) {
   const {
@@ -91,45 +100,81 @@ export function MainContent({ serverView }: { serverView: DriveViewType }) {
         }}
         className={cn(isMoving && "pointer-events-none opacity-60")}
       >
-        {selectedCount > 0 && (
-          <div className="mb-3 flex items-center justify-between gap-3 rounded-md border bg-muted/40 px-3 py-2">
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={clearSelection}>
-                <X />
-              </Button>
-              <span className="text-sm">
-                {selectedCount} {selectedCount === 1 ? "item" : "items"}{" "}
-                selected
-              </span>
-              {/* The old header tick was the only way to reach everything at
-                  once; with it gone, this and ⌘A are. */}
-              {!allSelected && (
-                <Button variant="ghost" size="sm" onClick={selectAll}>
-                  Select all
+        <div className="flex items-center gap-2 w-full">
+          {selectedCount > 0 ? (
+            <div className="flex items-center justify-between gap-3 px-3 bg-muted/40 py-2">
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={clearSelection}>
+                  <X />
                 </Button>
-              )}
+                <span className="text-sm">
+                  {selectedCount} {selectedCount === 1 ? "item" : "items"}{" "}
+                  selected
+                </span>
+                {/* The old header tick was the only way to reach everything at
+                  once; with it gone, this and ⌘A are. */}
+                {!allSelected && (
+                  <Button variant="ghost" size="sm" onClick={selectAll}>
+                    Select all
+                  </Button>
+                )}
+              </div>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() =>
+                  openModal("delete-items", {
+                    folderIds: selectedFolders,
+                    documentIds: selectedDocuments,
+                  })
+                }
+              >
+                <Trash2 />
+                Delete
+              </Button>
             </div>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() =>
-                openModal("delete-items", {
-                  folderIds: selectedFolders,
-                  documentIds: selectedDocuments,
-                })
-              }
-            >
-              <Trash2 />
-              Delete
-            </Button>
-          </div>
-        )}
+          ) : (
+            <div className="flex items-center gap-2 py-2 ">
+              <div>
+                <Select>
+                  <SelectTrigger className="">
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="light">PDF</SelectItem>
+                      <SelectItem value="dark">PPT</SelectItem>
+                      <SelectItem value="system">DOCX</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Select>
+                  <SelectTrigger className="">
+                    <SelectValue placeholder="Modified" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="light">Today</SelectItem>
+                      <SelectItem value="dark">Yesterday</SelectItem>
+                      <SelectItem value="system">Last 7 days</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/*
           Two shapes for one listing. Everything either view needs — selection,
           the drag wiring, the keyboard — sits above this branch, so the switch
           costs nothing but a re-render.
         */}
+        {/* TODO: Faded Overlay */}
+        {/* <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-background to-transparent" /> */}
+
         {view === "grid" ? (
           <DriveGrid
             folders={folders}
@@ -160,11 +205,7 @@ export function MainContent({ serverView }: { serverView: DriveViewType }) {
                 />
               ))}
               {documents.map((doc) => (
-                <DriveDocumentRow
-                  key={doc.id}
-                  doc={doc}
-                  onSelect={selectRow}
-                />
+                <DriveDocumentRow key={doc.id} doc={doc} onSelect={selectRow} />
               ))}
             </TableBody>
           </Table>
