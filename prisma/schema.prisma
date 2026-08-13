@@ -1,0 +1,45 @@
+
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Folder {
+  id String @id @default(cuid())
+  userId String
+  name String
+  parentId  String?
+  parent Folder?  @relation("FolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Folder[] @relation("FolderTree")
+  documents Document[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, parentId])
+}
+
+enum DocumentStatus {
+  UPLOADING
+  PROCESSING
+  READY
+  FAILED
+}
+
+model Document {
+  id String @id @default(cuid())
+  userId    String
+  folderId  String?
+  folder    Folder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  name      String
+  pdfUrl    String
+  status    DocumentStatus @default(UPLOADING)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([userId, folderId])
+}
