@@ -4,6 +4,7 @@ import { Geist, Geist_Mono, Inter } from "next/font/google";
 import { shadcn } from "@clerk/ui/themes";
 
 import "./globals.css";
+import { ThemeProvider } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
 import { ModalProvider } from "@/components/providers/modal-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         "font-sans",
         inter.variable,
       )}
+      suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
         <ClerkProvider
@@ -49,12 +51,19 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             },
           }}
         >
-          <TRPCReactProvider>
-            <TooltipProvider>{children}</TooltipProvider>
-            {/* Above the toaster: uploads started from a modal report into it. */}
-            <ModalProvider />
-            <Toaster position="bottom-right" />
-          </TRPCReactProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <TRPCReactProvider>
+              <TooltipProvider>{children}</TooltipProvider>
+              {/* Above the toaster: uploads started from a modal report into it. */}
+              <ModalProvider />
+              <Toaster position="bottom-right" />
+            </TRPCReactProvider>
+          </ThemeProvider>
         </ClerkProvider>
       </body>
     </html>

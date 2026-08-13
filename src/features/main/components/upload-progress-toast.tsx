@@ -25,11 +25,7 @@ export function UploadProgressToast({
         <span className="min-w-0 flex-1 truncate font-medium">{label}</span>
         <span className="tabular-nums text-muted-foreground">{percent}%</span>
       </div>
-      <Progress
-        value={percent}
-        aria-label={`Uploading ${label}`}
-        className="bg-red-400"
-      />
+      <Progress value={percent} aria-label={`Uploading ${label}`} />
       <p className="text-muted-foreground">Uploading…</p>
     </div>
   );

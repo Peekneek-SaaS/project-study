@@ -1,7 +1,7 @@
 "use client";
 
 import { useDroppable } from "@dnd-kit/react";
-import { CornerLeftUp } from "lucide-react";
+import { CornerLeftUp, CornerUpLeft } from "lucide-react";
 
 import { TableCell, TableRow } from "@/components/ui/table";
 import {
@@ -42,7 +42,7 @@ export function DriveParentRow({
     >
       <TableCell colSpan={4}>
         <div className="flex items-center gap-2">
-          <CornerLeftUp className="size-4 shrink-0" />
+          <CornerUpLeft className="size-4 shrink-0" />
           <span>..</span>
         </div>
       </TableCell>

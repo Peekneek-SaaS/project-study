@@ -2,6 +2,7 @@
 
 import { CreateFolderModal } from "@/features/main/modal/create-folder-modal";
 import { DeleteModal } from "@/features/main/modal/delete-modal";
+import { DocumentPreviewModal } from "@/features/main/modal/document-preview-modal";
 import { UploadModal } from "@/features/main/modal/upload-modal";
 
 /**
@@ -17,6 +18,7 @@ export function ModalProvider() {
       <UploadModal />
       <CreateFolderModal />
       <DeleteModal />
+      <DocumentPreviewModal />
     </>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  ExternalLink,
+  FileSearch,
   FolderOpen,
   Link2,
   type LucideIcon,
@@ -18,6 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useOpenDocument } from "@/features/main/hooks/use-open-document";
 import type { DriveDocument, DriveFolder } from "@/features/main/types";
 import { useDriveStore } from "@/lib/stores/drive-store";
 import { useModalStore } from "@/lib/stores/modal-store";
@@ -25,9 +26,7 @@ import { useModalStore } from "@/lib/stores/modal-store";
 interface MenuItemConfig {
   icon: LucideIcon;
   label: string;
-  /** External destination, opened in a new tab. Mutually exclusive with `onSelect`. */
-  href?: string;
-  onSelect?: () => void;
+  onSelect: () => void;
   /**
    * `DropdownMenuItem`'s own variants — anything else is not a style the menu
    * knows how to render.
@@ -52,12 +51,13 @@ const copyLink = async (url: string) => {
 function documentItems(
   doc: DriveDocument,
   confirmDelete: () => void,
+  openDocument: (doc: DriveDocument) => void,
 ): MenuItemConfig[] {
   return [
     {
-      icon: ExternalLink,
+      icon: FileSearch,
       label: "Open",
-      href: doc.pdfUrl,
+      onSelect: () => openDocument(doc),
       // Nothing to open until the upload has landed.
       disabled: doc.status !== "READY",
     },
@@ -105,6 +105,7 @@ function folderItems(
 export function DriveItemActions(props: DriveItemActionsProps) {
   const openModal = useModalStore((state) => state.open);
   const openFolder = useDriveStore((state) => state.openFolder);
+  const openDocument = useOpenDocument();
 
   // The confirmation lives in `ModalProvider`, so it outlives this row being
   // re-rendered away by the refetch that follows the delete.
@@ -117,7 +118,7 @@ export function DriveItemActions(props: DriveItemActionsProps) {
 
   const menuItems =
     props.kind === "document"
-      ? documentItems(props.item, confirmDelete)
+      ? documentItems(props.item, confirmDelete, openDocument)
       : folderItems(props.item, confirmDelete, openFolder);
 
   return (
@@ -133,29 +134,17 @@ export function DriveItemActions(props: DriveItemActionsProps) {
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-40" align="end">
         <DropdownMenuGroup>
-          {menuItems.map(
-            ({ label, href, onSelect, variant, disabled, icon: Icon }) => (
-              <DropdownMenuItem
-                key={label}
-                variant={variant}
-                disabled={disabled}
-                onSelect={onSelect}
-                asChild={href !== undefined}
-              >
-                {href !== undefined ? (
-                  <a href={href} target="_blank" rel="noreferrer">
-                    <Icon />
-                    <span>{label}</span>
-                  </a>
-                ) : (
-                  <>
-                    <Icon />
-                    <span>{label}</span>
-                  </>
-                )}
-              </DropdownMenuItem>
-            ),
-          )}
+          {menuItems.map(({ label, onSelect, variant, disabled, icon: Icon }) => (
+            <DropdownMenuItem
+              key={label}
+              variant={variant}
+              disabled={disabled}
+              onSelect={onSelect}
+            >
+              <Icon />
+              <span>{label}</span>
+            </DropdownMenuItem>
+          ))}
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>

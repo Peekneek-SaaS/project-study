@@ -9,6 +9,13 @@ export interface DeleteTarget {
   name: string;
 }
 
+/** The document the preview overlay is showing. */
+export interface PreviewTarget {
+  id: string;
+  name: string;
+  url: string;
+}
+
 /**
  * Every modal the app can open, with whatever it needs to be opened *with*.
  * `undefined` means the modal reads everything it needs from other stores.
@@ -19,6 +26,7 @@ interface ModalPayloads {
   "upload-file": undefined;
   "create-folder": undefined;
   "delete-item": DeleteTarget;
+  "preview-document": PreviewTarget;
 }
 
 export type ModalType = keyof ModalPayloads;
@@ -59,3 +67,7 @@ export const selectIsOpen = (type: ModalType) => (state: ModalStore) =>
  */
 export const selectDeleteTarget = (state: ModalStore) =>
   state.type === "delete-item" ? (state.payload as DeleteTarget) : null;
+
+/** The document to preview, or `null` when the overlay is not the modal on screen. */
+export const selectPreviewTarget = (state: ModalStore) =>
+  state.type === "preview-document" ? (state.payload as PreviewTarget) : null;

@@ -51,6 +51,11 @@ export function isAcceptedDocument(file: File) {
   return DOCUMENT_EXTENSIONS.some((extension) => name.endsWith(extension));
 }
 
+/** Only PDFs have an in-app viewer; everything else is handed to the browser. */
+export function isPdf(fileName: string) {
+  return fileName.toLowerCase().endsWith(".pdf");
+}
+
 export function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   const units = ["KB", "MB", "GB"];
