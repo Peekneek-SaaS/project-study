@@ -5,6 +5,7 @@ import { NotebookPen } from "lucide-react";
 
 import { NoteCard } from "@/features/sticky-notes/components/note-card";
 import { NoteCreateButton } from "@/features/sticky-notes/components/note-create-button";
+import { useNoteTarget } from "@/features/sticky-notes/hooks/use-note-target";
 import { groupNotesByDay } from "@/features/sticky-notes/lib/group-notes-by-day";
 import { useTRPC } from "@/trpc/client";
 
@@ -20,6 +21,7 @@ export function NotesGrid() {
   const { data: notes } = useSuspenseQuery(trpc.stickyNote.list.queryOptions());
 
   const groups = groupNotesByDay(notes);
+  const flashingId = useNoteTarget();
 
   if (groups.length === 0) {
     return (
@@ -49,9 +51,13 @@ export function NotesGrid() {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-2 gap-4  lg:grid-cols-3">
             {group.notes.map((note) => (
-              <NoteCard key={note.id} note={note} />
+              <NoteCard
+                key={note.id}
+                note={note}
+                isFlashing={note.id === flashingId}
+              />
             ))}
           </div>
         </section>

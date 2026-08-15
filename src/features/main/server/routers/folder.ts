@@ -1,3 +1,9 @@
+import {
+  DRIVE_MODIFIED_VALUES,
+  DRIVE_TYPE_VALUES,
+  modifiedRange,
+  typeExtensions,
+} from "@/features/main/lib/drive-filters";
 import { prisma } from "@/lib/prisma";
 import { deleteUploadedFiles } from "@/lib/uploadthing-server";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
@@ -287,32 +293,71 @@ export const FolderRouter = createTRPCRouter({
       };
     }),
 
+  /**
+   * One folder's contents, narrowed by the toolbar's filters.
+   *
+   * The filters are applied here rather than over the returned rows because a
+   * listing is only small until it isn't: filtering in the database keeps the
+   * response proportional to what is actually shown, and both clauses ride the
+   * `[userId, parentId]` / `[userId, folderId]` indexes that already scope the
+   * listing to this folder.
+   */
   getContents: protectedProcedure
-    .input(z.object({ folderId: z.string().nullable() }))
+    .input(
+      z.object({
+        folderId: z.string().nullable(),
+        type: z.enum(DRIVE_TYPE_VALUES).nullable().default(null),
+        modified: z.enum(DRIVE_MODIFIED_VALUES).nullable().default(null),
+      }),
+    )
     .query(async ({ ctx, input }) => {
-      const [folders, documents] = await Promise.all([
-        prisma.folder.findMany({
-          where: { userId: ctx.userId, parentId: input.folderId },
-          orderBy: { name: "asc" },
-        }),
-        prisma.document.findMany({
-          where: { userId: ctx.userId, folderId: input.folderId },
-          orderBy: { name: "asc" },
-          // `pdfUrl` is deliberately absent: it is a public UploadThing URL,
-          // and it never leaves the server. The client addresses a document
-          // through our own routes instead — see `lib/document-links.ts`.
-          select: {
-            id: true,
-            name: true,
-            status: true,
-            folderId: true,
-            isLocked: true,
-            createdAt: true,
-            updatedAt: true,
-          },
-        }),
-      ]);
-      return { folders, documents };
+      const updatedAt = modifiedRange(input.modified);
+      const extensions = input.type ? typeExtensions(input.type) : null;
+
+      const documentsQuery = prisma.document.findMany({
+        where: {
+          userId: ctx.userId,
+          folderId: input.folderId,
+          ...(updatedAt && { updatedAt }),
+          // `endsWith` per extension rather than one regex, so Prisma keeps it
+          // a plain `LIKE` — and case-insensitive because nothing normalises a
+          // name on the way in, so `.PDF` is as likely as `.pdf`.
+          ...(extensions && {
+            OR: extensions.map((extension) => ({
+              name: { endsWith: extension, mode: "insensitive" as const },
+            })),
+          }),
+        },
+        orderBy: { name: "asc" },
+        // `pdfUrl` is deliberately absent: it is a public UploadThing URL,
+        // and it never leaves the server. The client addresses a document
+        // through our own routes instead — see `lib/document-links.ts`.
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          folderId: true,
+          isLocked: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      // Filtering by type asks a question folders have no answer to, so they
+      // leave the listing rather than sitting there unfiltered above the files.
+      // Not queried at all in that case — the empty listing is known here.
+      const folders = extensions
+        ? []
+        : await prisma.folder.findMany({
+            where: {
+              userId: ctx.userId,
+              parentId: input.folderId,
+              ...(updatedAt && { updatedAt }),
+            },
+            orderBy: { name: "asc" },
+          });
+
+      return { folders, documents: await documentsQuery };
     }),
 
   getBreadcrumb: protectedProcedure

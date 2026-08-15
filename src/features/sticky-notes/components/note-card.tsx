@@ -1,21 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { MoreVertical, Palette, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { NoteAppearanceControls } from "@/features/sticky-notes/components/note-appearance-controls";
+import { NoteEditor } from "@/features/sticky-notes/components/note-editor";
+import { NoteModal } from "@/features/sticky-notes/components/note-modal";
+import { NoteToolbar } from "@/features/sticky-notes/components/note-toolbar";
 import { useNoteMutations } from "@/features/sticky-notes/hooks/use-note-mutations";
 import {
   noteAppearanceStyle,
@@ -25,23 +14,47 @@ import type { StickyNote } from "@/features/sticky-notes/types";
 import { cn } from "@/lib/utils";
 
 /**
- * One sticky note.
+ * How long a click waits to find out whether it was half of a double one.
  *
- * The size is fixed and stays fixed — that is the point of a wall of them, and
- * it is why the body scrolls rather than the card growing. Text is held in
- * local state rather than driven by the row: the note keeps typing responsive
- * while the save is still on its debounce, and a refetch of the list (someone
- * added a note elsewhere on the page) cannot reach in and replace a sentence
- * half-written.
+ * The two gestures mean different things here, and the browser reports the
+ * first click of a pair before it knows a second is coming — so opening the
+ * modal on the first one would open it every time the user meant to edit in
+ * place. Roughly the platform's own double-click threshold.
  */
-export function NoteCard({ note }: { note: StickyNote }) {
+const DOUBLE_CLICK_MS = 250;
+
+/**
+ * One sticky note on the wall.
+ *
+ * Read-only until asked otherwise, which is what lets a click mean something:
+ * once to open the note properly, twice to write on it where it sits. Fixed
+ * size either way — that is the point of a wall of them, and it is why the body
+ * scrolls rather than the card growing.
+ *
+ * Text is held here rather than driven by the row, and the modal is handed the
+ * same state: one note cannot disagree with itself while both views are open,
+ * and a refetch of the list cannot reach in and replace a half-written
+ * sentence.
+ */
+export function NoteCard({
+  note,
+  isFlashing = false,
+}: {
+  note: StickyNote;
+  /** Briefly ringed after being arrived at from search — see `NotesGrid`. */
+  isFlashing?: boolean;
+}) {
   const { saveContent, patchAppearance, removeNote, isRemoving } =
     useNoteMutations(note.id);
 
   // Seeded once. The row's `content` is not read again for the life of this
   // card, deliberately — see above.
   const [content, setContent] = useState(note.content);
-  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+
+  const articleRef = useRef<HTMLElement>(null);
+  const clickTimer = useRef<number | null>(null);
 
   const appearance = toNoteAppearance(note);
 
@@ -50,91 +63,99 @@ export function NoteCard({ note }: { note: StickyNote }) {
     saveContent(value);
   };
 
+  const cancelPendingClick = () => {
+    if (clickTimer.current === null) return;
+    window.clearTimeout(clickTimer.current);
+    clickTimer.current = null;
+  };
+
+  useEffect(() => cancelPendingClick, []);
+
+  const handleClick = () => {
+    // Already writing here: a click is a click into the text, not a request to
+    // open anything.
+    if (isEditing) return;
+    if (clickTimer.current !== null) return;
+
+    clickTimer.current = window.setTimeout(() => {
+      clickTimer.current = null;
+      setIsOpen(true);
+    }, DOUBLE_CLICK_MS);
+  };
+
+  const handleDoubleClick = (event: React.MouseEvent) => {
+    cancelPendingClick();
+    if (isEditing) return;
+
+    setIsEditing(true);
+
+    // Focused on the next frame, once the fields have lost `readOnly` —
+    // and on the one that was actually double-clicked, so the caret lands where
+    // the user was pointing rather than always in the body.
+    const target = event.target as HTMLElement | null;
+    const field =
+      target?.closest<HTMLElement>("[data-note-field]") ??
+      articleRef.current?.querySelector<HTMLElement>(
+        '[data-note-field="body"]',
+      );
+
+    window.requestAnimationFrame(() => field?.focus());
+  };
+
   return (
-    <article
-      // Every per-note value arrives as a custom property, so the stylesheet
-      // below stays free of anything specific to this note.
-      style={{
-        ...noteAppearanceStyle(appearance),
-        borderColor: "var(--note-edge)",
-      }}
-      className={cn(
-        "flex h-56 flex-col overflow-hidden rounded-lg border shadow-sm transition-opacity",
-        isRemoving && "pointer-events-none opacity-50",
-      )}
-    >
-      <div
-        className="flex items-center justify-between gap-1 px-1.5 py-1"
-        style={{ background: "var(--note-bg)" }}
-      >
-        <span className="sr-only">Note</span>
-        <div className="ml-auto flex items-center">
-          <Popover open={isPickerOpen} onOpenChange={setIsPickerOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Change how this note looks"
-                style={{ color: "var(--note-ink)" }}
-              >
-                <Palette />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-64">
-              {/* The same controls the settings modal will use — this one is
-                  pointed at a note, that one will be pointed at the defaults. */}
-              <NoteAppearanceControls
-                value={appearance}
-                onChange={(patch) => void patchAppearance(patch)}
-              />
-            </PopoverContent>
-          </Popover>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Note actions"
-                style={{ color: "var(--note-ink)" }}
-              >
-                <MoreVertical />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-auto min-w-36">
-              <DropdownMenuItem
-                variant="destructive"
-                onSelect={() => void removeNote()}
-              >
-                <Trash2 />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-
-      <textarea
-        value={content}
-        onChange={(event) => handleChange(event.target.value)}
-        placeholder="Write something…"
-        aria-label="Note text"
-        spellCheck={false}
+    <>
+      <article
+        ref={articleRef}
+        data-note-id={note.id}
+        onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
+        // Editing ends when attention leaves the note — clicking the page, or
+        // tabbing out. `relatedTarget` inside the card is a move between the
+        // title and the body, which is still editing.
+        onBlur={(event) => {
+          if (event.currentTarget.contains(event.relatedTarget)) return;
+          setIsEditing(false);
+        }}
+        // Every per-note value arrives as a custom property, so the stylesheet
+        // stays free of anything specific to this note.
         style={{
-          background: "var(--note-bg)",
-          color: "var(--note-ink)",
-          fontSize: "var(--note-font-size)",
-          lineHeight: "var(--note-line-height)",
+          ...noteAppearanceStyle(appearance),
+          borderColor: "var(--note-edge)",
         }}
         className={cn(
-          // `flex-1` with `min-h-0` is what keeps the card one height: the
-          // textarea takes what is left and scrolls the rest, instead of the
-          // content deciding how tall the note is.
-          "min-h-0 flex-1 resize-none px-3 pb-3 outline-none",
-          "placeholder:opacity-50",
-          appearance.showGrid && "note-ruled",
+          "flex h-56 flex-col overflow-hidden rounded-lg border shadow-sm transition-opacity",
+          isRemoving && "pointer-events-none opacity-50",
+          isFlashing && "note-flash",
         )}
+      >
+        <div
+          className="flex shrink-0 items-center justify-end gap-1 px-1.5 py-1"
+          style={{ background: "var(--note-bg)" }}
+        >
+          <NoteToolbar
+            appearance={appearance}
+            onAppearanceChange={(patch) => void patchAppearance(patch)}
+            onDelete={() => void removeNote()}
+          />
+        </div>
+
+        <NoteEditor
+          content={content}
+          onChange={handleChange}
+          appearance={appearance}
+          readOnly={!isEditing}
+        />
+      </article>
+
+      <NoteModal
+        open={isOpen}
+        onOpenChange={setIsOpen}
+        content={content}
+        onChange={handleChange}
+        appearance={appearance}
+        onAppearanceChange={(patch) => void patchAppearance(patch)}
+        onDelete={() => void removeNote()}
       />
-    </article>
+    </>
   );
 }

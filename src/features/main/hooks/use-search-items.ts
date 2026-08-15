@@ -39,6 +39,14 @@ export function searchBoardsOptions(trpc: ReturnType<typeof useTRPC>) {
   };
 }
 
+/** Notes, on the same terms as boards — its own router, its own invalidation. */
+export function searchNotesOptions(trpc: ReturnType<typeof useTRPC>) {
+  return {
+    ...trpc.stickyNote.list.queryOptions(),
+    staleTime: SEARCH_STALE_TIME,
+  };
+}
+
 /**
  * Fills the palette's cache ahead of time. Safe to call as often as the pointer
  * moves — a fetch already in flight is joined, and fresh data is left alone.
@@ -50,6 +58,7 @@ export function usePrefetchSearchItems() {
   return useCallback(() => {
     void queryClient.prefetchQuery(searchItemsOptions(trpc));
     void queryClient.prefetchQuery(searchBoardsOptions(trpc));
+    void queryClient.prefetchQuery(searchNotesOptions(trpc));
   }, [queryClient, trpc]);
 }
 

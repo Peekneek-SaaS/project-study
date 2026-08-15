@@ -79,8 +79,8 @@ export function DriveFolderCard({
       className={cn(
         // The border is transparent until it is needed, so selecting a card
         // outlines it without nudging the grid a pixel.
-        "flex select-none items-center gap-3 rounded-xl border border-transparent bg-muted/60 px-3 py-3 transition-colors",
-        "hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "flex select-none items-center gap-3 rounded-xl border border-transparent bg-input/20 px-3 py-3 transition-colors",
+        "hover:bg-input/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         isSelected && "border-primary bg-muted",
         isDragging && "cursor-grabbing",
         (isDragging || (isSelected && isDraggingSelection)) && "opacity-40",
@@ -88,9 +88,9 @@ export function DriveFolderCard({
       )}
     >
       {folder.isLocked ? (
-        <FolderLock className="size-5 shrink-0 text-foreground" />
+        <FolderLock className="size-5 shrink-0 text-primary" />
       ) : (
-        <FolderIcon className="size-5 shrink-0 fill-foreground text-foreground" />
+        <FolderIcon className="size-5 shrink-0 fill-foreground text-primary" />
       )}
       <span className="min-w-0 flex-1 truncate text-sm font-medium">
         {folder.name}

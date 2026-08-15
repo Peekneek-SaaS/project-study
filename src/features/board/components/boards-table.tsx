@@ -46,7 +46,7 @@ export function BoardsTable() {
   if (boards.length === 0) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 py-16 text-center">
-        <SquareMousePointer className="size-8 text-muted-foreground/40" />
+        <SquareMousePointer className="size-8 text-purple-500" />
         <div className="space-y-1">
           <p className="text-sm font-medium">No boards yet</p>
           <p className="text-sm text-muted-foreground">
@@ -77,7 +77,7 @@ export function BoardsTable() {
                   href={boardPath(board.id)}
                   className="flex items-center gap-2 font-medium hover:underline"
                 >
-                  <SquareMousePointer className="size-4 shrink-0 text-muted-foreground" />
+                  <SquareMousePointer className="size-4 shrink-0 text-purple-500" />
                   <span className="truncate">{board.name}</span>
                 </Link>
               </TableCell>

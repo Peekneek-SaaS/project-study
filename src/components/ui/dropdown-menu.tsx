@@ -65,7 +65,7 @@ function DropdownMenuItem({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Item> & {
   inset?: boolean
-  variant?: "default" | "destructive" | "success"
+  variant?: "default" | "destructive" | "success" 
 }) {
   return (
     <DropdownMenuPrimitive.Item
@@ -73,7 +73,7 @@ function DropdownMenuItem({
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        "group/dropdown-menu-item relative flex min-h-7 cursor-default items-center gap-2 rounded-md px-2 py-1 text-xs/relaxed transition-colors outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:not-data-[variant=success]:focus:**:text-accent-foreground data-inset:pl-7.5 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-[variant=success]:bg-emerald-300/25 data-[variant=success]:text-emerald-700 data-[variant=success]:focus:bg-emerald-300/45 data-[variant=success]:focus:text-emerald-800 dark:data-[variant=success]:bg-emerald-400/15 dark:data-[variant=success]:text-emerald-400 dark:data-[variant=success]:focus:bg-emerald-400/25 dark:data-[variant=success]:focus:text-emerald-300 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 data-[variant=destructive]:*:[svg]:text-destructive data-[variant=success]:*:[svg]:text-emerald-600 dark:data-[variant=success]:*:[svg]:text-emerald-400",
+        "group/dropdown-menu-item relative flex min-h-7 cursor-default items-center gap-2 rounded-md px-2 py-1 text-xs/relaxed transition-colors outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:not-data-[variant=success]:focus:**:text-accent-foreground data-inset:pl-7.5 data-[variant=destructive]:text-primary dark:data-[variant=destructive]:text-accent-foreground data-[variant=destructive]:focus:bg-primary data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/40 data-[variant=success]:bg-emerald-300/25 data-[variant=success]:text-emerald-700 data-[variant=success]:focus:bg-emerald-300/45 data-[variant=success]:focus:text-emerald-800 dark:data-[variant=success]:bg-emerald-400/15 dark:data-[variant=success]:text-emerald-400 dark:data-[variant=success]:focus:bg-emerald-400/25 dark:data-[variant=success]:focus:text-emerald-300 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 data-[variant=destructive]:*:[svg]:text-destructive data-[variant=success]:*:[svg]:text-emerald-600 dark:data-[variant=success]:*:[svg]:text-emerald-400",
         className
       )}
       {...props}

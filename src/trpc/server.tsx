@@ -45,4 +45,31 @@ export function prefetch<T extends ReturnType<TRPCQueryOptions<any>>>(
   }
 }
 
+/**
+ * `prefetch`, waited for.
+ *
+ * The version above hands the query to the streaming dehydrator and returns —
+ * which works when it is called from a component that is already awaiting
+ * something dynamic, because the request is still open underneath it. Called
+ * from a component with nothing to await, the query runs as a floating promise
+ * with the request scope going out from under it, and `auth()` inside a
+ * protected procedure has nothing to read: the query rejects with
+ * "Unauthorized", is dehydrated in that state, and `useSuspenseQuery` throws
+ * with it on the server.
+ *
+ * Awaiting keeps the whole thing inside the request, and dehydrates resolved
+ * data rather than a promise still deciding. Use this one from any server
+ * component that is not already awaiting something else.
+ */
+export async function prefetchAwaited(
+  // Borrowed from `prefetch` rather than restated, so the two cannot describe
+  // different things.
+  queryOptions: Parameters<typeof prefetch>[0],
+) {
+  // No infinite branch: an infinite query is a list being paged through, which
+  // is exactly the case worth streaming rather than waiting for. Reach for
+  // `prefetch` there.
+  await getQueryClient().prefetchQuery(queryOptions);
+}
+
 export const caller = appRouter.createCaller(createTRPCContext);

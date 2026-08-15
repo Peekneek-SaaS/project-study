@@ -24,11 +24,6 @@ export type SelectRow = (
   item: DriveItemKey,
 ) => void;
 
-/** A tap, as opposed to a click — pointer info survives onto the click event. */
-const isTouch = (event: React.MouseEvent) =>
-  event.nativeEvent instanceof PointerEvent &&
-  event.nativeEvent.pointerType === "touch";
-
 interface DriveRowInteractionOptions {
   item: DriveItemKey;
   /** dnd-kit's flag for the row being carried right now. */
@@ -46,12 +41,13 @@ interface DriveRowInteractionOptions {
  * takes everything between the anchor and here — and a selected row can still
  * be picked up and dragged, so the two gestures have to stay out of each
  * other's way. Touch has neither modifiers nor a double-tap worth trusting, so
- * it gets the phone convention instead: tap opens, hold selects, and carrying
- * on from the hold drags. The last of those belongs to the sensor rather than
- * to this hook — see `driveSensors`, which arms the drag on the same hold this
- * one ticks the row with.
+ * it gets the phone convention instead: tap opens, hold selects, and once a
+ * hold has opened a selection every further tap adds to it, until the last tick
+ * comes off and taps go back to opening. Carrying on from the hold drags, which
+ * belongs to the sensor rather than to this hook — see `driveSensors`, which
+ * arms the drag on the same hold this one ticks the row with.
  *
- * Shared by both row kinds so folders and documents cannot drift apart.
+ * Shared by every row and card so the two views cannot drift apart.
  */
 export function useDriveRowInteraction({
   item,
@@ -69,6 +65,13 @@ export function useDriveRowInteraction({
   useEffect(() => {
     if (isDragging) dragged.current = true;
   }, [isDragging]);
+
+  // Which kind of pointer opened the gesture, read where it is trustworthy.
+  // Browsers disagree about the click a tap leaves behind — WebKit hands back
+  // an empty `pointerType`, and a click synthesised from touch can claim to be
+  // a mouse — so asking the click itself would make a phone look like a
+  // desktop, and the touch branch below would never run.
+  const pointerType = useRef<string>("mouse");
 
   // The hold that selects, and the click it has to swallow afterwards.
   const longPress = useRef<{
@@ -91,6 +94,7 @@ export function useDriveRowInteraction({
   const handlePointerDown = (event: React.PointerEvent) => {
     dragged.current = false;
     longPress.current.fired = false;
+    pointerType.current = event.pointerType;
     cancelLongPress();
 
     if (event.pointerType !== "touch") return;
@@ -123,14 +127,16 @@ export function useDriveRowInteraction({
   const handleClick = (event: React.MouseEvent) => {
     if (isDragging || dragged.current) return;
 
-    if (isTouch(event)) {
+    if (pointerType.current === "touch") {
       // The hold already did the work; the click it leaves behind is noise.
       if (longPress.current.fired) {
         longPress.current.fired = false;
         return;
       }
-      // Tapping into a selection extends it rather than opening — the only way
-      // to pick a second row without modifier keys.
+      // A selection is already open, so this tap joins it rather than opening
+      // the row — the only way to pick a second one without modifier keys, and
+      // what a phone's file manager does once a hold has put it into selection
+      // mode. Untick the last row and the next tap opens again.
       if (hasSelection) toggle(item);
       else onOpen();
       return;
@@ -149,7 +155,9 @@ export function useDriveRowInteraction({
     onPointerCancel: cancelLongPress,
     onClick: handleClick,
     onDoubleClick: (event: React.MouseEvent) => {
-      if (dragged.current) return;
+      // Two quick taps are two taps on a phone — a row ticked and unticked —
+      // not the desktop gesture for opening, which is why touch stops here.
+      if (dragged.current || pointerType.current === "touch") return;
       // The first click of the pair already selected the row; opening on top of
       // that is exactly what a file manager does.
       event.preventDefault();
@@ -158,21 +166,17 @@ export function useDriveRowInteraction({
     onContextMenu: (event: React.MouseEvent) => {
       // Android raises this at the end of a hold. Right-click on a desktop is
       // left alone.
-      if (isTouch(event) || longPress.current.fired) event.preventDefault();
+      if (pointerType.current === "touch" || longPress.current.fired)
+        event.preventDefault();
     },
     onKeyDown: (event: React.KeyboardEvent) => {
       // Rows carry buttons, so only act on the row's own keystrokes.
       if (event.target !== event.currentTarget) return;
 
-      if (event.key === "Enter") {
-        event.preventDefault();
-        onOpen();
-        return;
-      }
-      if (event.key === " ") {
-        event.preventDefault();
-        toggle(item);
-      }
+      // Enter opens. Space is left to the browser, which scrolls with it.
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      onOpen();
     },
   };
 }

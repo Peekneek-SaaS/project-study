@@ -7,8 +7,10 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query";
+import { useQueryStates } from "nuqs";
 import { toast } from "sonner";
 
+import { driveFilterParsers } from "@/features/main/lib/params";
 import type { DriveDragData, DriveDropData } from "@/features/main/types";
 import { useDriveSelectionStore } from "@/lib/stores/drive-selection-store";
 import {
@@ -32,8 +34,17 @@ export function useDriveBrowser() {
   const currentFolderId = useDriveStore(selectCurrentFolderId);
   const parentFolderId = useDriveStore(selectParentFolderId);
 
+  // Straight from the URL into the request: the filters are part of what is
+  // being asked for, so they belong in the query key rather than in a pass over
+  // the answer. Each combination caches as its own listing, and going back to
+  // an already-seen one is instant.
+  const [filters] = useQueryStates(driveFilterParsers);
+
   const { data } = useSuspenseQuery(
-    trpc.folder.getContents.queryOptions({ folderId: currentFolderId }),
+    trpc.folder.getContents.queryOptions({
+      folderId: currentFolderId,
+      ...filters,
+    }),
   );
 
   // A move rewrites two folders' listings, so refresh them all rather than
@@ -152,6 +163,8 @@ export function useDriveBrowser() {
     documents: data.documents,
     currentFolderId,
     parentFolderId,
+    // An empty listing means two different things, and only this knows which.
+    isFiltering: filters.type !== null || filters.modified !== null,
     handleDragStart,
     handleDragEnd,
     isMoving:

@@ -4,7 +4,7 @@ import { QueryErrorBoundary } from "@/components/query-error-boundary";
 import { BoardCreateButton } from "@/features/board/components/board-create-button";
 import { BoardsTable } from "@/features/board/components/boards-table";
 import { BoardsTableSkeleton } from "@/features/board/components/boards-table-skeleton";
-import { HydrateClient, prefetch, trpc } from "@/trpc/server";
+import { HydrateClient, prefetchAwaited, trpc } from "@/trpc/server";
 
 /**
  * The boards index.
@@ -12,8 +12,8 @@ import { HydrateClient, prefetch, trpc } from "@/trpc/server";
  * Only standalone boards are listed, which is all the router will return — the
  * per-document ones will arrive beside their document rather than here.
  */
-export function BoardsView() {
-  prefetch(trpc.board.list.queryOptions());
+export async function BoardsView() {
+  await prefetchAwaited(trpc.board.list.queryOptions());
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4">

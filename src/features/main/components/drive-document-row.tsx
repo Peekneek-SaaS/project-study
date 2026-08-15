@@ -66,7 +66,7 @@ export function DriveDocumentRow({
         // `select-none` so double-clicking to open does not leave the file name
         // highlighted underneath the preview.
         "cursor-default select-none",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset hover:bg-input/50",
         SELECTED_ROW_CLASS,
         isDragging && "cursor-grabbing",
         // Dimmed while held, and while the rest of the selection it belongs to
@@ -77,9 +77,9 @@ export function DriveDocumentRow({
       <TableCell>
         <div className="flex items-center gap-2">
           {doc.isLocked ? (
-            <FileLock className="size-4 shrink-0 text-muted-foreground" />
+            <FileLock className="size-4 shrink-0 text-orange-400" />
           ) : (
-            <FileText className="size-4 shrink-0 text-muted-foreground" />
+            <FileText className="size-4 shrink-0 text-orange-400" />
           )}
           <span className="truncate">{doc.name}</span>
         </div>
@@ -93,12 +93,13 @@ export function DriveDocumentRow({
       <DriveRowActions>
         <Button
           size="icon"
-          variant={isReady ? "default" : "secondary"}
+          variant={isReady ? "ghost" : "secondary"}
           disabled={!isReady}
           onClick={() => openDocument(doc)}
           aria-label={`Open ${doc.name}`}
+          className={cn("")}
         >
-          <Play className="size-4" />
+          <Play className="size-4 fill-emerald-400 stroke-emerald-400" />
         </Button>
 
         <DriveItemActions kind="document" item={doc} />

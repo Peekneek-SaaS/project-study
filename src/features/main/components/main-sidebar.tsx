@@ -46,6 +46,7 @@ export interface MenuItemsProps {
   label: string;
   href?: string;
   onClick?: () => void;
+  iconClassName?: string;
 }
 
 interface MenuGroupProps {
@@ -62,16 +63,19 @@ const MainSidebar = () => {
       label: "Dashboard",
       href: "/main",
       icon: Home,
+      iconClassName: "text-blue-500",
     },
     {
       label: "Board",
       href: "/board",
       icon: SquareMousePointer,
+      iconClassName: "text-purple-500",
     },
     {
       label: "Sticky Notes",
-      href: "/stickynotes",
+      href: "/sticky-notes",
       icon: NotebookPen,
+      iconClassName: "text-yellow-500",
     },
   ];
 
@@ -88,7 +92,7 @@ const MainSidebar = () => {
   ];
 
   return (
-    <Sidebar collapsible="icon" variant="inset">
+    <Sidebar collapsible="icon" variant="floating">
       <SidebarHeader className="flex flex-col gap-4 pt-4">
         <div className="flex items-center gap-2 pl-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:pl-0">
           <Logo href="/main" />
@@ -150,16 +154,18 @@ const NavItems = ({ groupLabel, items, pathName }: MenuGroupProps) => {
               }
               onClick={() => handleSelect(item)}
               tooltip={item.label}
-              className="h-9 px-3 py-2 text-[13px] tracking-tight font-medium border border-transparent data-[active=true]:border-primary data-[active=true]:shadow-[0px_1px_1px_0px_rgba(44,54,53,0.03),inset_0px_0px_0px_2px_white]"
+              className={cn(
+                "h-9 px-3 py-2 text-[13px] tracking-tight font-medium border border-transparent bg-transparent data-[active=true]:border-primary data-[active=true]:bg-transparent",
+              )}
             >
               {item.href ? (
                 <Link href={item.href}>
-                  <item.icon />
+                  <item.icon className={cn("", item.iconClassName)} />
                   <span>{item.label}</span>
                 </Link>
               ) : (
                 <>
-                  <item.icon />
+                  <item.icon className={cn("", item.iconClassName)} />
                   <span>{item.label}</span>
                 </>
               )}

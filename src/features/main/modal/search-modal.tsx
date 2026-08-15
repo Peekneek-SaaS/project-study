@@ -6,9 +6,10 @@ import {
   FileText,
   Folder,
   LucideIcon,
+  NotebookPen,
   SquareMousePointer,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import {
   Command,
@@ -24,13 +25,18 @@ import { Spinner } from "@/components/ui/spinner";
 import { DriveStatusBadge } from "@/features/main/components/drive-status-badge";
 import { boardPath } from "@/features/board/types";
 import { useOpenDocument } from "@/features/main/hooks/use-open-document";
+import { DRIVE_PATH } from "@/features/main/types";
 import {
   searchBoardsOptions,
   searchItemsOptions,
+  searchNotesOptions,
 } from "@/features/main/hooks/use-search-items";
+import { noteDisplayTitle } from "@/features/sticky-notes/lib/note-content";
+import { stickyNotePath } from "@/features/sticky-notes/types";
 import { useDriveStore } from "@/lib/stores/drive-store";
 import { useSearchStore } from "@/lib/stores/search-store";
 import { useTRPC } from "@/trpc/client";
+import { cn } from "@/lib/utils";
 
 interface SearchFolder {
   id: string;
@@ -96,6 +102,9 @@ export function SearchModal() {
   const closeSearch = useSearchStore((state) => state.close);
 
   const router = useRouter();
+  // Compared rather than pushed blindly: pushing the route you are already on
+  // stacks a duplicate history entry, which costs the back button a press.
+  const pathname = usePathname();
   const openFolder = useDriveStore((state) => state.openFolder);
   const goToCrumb = useDriveStore((state) => state.goToCrumb);
   const openDocument = useOpenDocument();
@@ -114,11 +123,16 @@ export function SearchModal() {
     ...searchBoardsOptions(trpc),
     enabled: isOpen,
   });
+  const { data: noteData, isLoading: isLoadingNotes } = useQuery({
+    ...searchNotesOptions(trpc),
+    enabled: isOpen,
+  });
 
-  const isLoading = isLoadingItems || isLoadingBoards;
+  const isLoading = isLoadingItems || isLoadingBoards || isLoadingNotes;
   const folders = data?.folders ?? [];
   const documents = data?.documents ?? [];
   const boards = boardData ?? [];
+  const notes = noteData ?? [];
 
   /**
    * Search can land on a folder several levels down, so the breadcrumb trail is
@@ -130,6 +144,12 @@ export function SearchModal() {
     closeSearch();
     goToCrumb(null);
     for (const crumb of trail) openFolder(crumb);
+
+    // Moving the trail only rearranges the drive; it does not put it on screen.
+    // Searched from a board or the notes page, everything above would happen
+    // correctly and invisibly. The trail survives the navigation — it is a
+    // client store, not route state — so it is set first and travels with us.
+    if (pathname !== DRIVE_PATH) router.push(DRIVE_PATH);
   };
 
   const handleSelectDocument = (doc: (typeof documents)[number]) => {
@@ -144,6 +164,13 @@ export function SearchModal() {
   const handleSelectBoard = (boardId: string) => {
     closeSearch();
     router.push(boardPath(boardId));
+  };
+
+  // Notes share a page, so the id travels on the URL: the grid picks it up,
+  // scrolls to that note and rings it — see `useNoteTarget`.
+  const handleSelectNote = (noteId: string) => {
+    closeSearch();
+    router.push(stickyNotePath(noteId));
   };
 
   return (
@@ -191,8 +218,9 @@ export function SearchModal() {
                   key={folder.id}
                   value={`${folder.name} ${folder.id}`}
                   onSelect={() => handleSelectFolder(folder.id)}
+                  className={cn("")}
                 >
-                  <Folder className="text-muted-foreground" />
+                  <Folder className="text-primary hover:text-primary" />
                   <span className="truncate">{folder.name}</span>
                   {/* <span className="ml-auto truncate pl-2 text-[0.625rem] text-muted-foreground ">
                     {locationLabel(trailTo(folders, folder.parentId))}
@@ -234,8 +262,28 @@ export function SearchModal() {
                   value={`${board.name} ${board.id}`}
                   onSelect={() => handleSelectBoard(board.id)}
                 >
-                  <SquareMousePointer className="text-muted-foreground" />
+                  <SquareMousePointer className="text-purple-500" />
                   <span className="truncate">{board.name}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+
+          {notes.length > 0 && (
+            <CommandGroup heading="Notes">
+              {notes.map((note) => (
+                <CommandItem
+                  key={note.id}
+                  // The whole note is searchable, not just its name: a note is
+                  // usually remembered by something written *in* it. The name
+                  // is what gets shown, and cmdk matches on the rest silently.
+                  value={`${noteDisplayTitle(note.content)} ${note.content} ${note.id}`}
+                  onSelect={() => handleSelectNote(note.id)}
+                >
+                  <NotebookPen className="text-yellow-500" />
+                  <span className="truncate">
+                    {noteDisplayTitle(note.content)}
+                  </span>
                 </CommandItem>
               ))}
             </CommandGroup>

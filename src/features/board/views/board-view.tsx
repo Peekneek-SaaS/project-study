@@ -1,5 +1,5 @@
 import { QueryErrorBoundary } from "@/components/query-error-boundary";
-import { HydrateClient, prefetch, trpc } from "@/trpc/server";
+import { HydrateClient, prefetchAwaited, trpc } from "@/trpc/server";
 
 import BoardDynamic from "../components/board-dynamic";
 
@@ -15,8 +15,8 @@ import BoardDynamic from "../components/board-dynamic";
  * canvas mounts — Excalidraw reads its initial data once and never looks again,
  * so arriving late would mean an empty board that fills in behind the user.
  */
-const BoardView = ({ boardId }: { boardId: string }) => {
-  prefetch(trpc.board.get.queryOptions({ id: boardId }));
+const BoardView = async ({ boardId }: { boardId: string }) => {
+  await prefetchAwaited(trpc.board.get.queryOptions({ id: boardId }));
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

@@ -1,19 +1,11 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { PlusIcon } from "lucide-react";
-import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { useTRPC } from "@/trpc/client";
+import { useCreateNote } from "@/features/sticky-notes/hooks/use-create-note";
 
-/**
- * Adds a note.
- *
- * Nothing is asked for first — not a colour, not a title. A sticky note that
- * needs a dialog before it exists is not a sticky note; the router picks a
- * colour at random and the note is editable the moment it lands.
- */
+/** The notes page's way in. What it does lives in `useCreateNote`. */
 export function NoteCreateButton({
   label = "New note",
   variant = "default",
@@ -21,30 +13,16 @@ export function NoteCreateButton({
   label?: string;
   variant?: "default" | "outline";
 }) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-
-  const create = useMutation(trpc.stickyNote.create.mutationOptions());
-
-  const handleCreate = async () => {
-    try {
-      await create.mutateAsync({});
-      await queryClient.invalidateQueries(trpc.stickyNote.list.queryFilter());
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not create the note",
-      );
-    }
-  };
+  const { createNote, isPending } = useCreateNote();
 
   return (
     <Button
       variant={variant}
-      onClick={handleCreate}
-      disabled={create.isPending}
+      onClick={() => void createNote()}
+      disabled={isPending}
     >
       <PlusIcon />
-      {create.isPending ? "Adding…" : label}
+      {isPending ? "Adding…" : label}
     </Button>
   );
 }

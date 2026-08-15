@@ -1,6 +1,6 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inter } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import { shadcn } from "@clerk/ui/themes";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 
@@ -12,16 +12,19 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { TRPCReactProvider } from "@/trpc/client";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const fontSans = Inter({
   subsets: ["latin"],
+  variable: "--font-sans",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const fontSerif = Inter({
   subsets: ["latin"],
+  variable: "--font-serif",
+});
+
+const fontMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
 });
 
 export const metadata: Metadata = {
@@ -36,10 +39,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={cn(
         "h-full",
         "antialiased",
-        geistSans.variable,
-        geistMono.variable,
+        fontSerif.variable,
+        fontSans.variable,
         "font-sans",
-        inter.variable,
+        fontMono.variable,
       )}
       suppressHydrationWarning
     >
@@ -64,7 +67,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               </TooltipProvider>
               {/* Above the toaster: uploads started from a modal report into it. */}
               <ModalProvider />
-              <Toaster position="bottom-right" />
+              <Toaster position="top-center" />
             </TRPCReactProvider>
           </ThemeProvider>
         </ClerkProvider>

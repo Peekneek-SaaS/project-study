@@ -8,9 +8,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { FolderPlus, SquareMousePointer, Upload } from "lucide-react";
+import {
+  FolderPlus,
+  NotebookPen,
+  SquareMousePointer,
+  Upload,
+} from "lucide-react";
 import type { ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { useCreateBoard } from "@/features/board/hooks/use-create-board";
+import { useCreateNote } from "@/features/sticky-notes/hooks/use-create-note";
+import { stickyNotePath } from "@/features/sticky-notes/types";
 import { MenuItemsProps } from "./main-sidebar";
 import { useModalStore } from "@/lib/stores/modal-store";
 import { useSidebar } from "@/components/ui/sidebar";
@@ -37,7 +45,9 @@ const CreateDropdown = ({
 }: CreateDropdownProps) => {
   const openModal = useModalStore((state) => state.open);
   const { isMobile, openMobile, setOpenMobile } = useSidebar();
+  const router = useRouter();
   const { createBoard } = useCreateBoard();
+  const { createNote } = useCreateNote();
 
   // Opening a modal from inside the mobile sheet has to wait for the sheet to
   // animate out, or the two overlays fight. Rendered outside the sheet (the
@@ -56,6 +66,7 @@ const CreateDropdown = ({
       label: "New Folder",
       icon: FolderPlus,
       onClick: () => runFromSidebar(() => openModal("create-folder")),
+      iconClassName: "text-primary",
     },
     {
       label: "New Board",
@@ -68,6 +79,21 @@ const CreateDropdown = ({
         setOpenMobile(false);
         void createBoard();
       },
+      iconClassName: "text-purple-500",
+    },
+    {
+      label: "New Note",
+      icon: NotebookPen,
+      // Travels, like the board above — the note is added wherever you are, so
+      // the page that shows it has to be the next thing you see. Pointed at the
+      // new note so the grid scrolls to it rather than leaving it to be found.
+      onClick: () => {
+        setOpenMobile(false);
+        void createNote().then((note) => {
+          if (note) router.push(stickyNotePath(note.id));
+        });
+      },
+      iconClassName: "text-yellow-500",
     },
   ];
 
@@ -91,19 +117,23 @@ const CreateDropdown = ({
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         <DropdownMenuGroup>
-          {createActions.map(({ label, icon: Icon2, onClick, href }) => (
-            <DropdownMenuItem onClick={onClick} key={label}>
-              <Icon2 />
-              <span>{label}</span>
-            </DropdownMenuItem>
-          ))}
+          {createActions.map(
+            ({ label, icon: Icon2, onClick, href, iconClassName }) => (
+              <DropdownMenuItem onClick={onClick} key={label}>
+                <Icon2 className={cn("", iconClassName)} />
+                <span>{label}</span>
+              </DropdownMenuItem>
+            ),
+          )}
           <Separator className="my-1" />
-          {uploadActions.map(({ label, icon: Icon2, onClick, href }) => (
-            <DropdownMenuItem onClick={onClick} key={label}>
-              <Icon2 />
-              <span>{label}</span>
-            </DropdownMenuItem>
-          ))}
+          {uploadActions.map(
+            ({ label, icon: Icon2, onClick, href, iconClassName }) => (
+              <DropdownMenuItem onClick={onClick} key={label}>
+                <Icon2 className={cn("", iconClassName)} />
+                <span>{label}</span>
+              </DropdownMenuItem>
+            ),
+          )}
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -4,7 +4,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import MainSidebar from "@/features/main/components/main-sidebar";
 
 import MainHeader from "@/features/main/components/main-header";
-import { HydrateClient, prefetch, trpc } from "@/trpc/server";
+import { HydrateClient } from "@/trpc/server";
 import { Suspense } from "react";
 import { QueryErrorBoundary } from "@/components/query-error-boundary";
 import { Spinner } from "@/components/ui/spinner";
@@ -25,9 +25,9 @@ const MainLayout: React.FC<MainLayoutProps> = async ({ children }) => {
     redirect("/sign-in");
   }
 
-  // The drive always opens at the root, so its listing can be warmed here and
-  // handed to the client already hydrated. Deeper folders are fetched on click.
-  prefetch(trpc.folder.getContents.queryOptions({ folderId: null }));
+  // The drive's listing is warmed by `MainView` rather than here: it depends on
+  // the filters in the query string, which a layout cannot see, and a prefetch
+  // under the wrong key hydrates nothing.
 
   return (
     <SidebarProvider defaultOpen={defaultOpen}>

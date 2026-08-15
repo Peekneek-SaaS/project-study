@@ -37,6 +37,11 @@ export function useDocumentUpload() {
   const toastId = useRef<string | number | null>(null);
   const label = useRef("");
 
+  const dismissProgressToast = () => {
+    if (toastId.current !== null) toast.dismiss(toastId.current);
+    toastId.current = null;
+  };
+
   const { startUpload, isUploading } = useUploadThing("documentUploader", {
     // 1% steps: the default "coarse" granularity moves the bar in visible jumps.
     uploadProgressGranularity: "fine",
@@ -51,23 +56,22 @@ export function useDocumentUpload() {
     },
 
     onClientUploadComplete: async () => {
-      toast.success(`Uploaded ${label.current}`, {
-        id: toastId.current ?? undefined,
-        duration: 4000,
-      });
-      toastId.current = null;
+      // A new toast rather than an update of the progress one: sonner merges
+      // updates onto the existing toast, so the custom body would survive and
+      // the success toast would render the finished bar with the tick above it.
+      dismissProgressToast();
+      toast.success(`Uploaded ${label.current}`, { duration: 4000 });
       // The whole router, not just the listing: the search palette's flat index
       // is a `folder` query too, and it holds its answer for minutes.
       await queryClient.invalidateQueries(trpc.folder.pathFilter());
     },
 
     onUploadError: (error) => {
+      dismissProgressToast();
       toast.error(`Could not upload ${label.current}`, {
-        id: toastId.current ?? undefined,
         description: error.message,
         duration: 6000,
       });
-      toastId.current = null;
     },
   });
 

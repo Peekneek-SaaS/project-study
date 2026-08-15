@@ -74,8 +74,8 @@ export function DriveDocumentCard({
       role="option"
       aria-selected={isSelected}
       className={cn(
-        "flex select-none flex-col overflow-hidden rounded-xl bg-muted/60 transition-colors",
-        "hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "flex select-none flex-col overflow-hidden rounded-xl bg-input/20 transition-colors",
+        "hover:bg-input/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         isSelected && "bg-primary/10 ring-2 ring-primary ring-inset",
         isDragging && "cursor-grabbing",
         (isDragging || (isSelected && isDraggingSelection)) && "opacity-40",
@@ -89,12 +89,12 @@ export function DriveDocumentCard({
         <DriveActionsShield className="gap-1">
           <Button
             size="icon-sm"
-            variant={isReady ? "default" : "secondary"}
+            variant={isReady ? "ghost" : "secondary"}
             disabled={!isReady}
             onClick={() => openDocument(doc)}
             aria-label={`Open ${doc.name}`}
           >
-            <Play className="size-3.5" />
+            <Play className="size-3.5 fill-emerald-400 stroke-emerald-400" />
           </Button>
           <DriveItemActions kind="document" item={doc} />
         </DriveActionsShield>

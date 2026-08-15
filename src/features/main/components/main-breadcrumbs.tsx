@@ -153,7 +153,7 @@ const MainBreadCrumbs = () => {
   return (
     <div
       ref={containerRef}
-      className="flex items-center gap-2 absolute bottom-0 inset-x-0 bg-muted p-3 m-2 rounded-lg shadow-sm ring-1 ring-sidebar-border dark:bg-transparent"
+      className="flex items-center gap-2 absolute bottom-0 inset-x-0 bg-muted p-3 m-2 rounded-lg shadow-sm ring-1 ring-sidebar-border "
     >
       <Breadcrumb className="min-w-0 flex-1">
         {/*
@@ -170,14 +170,14 @@ const MainBreadCrumbs = () => {
 
             return (
               <React.Fragment key={crumb.key}>
-                <BreadcrumbItem className="shrink-0">
+                <BreadcrumbItem className="shrink-0 ">
                   {isLast ? (
                     <BreadcrumbPage className="max-w-48 truncate">
                       {crumb.label}
                     </BreadcrumbPage>
                   ) : (
                     <BreadcrumbLink asChild>
-                      {crumbElement(crumb, "max-w-32 cursor-pointer truncate")}
+                      {crumbElement(crumb, "max-w-32 cursor-pointer truncate ")}
                     </BreadcrumbLink>
                   )}
                 </BreadcrumbItem>
@@ -191,7 +191,7 @@ const MainBreadCrumbs = () => {
                           // Sized past the 16px glyph, since this is the one
                           // thing in the row a finger has to find — but not by
                           // much, in a row that is short of space by definition.
-                          className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-sm transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                          className="flex size-6 shrink-0 cursor-pointer items-center  justify-center rounded-sm transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                           // The ellipsis is decorative, so the button has to
                           // say what it is for itself.
                           aria-label={`Show ${folded.length} more ${folded.length === 1 ? "folder" : "folders"}`}

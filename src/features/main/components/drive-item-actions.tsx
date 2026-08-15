@@ -26,6 +26,7 @@ import type { DriveDocument, DriveFolder } from "@/features/main/types";
 import { documentPreviewPath } from "@/lib/document-links";
 import { useDriveStore } from "@/lib/stores/drive-store";
 import { useModalStore } from "@/lib/stores/modal-store";
+import { cn } from "@/lib/utils";
 
 interface MenuItemConfig {
   icon: LucideIcon;
@@ -138,7 +139,7 @@ function folderItems(
       icon: Trash2,
       label: "Delete",
       onSelect: confirmDelete,
-      variant: "destructive",
+      variant: "default",
     },
   ];
 }
@@ -187,11 +188,11 @@ export function DriveItemActions(props: DriveItemActionsProps) {
               <DropdownMenuItem
                 key={label}
                 variant={variant}
-                className={className}
+                className={cn("", className)}
                 disabled={disabled}
                 onSelect={onSelect}
               >
-                <Icon />
+                <Icon className="" />
                 <span>{label}</span>
               </DropdownMenuItem>
             ),

@@ -9,6 +9,16 @@ export type DriveFolder = DriveContents["folders"][number];
 export type DriveDocument = DriveContents["documents"][number];
 export type DocumentStatus = DriveDocument["status"];
 
+/**
+ * Where the drive is drawn.
+ *
+ * A folder has no URL of its own — which one is open is the trail in
+ * `drive-store`, not a route — so anything opening a folder from elsewhere has
+ * to move the trail *and* come here. The two halves are easy to separate by
+ * accident, and separated they look like nothing happened.
+ */
+export const DRIVE_PATH = "/main";
+
 /** dnd-kit `type`/`accept` categories. */
 export const DRAG_TYPE = {
   folder: "folder",

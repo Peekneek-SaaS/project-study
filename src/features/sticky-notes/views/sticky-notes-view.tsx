@@ -4,7 +4,7 @@ import { QueryErrorBoundary } from "@/components/query-error-boundary";
 import { NoteCreateButton } from "@/features/sticky-notes/components/note-create-button";
 import { NotesGrid } from "@/features/sticky-notes/components/notes-grid";
 import { NotesGridSkeleton } from "@/features/sticky-notes/components/notes-grid-skeleton";
-import { HydrateClient, prefetch, trpc } from "@/trpc/server";
+import { HydrateClient, prefetchAwaited, trpc } from "@/trpc/server";
 
 /**
  * The sticky notes page.
@@ -12,8 +12,8 @@ import { HydrateClient, prefetch, trpc } from "@/trpc/server";
  * Only standalone notes are listed, which is all the router will return — the
  * per-document ones will arrive beside their document rather than here.
  */
-export function StickyNotesView() {
-  prefetch(trpc.stickyNote.list.queryOptions());
+export async function StickyNotesView() {
+  await prefetchAwaited(trpc.stickyNote.list.queryOptions());
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4">

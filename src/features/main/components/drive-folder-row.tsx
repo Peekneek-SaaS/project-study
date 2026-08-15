@@ -79,7 +79,7 @@ export function DriveFolderRow({
         // `select-none` so the double-click that opens a folder does not leave
         // its name highlighted behind the folder you just walked into.
         "cursor-default select-none",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset hover:bg-input/50",
         SELECTED_ROW_CLASS,
         isDragging && "cursor-grabbing",
         // Dimmed while held, and while the rest of the selection it belongs to
@@ -91,9 +91,9 @@ export function DriveFolderRow({
       <TableCell>
         <div className="flex items-center gap-2">
           {folder.isLocked ? (
-            <FolderLock className="size-4 shrink-0 text-muted-foreground" />
+            <FolderLock className="size-4 shrink-0 text-primary" />
           ) : (
-            <FolderIcon className="size-4 shrink-0 text-muted-foreground" />
+            <FolderIcon className="size-4 shrink-0 text-primary" />
           )}
 
           <span className="truncate">{folder.name}</span>
