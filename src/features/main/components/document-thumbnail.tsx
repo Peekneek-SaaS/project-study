@@ -23,7 +23,7 @@ const LazyPdfThumbnail = dynamic(
 );
 
 /** Grid cards run to the edge of the screen; start a little before that. */
-const PRELOAD_MARGIN = "300px";
+const PRELOAD_MARGIN_PX = 300;
 
 /**
  * What a document looks like on its card.
@@ -43,11 +43,24 @@ export function DocumentThumbnail({ doc }: { doc: DriveDocument }) {
     const element = ref.current;
     if (!element || isNearViewport) return;
 
+    // Measured once up front, because an observer reports for the first time on
+    // a later frame — and on a fresh load every card on screen is sitting in
+    // that gap waiting to be told what it can already see. The observer is left
+    // to the cards this does not answer for.
+    const { top, bottom } = element.getBoundingClientRect();
+    if (
+      top < window.innerHeight + PRELOAD_MARGIN_PX &&
+      bottom > -PRELOAD_MARGIN_PX
+    ) {
+      setIsNearViewport(true);
+      return;
+    }
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) setIsNearViewport(true);
       },
-      { rootMargin: PRELOAD_MARGIN },
+      { rootMargin: `${PRELOAD_MARGIN_PX}px` },
     );
     observer.observe(element);
     return () => observer.disconnect();
@@ -59,8 +72,15 @@ export function DocumentThumbnail({ doc }: { doc: DriveDocument }) {
 
   return (
     <div ref={ref} className="h-full w-full overflow-hidden">
-      {canPreview && isNearViewport ? (
-        <LazyPdfThumbnail url={documentFilePath(doc.id)} />
+      {canPreview ? (
+        // A PDF waiting its turn gets the skeleton it is about to show anyway.
+        // The icon would be a third thing to look at on the way to the page —
+        // and a wrong one, since this card is not going to keep it.
+        isNearViewport ? (
+          <LazyPdfThumbnail url={documentFilePath(doc.id)} />
+        ) : (
+          <Skeleton className="h-full w-full rounded-none" />
+        )
       ) : (
         <div className="flex h-full items-center justify-center">
           <Icon className="size-10 text-muted-foreground/40" />

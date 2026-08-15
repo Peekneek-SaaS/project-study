@@ -41,9 +41,37 @@ model Document {
   pdfUrl    String
   status    DocumentStatus @default(UPLOADING)
   isLocked Boolean @default(true)
-  
+
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
 
+  /// The board tied to this document, once per-document boards are built. The
+  /// back half of `Board.documentId` — no column of its own.
+  board     Board?
+
   @@index([userId, folderId])
+}
+
+/// An Excalidraw scene.
+///
+/// `documentId` is what a board is *about*: null means it stands on its own,
+/// and set means it belongs to a document. Only standalone boards are built
+/// for now — nothing writes a `documentId` yet — but the column and its
+/// uniqueness are here so the per-document ones need a feature rather than a
+/// migration. `@unique` is what makes it at most one board per document, and
+/// the cascade means deleting a document takes its board with it.
+model Board {
+  id         String    @id @default(cuid())
+  userId     String
+  documentId String?   @unique
+  name       String    @default("Untitled Board")
+  /// The whole Excalidraw scene: `{ elements, appState, files }`, as written
+  /// by `serializeAsJSON`. Opaque here on purpose — its shape is Excalidraw's
+  /// to change, and nothing in the database reads into it.
+  snapshot   Json
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  document   Document? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, documentId])
 }

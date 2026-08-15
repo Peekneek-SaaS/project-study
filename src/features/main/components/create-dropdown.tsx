@@ -8,8 +8,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { FolderPlus, Upload } from "lucide-react";
+import { FolderPlus, SquareMousePointer, Upload } from "lucide-react";
 import type { ReactNode } from "react";
+import { useCreateBoard } from "@/features/board/hooks/use-create-board";
 import { MenuItemsProps } from "./main-sidebar";
 import { useModalStore } from "@/lib/stores/modal-store";
 import { useSidebar } from "@/components/ui/sidebar";
@@ -36,6 +37,7 @@ const CreateDropdown = ({
 }: CreateDropdownProps) => {
   const openModal = useModalStore((state) => state.open);
   const { isMobile, openMobile, setOpenMobile } = useSidebar();
+  const { createBoard } = useCreateBoard();
 
   // Opening a modal from inside the mobile sheet has to wait for the sheet to
   // animate out, or the two overlays fight. Rendered outside the sheet (the
@@ -54,6 +56,18 @@ const CreateDropdown = ({
       label: "New Folder",
       icon: FolderPlus,
       onClick: () => runFromSidebar(() => openModal("create-folder")),
+    },
+    {
+      label: "New Board",
+      icon: SquareMousePointer,
+      // Not `runFromSidebar`: this navigates rather than opening an overlay, so
+      // there is nothing for the sheet to fight with and no reason to hold the
+      // request back until it has finished animating. It does still have to
+      // close, or it would sit on top of the board it just opened.
+      onClick: () => {
+        setOpenMobile(false);
+        void createBoard();
+      },
     },
   ];
 

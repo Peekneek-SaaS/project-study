@@ -117,6 +117,80 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/*
+  Excalidraw, in this app's colours.
+
+  Its accent is a fixed violet in one block and a lighter violet in a
+  `.theme--dark` block. Pointing those at the shadcn tokens instead means there
+  is nothing here to keep in sync: `--primary` and `--accent` already change
+  with `.dark`, so one set of declarations covers both modes.
+
+  Both selectors are listed for specificity rather than for different values.
+  `.custom-styles .excalidraw` ties Excalidraw's own `.excalidraw.theme--dark`
+  block, and a tie is settled by whichever stylesheet happens to be emitted
+  last — so the second selector puts the dark case a class ahead and out of the
+  argument entirely.
+
+  The shades read as "further from the surface, in whichever direction the
+  surface goes": mixing towards `--foreground` darkens the accent in light mode
+  and lightens it in dark mode, which is exactly the relationship Excalidraw's
+  own two blocks describe by hand.
+*/
+.custom-styles .excalidraw,
+.custom-styles .excalidraw.theme--dark {
+  --color-primary: var(--primary);
+  --color-primary-hover: color-mix(
+    in oklch,
+    var(--primary) 85%,
+    var(--foreground)
+  );
+  --color-primary-darker: color-mix(
+    in oklch,
+    var(--primary) 75%,
+    var(--foreground)
+  );
+  --color-primary-darkest: color-mix(
+    in oklch,
+    var(--primary) 60%,
+    var(--foreground)
+  );
+
+  /* Not a lighter primary — the tinted surface that `--color-primary` is drawn
+     on, and drawn in when the two swap places. `--accent` is the token for
+     exactly that, and it stays legible against `--primary` in both modes. */
+  --color-primary-light: var(--accent);
+  --color-primary-light-darker: color-mix(
+    in oklch,
+    var(--accent) 85%,
+    var(--foreground)
+  );
+
+  /* Surfaces, in the order Excalidraw stacks them: `lowest` is the ground and
+     each one after it carries more contrast. Safe to repaint because dark mode
+     inverts only the `canvas` element, never the chrome — the drawing keeps
+     Excalidraw's own handling and none of this reaches it. */
+  --color-surface-lowest: var(--background);
+  --color-surface-mid: var(--card);
+  --color-surface-low: var(--muted);
+  --color-surface-high: var(--accent);
+
+  /* The floating toolbars. `--popup-bg-color` and `--sidebar-bg-color` are
+     defined in terms of this one, so they follow without being named. */
+  --island-bg-color: var(--popover);
+  --default-bg-color: var(--background);
+
+  --color-on-surface: var(--foreground);
+  --popup-text-color: var(--popover-foreground);
+
+  --color-border-outline: var(--border);
+  --color-border-outline-variant: var(--border);
+
+  --input-bg-color: var(--background);
+  --input-border-color: var(--input);
+  --input-hover-bg-color: var(--accent);
+  --input-label-color: var(--muted-foreground);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

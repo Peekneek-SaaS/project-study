@@ -1,7 +1,14 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { CornerDownLeft, FileText, Folder, LucideIcon } from "lucide-react";
+import {
+  CornerDownLeft,
+  FileText,
+  Folder,
+  LucideIcon,
+  SquareMousePointer,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import {
   Command,
@@ -15,8 +22,12 @@ import {
 import { Kbd } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
 import { DriveStatusBadge } from "@/features/main/components/drive-status-badge";
+import { boardPath } from "@/features/board/types";
 import { useOpenDocument } from "@/features/main/hooks/use-open-document";
-import { searchItemsOptions } from "@/features/main/hooks/use-search-items";
+import {
+  searchBoardsOptions,
+  searchItemsOptions,
+} from "@/features/main/hooks/use-search-items";
 import { useDriveStore } from "@/lib/stores/drive-store";
 import { useSearchStore } from "@/lib/stores/search-store";
 import { useTRPC } from "@/trpc/client";
@@ -84,6 +95,7 @@ export function SearchModal() {
   const setQuery = useSearchStore((state) => state.setQuery);
   const closeSearch = useSearchStore((state) => state.close);
 
+  const router = useRouter();
   const openFolder = useDriveStore((state) => state.openFolder);
   const goToCrumb = useDriveStore((state) => state.goToCrumb);
   const openDocument = useOpenDocument();
@@ -94,13 +106,19 @@ export function SearchModal() {
   // gate stays because a warm-up that has not landed yet — or was never run,
   // for anything that opens the palette without the header — should still fetch
   // on open rather than on every page that mounts this modal.
-  const { data, isLoading } = useQuery({
+  const { data, isLoading: isLoadingItems } = useQuery({
     ...searchItemsOptions(trpc),
     enabled: isOpen,
   });
+  const { data: boardData, isLoading: isLoadingBoards } = useQuery({
+    ...searchBoardsOptions(trpc),
+    enabled: isOpen,
+  });
 
+  const isLoading = isLoadingItems || isLoadingBoards;
   const folders = data?.folders ?? [];
   const documents = data?.documents ?? [];
+  const boards = boardData ?? [];
 
   /**
    * Search can land on a folder several levels down, so the breadcrumb trail is
@@ -119,6 +137,13 @@ export function SearchModal() {
     // over it traps focus in the one that is on its way out.
     closeSearch();
     openDocument(doc);
+  };
+
+  // A board is a page rather than something that opens over the drive, so this
+  // one navigates instead of handing off to another modal.
+  const handleSelectBoard = (boardId: string) => {
+    closeSearch();
+    router.push(boardPath(boardId));
   };
 
   return (
@@ -196,6 +221,21 @@ export function SearchModal() {
                     </span>
                     <DriveStatusBadge status={doc.status} />
                   </div> */}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+
+          {boards.length > 0 && (
+            <CommandGroup heading="Boards">
+              {boards.map((board) => (
+                <CommandItem
+                  key={board.id}
+                  value={`${board.name} ${board.id}`}
+                  onSelect={() => handleSelectBoard(board.id)}
+                >
+                  <SquareMousePointer className="text-muted-foreground" />
+                  <span className="truncate">{board.name}</span>
                 </CommandItem>
               ))}
             </CommandGroup>

@@ -24,6 +24,22 @@ export function searchItemsOptions(trpc: ReturnType<typeof useTRPC>) {
 }
 
 /**
+ * Boards, as their own query rather than folded into the one above.
+ *
+ * Two requests, but not two round trips: the client batches, and both of these
+ * are asked for in the same tick. What it buys is that each router keeps
+ * answering for its own data — a board mutation invalidates `board` and the
+ * palette follows, with nothing in the board feature having to know that a
+ * query in the folder router quietly included its rows.
+ */
+export function searchBoardsOptions(trpc: ReturnType<typeof useTRPC>) {
+  return {
+    ...trpc.board.list.queryOptions(),
+    staleTime: SEARCH_STALE_TIME,
+  };
+}
+
+/**
  * Fills the palette's cache ahead of time. Safe to call as often as the pointer
  * moves — a fetch already in flight is joined, and fresh data is left alone.
  */
@@ -33,6 +49,7 @@ export function usePrefetchSearchItems() {
 
   return useCallback(() => {
     void queryClient.prefetchQuery(searchItemsOptions(trpc));
+    void queryClient.prefetchQuery(searchBoardsOptions(trpc));
   }, [queryClient, trpc]);
 }
 

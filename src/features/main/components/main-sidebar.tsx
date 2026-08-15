@@ -2,7 +2,6 @@
 
 import {
   AudioLines,
-  FolderPlus,
   Headphones,
   Home,
   LayoutGrid,
@@ -11,7 +10,6 @@ import {
   PlusIcon,
   Settings,
   SquareMousePointer,
-  Upload,
   Volume2,
 } from "lucide-react";
 import Link from "next/link";
@@ -39,13 +37,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useModalStore } from "@/lib/stores/modal-store";
 import CreateDropdown from "./create-dropdown";
 import Image from "next/image";
 import Logo from "@/components/logo";
-
-/** Matches `SheetContent`'s `duration-200` exit transition. */
-const SHEET_EXIT_MS = 200;
 
 export interface MenuItemsProps {
   icon: LucideIcon;
@@ -62,23 +56,6 @@ interface MenuGroupProps {
 
 const MainSidebar = () => {
   const pathName = usePathname();
-  const openModal = useModalStore((state) => state.open);
-  const { isMobile, setOpenMobile } = useSidebar();
-
-  /**
-   * On mobile the sidebar *is* a sheet — its own dialog. Opening a modal from
-   * inside it would stack two overlays and leave focus behind with the sheet,
-   * so close the sheet first and let it finish animating out before handing the
-   * screen over.
-   */
-  const runFromSidebar = (action: () => void) => {
-    if (!isMobile) {
-      action();
-      return;
-    }
-    setOpenMobile(false);
-    window.setTimeout(action, SHEET_EXIT_MS);
-  };
 
   const routes: MenuItemsProps[] = [
     {
@@ -93,7 +70,7 @@ const MainSidebar = () => {
     },
     {
       label: "Sticky Notes",
-      href: "/sticky-notes",
+      href: "/stickynotes",
       icon: NotebookPen,
     },
   ];
@@ -107,19 +84,6 @@ const MainSidebar = () => {
       label: "Help and support",
       href: "mailto:business@codewithantonio.com",
       icon: Headphones,
-    },
-  ];
-
-  const createButtonActions: MenuItemsProps[] = [
-    {
-      label: "New Folder",
-      icon: FolderPlus,
-      onClick: () => runFromSidebar(() => openModal("create-folder")),
-    },
-    {
-      label: "Upload File",
-      icon: Upload,
-      onClick: () => runFromSidebar(() => openModal("upload-file")),
     },
   ];
 
@@ -148,6 +112,22 @@ const MainSidebar = () => {
 export default MainSidebar;
 
 const NavItems = ({ groupLabel, items, pathName }: MenuGroupProps) => {
+  const { setOpenMobile } = useSidebar();
+
+  /**
+   * On mobile the sidebar *is* a sheet, and a sheet does not know that a link
+   * inside it went anywhere — the route changes underneath while the sheet
+   * stays put, covering the page it just opened. Closing it is this component's
+   * job, since nothing about the navigation does it.
+   *
+   * Harmless on desktop: `openMobile` drives the sheet, and the sheet is not
+   * rendered there.
+   */
+  const handleSelect = (item: MenuItemsProps) => {
+    setOpenMobile(false);
+    item.onClick?.();
+  };
+
   return (
     <SidebarGroup className="space-y-2">
       {groupLabel && (
@@ -168,9 +148,9 @@ const NavItems = ({ groupLabel, items, pathName }: MenuGroupProps) => {
                     : pathName.startsWith(item.href)
                   : false
               }
-              onClick={item.onClick}
+              onClick={() => handleSelect(item)}
               tooltip={item.label}
-              className="h-9 px-3 py-2 text-[13px] tracking-tight font-medium border border-transparent data-[active=true]:border-border data-[active=true]:shadow-[0px_1px_1px_0px_rgba(44,54,53,0.03),inset_0px_0px_0px_2px_white]"
+              className="h-9 px-3 py-2 text-[13px] tracking-tight font-medium border border-transparent data-[active=true]:border-primary data-[active=true]:shadow-[0px_1px_1px_0px_rgba(44,54,53,0.03),inset_0px_0px_0px_2px_white]"
             >
               {item.href ? (
                 <Link href={item.href}>
