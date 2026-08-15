@@ -7,8 +7,10 @@ import {
   Home,
   LayoutGrid,
   type LucideIcon,
+  NotebookPen,
   PlusIcon,
   Settings,
+  SquareMousePointer,
   Upload,
   Volume2,
 } from "lucide-react";
@@ -39,6 +41,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useModalStore } from "@/lib/stores/modal-store";
 import CreateDropdown from "./create-dropdown";
+import Image from "next/image";
+import Logo from "@/components/logo";
 
 /** Matches `SheetContent`'s `duration-200` exit transition. */
 const SHEET_EXIT_MS = 200;
@@ -83,18 +87,14 @@ const MainSidebar = () => {
       icon: Home,
     },
     {
-      label: "Explore Board",
+      label: "Board",
       href: "/board",
-      icon: LayoutGrid,
+      icon: SquareMousePointer,
     },
     {
-      label: "Text to speech",
-      href: "/text-to-speech",
-      icon: AudioLines,
-    },
-    {
-      label: "Voice cloning",
-      icon: Volume2,
+      label: "Sticky Notes",
+      href: "/sticky-notes",
+      icon: NotebookPen,
     },
   ];
 
@@ -127,44 +127,9 @@ const MainSidebar = () => {
     <Sidebar collapsible="icon" variant="inset">
       <SidebarHeader className="flex flex-col gap-4 pt-4">
         <div className="flex items-center gap-2 pl-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:pl-0">
-          {/* <Image
-            src="/logo.svg"
-            alt="Resonance"
-            width={24}
-            height={24}
-            className="rounded-sm"
-          /> */}
-          <span className="group-data-[collapsible=icon]:hidden font-semibold text-lg tracking-tighter text-foreground">
-            Study
-          </span>
+          <Logo href="/main" />
           <SidebarTrigger className="ml-auto md:hidden" />
         </div>
-        {/* <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton variant="primary">
-                  <PlusIcon />
-                  <span className="group-data-[collapsible=icon]:hidden">
-                    Create
-                  </span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuGroup>
-              {createButtonActions.map(
-                ({ label, icon: Icon, onClick, href }) => (
-                  <DropdownMenuItem onClick={onClick} key={label}>
-                    <Icon />
-                    <span>{label}</span>
-                  </DropdownMenuItem>
-                ),
-              )}
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu> */}
         <CreateDropdown
           buttonLabel="New"
           buttonIcon={<PlusIcon />}
@@ -184,7 +149,7 @@ export default MainSidebar;
 
 const NavItems = ({ groupLabel, items, pathName }: MenuGroupProps) => {
   return (
-    <SidebarGroup>
+    <SidebarGroup className="space-y-2">
       {groupLabel && (
         <SidebarGroupLabel className="teext-muted-foreground text-[11px] uppercase">
           {groupLabel}

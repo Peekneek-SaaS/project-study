@@ -24,7 +24,7 @@ export async function MainView() {
           buttonIconPosition="end"
           buttonIcon={<ChevronDown />}
           buttonVariant="ghost"
-          className="text-lg"
+          className="sm:text-xl text-lg"
         />
         <MainViewType serverView={serverView} />
       </div>

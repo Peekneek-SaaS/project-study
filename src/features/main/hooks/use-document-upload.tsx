@@ -56,9 +56,9 @@ export function useDocumentUpload() {
         duration: 4000,
       });
       toastId.current = null;
-      await queryClient.invalidateQueries(
-        trpc.folder.getContents.pathFilter(),
-      );
+      // The whole router, not just the listing: the search palette's flat index
+      // is a `folder` query too, and it holds its answer for minutes.
+      await queryClient.invalidateQueries(trpc.folder.pathFilter());
     },
 
     onUploadError: (error) => {

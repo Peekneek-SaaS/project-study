@@ -38,6 +38,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import MainSelectFilter from "./main-select-filters";
+import MainFilterView from "../views/main-filter-view";
 
 export function MainContent({ serverView }: { serverView: DriveViewType }) {
   const {
@@ -134,44 +136,10 @@ export function MainContent({ serverView }: { serverView: DriveViewType }) {
               </Button>
             </div>
           ) : (
-            <div className="flex items-center gap-2 py-2 ">
-              <div>
-                <Select>
-                  <SelectTrigger className="">
-                    <SelectValue placeholder="Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="light">PDF</SelectItem>
-                      <SelectItem value="dark">PPT</SelectItem>
-                      <SelectItem value="system">DOCX</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Select>
-                  <SelectTrigger className="">
-                    <SelectValue placeholder="Modified" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="light">Today</SelectItem>
-                      <SelectItem value="dark">Yesterday</SelectItem>
-                      <SelectItem value="system">Last 7 days</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+            <MainFilterView />
           )}
         </div>
 
-        {/*
-          Two shapes for one listing. Everything either view needs — selection,
-          the drag wiring, the keyboard — sits above this branch, so the switch
-          costs nothing but a re-render.
-        */}
         {/* TODO: Faded Overlay */}
         {/* <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-background to-transparent" /> */}
 

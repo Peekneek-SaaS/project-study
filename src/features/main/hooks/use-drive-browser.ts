@@ -37,9 +37,10 @@ export function useDriveBrowser() {
   );
 
   // A move rewrites two folders' listings, so refresh them all rather than
-  // guessing which ones are cached.
+  // guessing which ones are cached — and the whole router with them, since the
+  // search palette's index carries the parent that just changed.
   const onSettled = useCallback(
-    () => queryClient.invalidateQueries(trpc.folder.getContents.pathFilter()),
+    () => queryClient.invalidateQueries(trpc.folder.pathFilter()),
     [queryClient, trpc],
   );
   const onError = useCallback((error: { message: string }) => {
@@ -89,7 +90,15 @@ export function useDriveBrowser() {
 
   const handleDragEnd = useCallback(
     ({ operation, canceled }: DragEndEvent) => {
-      useDriveSelectionStore.getState().setDraggingSelection(false);
+      // What the drag decided it was carrying when it started, before the flag
+      // is cleared. Recomputing it here would read a selection that may have
+      // changed under the drag: a touch hold arms the drag and ticks the row on
+      // the same timer, and the tick lands second — so a row held while other
+      // rows were selected starts out carrying only itself and would arrive
+      // looking like it had brought the whole selection with it.
+      const { isDraggingSelection, setDraggingSelection } =
+        useDriveSelectionStore.getState();
+      setDraggingSelection(false);
       if (canceled) return;
 
       const drag = operation.source?.data as DriveDragData | undefined;
@@ -100,18 +109,15 @@ export function useDriveBrowser() {
       // Dropped back where it already lives.
       if (targetId === currentFolderId) return;
 
-      // Picking up a ticked row carries the whole selection; picking up
-      // anything else moves just that thing, ticks elsewhere notwithstanding.
-      // Read at drop time rather than subscribed to, so this handler is not
-      // rebuilt on every tick.
+      // Which rows those are, though, is read now rather than at drag start —
+      // and read rather than subscribed to, so this handler is not rebuilt on
+      // every tick.
       const { folderIds, documentIds, clear } =
         useDriveSelectionStore.getState();
-      const isSelected =
-        drag.kind === "folder"
-          ? folderIds.has(drag.id)
-          : documentIds.has(drag.id);
 
-      if (isSelected && folderIds.size + documentIds.size > 1) {
+      // Picking up a ticked row carries the whole selection; picking up
+      // anything else moves just that thing, ticks elsewhere notwithstanding.
+      if (isDraggingSelection) {
         // Dropping a selection onto one of its own folders puts the rest
         // inside it; that folder stays where it is.
         const selectedFolders = [...folderIds].filter((id) => id !== targetId);

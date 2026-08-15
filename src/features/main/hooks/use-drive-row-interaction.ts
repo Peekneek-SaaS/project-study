@@ -3,6 +3,10 @@
 import { useEffect, useRef } from "react";
 
 import {
+  TOUCH_HOLD_MS,
+  TOUCH_HOLD_TOLERANCE_PX,
+} from "@/features/main/lib/drive-sensors";
+import {
   type DriveItemKey,
   selectHasSelection,
   useDriveSelectionStore,
@@ -19,11 +23,6 @@ export type SelectRow = (
   modifiers: RowSelectModifiers,
   item: DriveItemKey,
 ) => void;
-
-/** Long enough not to fire on a tap, short enough to feel like a press. */
-const LONG_PRESS_MS = 400;
-/** A press that wanders this far is a scroll, not a hold. */
-const LONG_PRESS_TOLERANCE_PX = 10;
 
 /** A tap, as opposed to a click — pointer info survives onto the click event. */
 const isTouch = (event: React.MouseEvent) =>
@@ -47,7 +46,10 @@ interface DriveRowInteractionOptions {
  * takes everything between the anchor and here — and a selected row can still
  * be picked up and dragged, so the two gestures have to stay out of each
  * other's way. Touch has neither modifiers nor a double-tap worth trusting, so
- * it gets the phone convention instead: tap opens, hold selects.
+ * it gets the phone convention instead: tap opens, hold selects, and carrying
+ * on from the hold drags. The last of those belongs to the sensor rather than
+ * to this hook — see `driveSensors`, which arms the drag on the same hold this
+ * one ticks the row with.
  *
  * Shared by both row kinds so folders and documents cannot drift apart.
  */
@@ -98,18 +100,24 @@ export function useDriveRowInteraction({
       longPress.current.timer = null;
       longPress.current.fired = true;
       toggle(item);
-      // Confirms the hold landed, on the phones that offer it.
+      // Confirms the hold landed, on the phones that offer it. The row lifting
+      // under the finger — the sensor's doing, on the same timer — says it
+      // everywhere else.
       navigator.vibrate?.(10);
-    }, LONG_PRESS_MS);
+    }, TOUCH_HOLD_MS);
   };
 
   const handlePointerMove = (event: React.PointerEvent) => {
     const { origin } = longPress.current;
     if (!origin) return;
 
-    const travelled =
-      Math.abs(event.clientX - origin.x) + Math.abs(event.clientY - origin.y);
-    if (travelled > LONG_PRESS_TOLERANCE_PX) cancelLongPress();
+    // Straight-line, matching how the sensor measures its own tolerance, so a
+    // drift that costs the drag costs the tick as well.
+    const travelled = Math.hypot(
+      event.clientX - origin.x,
+      event.clientY - origin.y,
+    );
+    if (travelled > TOUCH_HOLD_TOLERANCE_PX) cancelLongPress();
   };
 
   const handleClick = (event: React.MouseEvent) => {

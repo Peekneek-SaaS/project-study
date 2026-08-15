@@ -2,6 +2,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Inter } from "next/font/google";
 import { shadcn } from "@clerk/ui/themes";
+import { NuqsAdapter } from "nuqs/adapters/next/app";
 
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -58,7 +59,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             disableTransitionOnChange
           >
             <TRPCReactProvider>
-              <TooltipProvider>{children}</TooltipProvider>
+              <TooltipProvider>
+                <NuqsAdapter>{children}</NuqsAdapter>
+              </TooltipProvider>
               {/* Above the toaster: uploads started from a modal report into it. */}
               <ModalProvider />
               <Toaster position="bottom-right" />

@@ -26,9 +26,9 @@ export function CreateFolderModal() {
       onSuccess: async (folder) => {
         toast.success(`Created ${folder.name}`);
         handleOpenChange(false);
-        await queryClient.invalidateQueries(
-          trpc.folder.getContents.pathFilter(),
-        );
+        // The whole router: the new folder has to reach the search palette's
+        // flat index as well as the listing.
+        await queryClient.invalidateQueries(trpc.folder.pathFilter());
       },
       onError: (error) => toast.error(error.message),
     }),

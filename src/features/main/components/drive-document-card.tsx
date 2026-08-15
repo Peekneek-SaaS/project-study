@@ -74,11 +74,9 @@ export function DriveDocumentCard({
       role="option"
       aria-selected={isSelected}
       className={cn(
-        // The border is transparent until it is needed, so selecting a card
-        // outlines it without nudging the grid a pixel.
-        "flex select-none flex-col overflow-hidden rounded-xl border border-transparent bg-muted/60 transition-colors",
+        "flex select-none flex-col overflow-hidden rounded-xl bg-muted/60 transition-colors",
         "hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        isSelected && "border-primary bg-muted",
+        isSelected && "bg-primary/10 ring-2 ring-primary ring-inset",
         isDragging && "cursor-grabbing",
         (isDragging || (isSelected && isDraggingSelection)) && "opacity-40",
       )}

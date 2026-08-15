@@ -16,6 +16,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
 import { DriveStatusBadge } from "@/features/main/components/drive-status-badge";
 import { useOpenDocument } from "@/features/main/hooks/use-open-document";
+import { searchItemsOptions } from "@/features/main/hooks/use-search-items";
 import { useDriveStore } from "@/lib/stores/drive-store";
 import { useSearchStore } from "@/lib/stores/search-store";
 import { useTRPC } from "@/trpc/client";
@@ -88,10 +89,13 @@ export function SearchModal() {
   const openDocument = useOpenDocument();
 
   const trpc = useTRPC();
-  // Nothing is fetched until the palette is asked for; after that the list is
-  // cached, so reopening it is instant.
+  // Normally already answered: the header warms this entry on idle and again on
+  // hover, so opening the palette usually reads straight from the cache. The
+  // gate stays because a warm-up that has not landed yet — or was never run,
+  // for anything that opens the palette without the header — should still fetch
+  // on open rather than on every page that mounts this modal.
   const { data, isLoading } = useQuery({
-    ...trpc.folder.getAllItems.queryOptions(),
+    ...searchItemsOptions(trpc),
     enabled: isOpen,
   });
 
