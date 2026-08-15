@@ -1,9 +1,8 @@
 import {
-  DRIVE_MODIFIED_VALUES,
   DRIVE_TYPE_VALUES,
-  modifiedRange,
   typeExtensions,
 } from "@/features/main/lib/drive-filters";
+import { MODIFIED_VALUES, modifiedRange } from "@/lib/list-filters";
 import { prisma } from "@/lib/prisma";
 import { deleteUploadedFiles } from "@/lib/uploadthing-server";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
@@ -307,7 +306,7 @@ export const FolderRouter = createTRPCRouter({
       z.object({
         folderId: z.string().nullable(),
         type: z.enum(DRIVE_TYPE_VALUES).nullable().default(null),
-        modified: z.enum(DRIVE_MODIFIED_VALUES).nullable().default(null),
+        modified: z.enum(MODIFIED_VALUES).nullable().default(null),
       }),
     )
     .query(async ({ ctx, input }) => {

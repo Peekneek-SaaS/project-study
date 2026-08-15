@@ -1,9 +1,7 @@
 import { createLoader, parseAsStringLiteral } from "nuqs/server";
 
-import {
-  DRIVE_MODIFIED_VALUES,
-  DRIVE_TYPE_VALUES,
-} from "@/features/main/lib/drive-filters";
+import { DRIVE_TYPE_VALUES } from "@/features/main/lib/drive-filters";
+import { MODIFIED_VALUES } from "@/lib/list-filters";
 
 /**
  * The drive's filters, as URL search params.
@@ -20,7 +18,7 @@ import {
  */
 export const driveFilterParsers = {
   type: parseAsStringLiteral(DRIVE_TYPE_VALUES),
-  modified: parseAsStringLiteral(DRIVE_MODIFIED_VALUES),
+  modified: parseAsStringLiteral(MODIFIED_VALUES),
 };
 
 /** Server-side reader for the above. Takes a page's `searchParams` promise. */
@@ -28,5 +26,5 @@ export const loadDriveFilters = createLoader(driveFilterParsers);
 
 export type DriveFilters = {
   type: (typeof DRIVE_TYPE_VALUES)[number] | null;
-  modified: (typeof DRIVE_MODIFIED_VALUES)[number] | null;
+  modified: (typeof MODIFIED_VALUES)[number] | null;
 };

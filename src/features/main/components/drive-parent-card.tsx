@@ -11,6 +11,7 @@ import {
 } from "@/features/main/types";
 import { useDriveStore } from "@/lib/stores/drive-store";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 /**
  * Grid view's way back out of a folder — and, as with the row it replaces, the
@@ -31,18 +32,16 @@ export function DriveParentCard({
   });
 
   return (
-    <button
+    <Button
       ref={ref}
-      type="button"
       onClick={() => goToCrumb(parentFolderId)}
       className={cn(
-        "flex w-fit select-none items-center gap-2 rounded-xl border border-transparent bg-muted/60 px-3 py-2 text-sm text-muted-foreground transition-colors",
-        "hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "w-fit",
         isDropTarget && "border-primary bg-accent text-foreground",
       )}
     >
-      <CornerUpLeft className="size-4" />
+      <CornerUpLeft className="size-3.5" />
       Back
-    </button>
+    </Button>
   );
 }

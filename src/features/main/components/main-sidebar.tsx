@@ -135,7 +135,7 @@ const NavItems = ({ groupLabel, items, pathName }: MenuGroupProps) => {
   return (
     <SidebarGroup className="space-y-2">
       {groupLabel && (
-        <SidebarGroupLabel className="teext-muted-foreground text-[11px] uppercase">
+        <SidebarGroupLabel className="text-muted-foreground text-[11px] uppercase group-data-[collapsible=icon]:hidden">
           {groupLabel}
         </SidebarGroupLabel>
       )}

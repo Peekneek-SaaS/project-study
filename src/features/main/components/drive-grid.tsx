@@ -27,7 +27,7 @@ export function DriveGrid({
   onSelect: SelectRow;
 }) {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 py-2">
       {!isRoot && <DriveParentCard parentFolderId={parentFolderId} />}
 
       {folders.length > 0 && (

@@ -1,32 +1,56 @@
 "use client";
 
-import { FileText } from "lucide-react";
-
 import { Progress } from "@/components/ui/progress";
 
 /**
- * Body of the upload toast. Sonner's custom toasts render unstyled, so this
- * paints the popover surface itself to match the rest of the toaster.
+ * The upload toast's contents, shaped to go *inside* a sonner toast rather than
+ * to replace one.
+ *
+ * These are handed to `toast.loading` as its title and description, so the
+ * surface, the icon, the spacing, the enter and exit animations and the
+ * loading-to-success swap are all sonner's own — the same ones every other
+ * toast in the app gets. The earlier version went through `toast.custom`, which
+ * renders unstyled, and so had to paint a copy of that surface by hand: a
+ * second definition of what a toast looks like, drifting on its own.
  */
-export function UploadProgressToast({
+
+/** One file's name, or a count once a batch is going up, with its progress. */
+export function UploadToastTitle({
   label,
   progress,
 }: {
-  /** One file's name, or a count once a batch is going up. */
   label: string;
   progress: number;
 }) {
-  const percent = Math.round(progress);
-
   return (
-    <div className="flex w-full flex-col gap-2 rounded-[var(--radius)] border bg-popover p-3 text-xs text-popover-foreground shadow-lg">
-      <div className="flex items-center gap-2">
-        <FileText className="size-4 shrink-0 text-muted-foreground" />
-        <span className="min-w-0 flex-1 truncate font-medium">{label}</span>
-        <span className="tabular-nums text-muted-foreground">{percent}%</span>
-      </div>
-      <Progress value={percent} aria-label={`Uploading ${label}`} />
-      <p className="text-muted-foreground">Uploading…</p>
-    </div>
+    <span className="flex items-baseline gap-2">
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {/* `tabular-nums` so counting up does not shuffle the digits sideways. */}
+      <span className="shrink-0 tabular-nums opacity-70">
+        {Math.round(progress)}%
+      </span>
+    </span>
+  );
+}
+
+/**
+ * The bar, as the toast's description.
+ *
+ * Sonner's `[data-content]` is a full-width column, so this fills the toast
+ * without being told how wide it is.
+ */
+export function UploadToastProgress({
+  label,
+  progress,
+}: {
+  label: string;
+  progress: number;
+}) {
+  return (
+    <Progress
+      value={progress}
+      aria-label={`Uploading ${label}`}
+      className="mt-1"
+    />
   );
 }

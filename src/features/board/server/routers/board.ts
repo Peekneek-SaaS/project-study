@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import z from "zod";
 
 import type { StoredScene } from "@/features/board/lib/scene";
+import { MODIFIED_VALUES, modifiedRange } from "@/lib/list-filters";
 import { prisma } from "@/lib/prisma";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
@@ -65,14 +66,34 @@ export const BoardRouter = createTRPCRouter({
    *
    * Snapshots are not selected: a scene is unbounded, and a table that only
    * shows names would otherwise carry every drawing in the account.
+   *
+   * The "modified" filter is applied here rather than over the rows that come
+   * back, for the same reason the drive's is: the response stays proportional
+   * to what is actually shown, however many boards the account collects.
    */
-  list: protectedProcedure.query(async ({ ctx }) => {
-    return prisma.board.findMany({
-      where: { userId: ctx.userId, documentId: null },
-      orderBy: { updatedAt: "desc" },
-      select: listFields,
-    });
-  }),
+  list: protectedProcedure
+    .input(
+      z
+        .object({
+          modified: z.enum(MODIFIED_VALUES).nullable().default(null),
+        })
+        // Optional so the callers that want every board — the sidebar, a
+        // prefetch with nothing to filter by — can go on calling `list()`.
+        .default({ modified: null }),
+    )
+    .query(async ({ ctx, input }) => {
+      const updatedAt = modifiedRange(input.modified);
+
+      return prisma.board.findMany({
+        where: {
+          userId: ctx.userId,
+          documentId: null,
+          ...(updatedAt && { updatedAt }),
+        },
+        orderBy: { updatedAt: "desc" },
+        select: listFields,
+      });
+    }),
 
   /** One board, with its scene, for the canvas. */
   get: protectedProcedure
@@ -155,5 +176,25 @@ export const BoardRouter = createTRPCRouter({
       await prisma.board.delete({ where: { id: input.id } });
 
       return { id: input.id };
+    }),
+
+  /**
+   * Deletes a whole selection at once.
+   *
+   * No `assertOwned` loop: `deleteMany` is scoped by `userId`, so ids that are
+   * not the caller's match nothing rather than erroring the whole batch — the
+   * same shape as `folder.bulkRemove`, and one round trip, so a dropped request
+   * partway down the list cannot leave the delete half-finished.
+   */
+  bulkRemove: protectedProcedure
+    .input(z.object({ ids: z.array(z.string()) }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.ids.length === 0) return { count: 0 };
+
+      const { count } = await prisma.board.deleteMany({
+        where: { userId: ctx.userId, id: { in: input.ids } },
+      });
+
+      return { count };
     }),
 });

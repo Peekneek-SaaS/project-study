@@ -21,6 +21,7 @@ import { DriveParentRow } from "@/features/main/components/drive-parent-row";
 import { useDriveBrowser } from "@/features/main/hooks/use-drive-browser";
 import { useDriveRowSelection } from "@/features/main/hooks/use-drive-row-selection";
 import { driveSensors } from "@/features/main/lib/drive-sensors";
+import { ROW_ATTRIBUTE } from "@/hooks/use-row-interaction";
 import type { DriveDragData } from "@/features/main/types";
 import { useDriveSelectionStore } from "@/lib/stores/drive-selection-store";
 import {
@@ -30,6 +31,31 @@ import {
 import { useModalStore } from "@/lib/stores/modal-store";
 import { cn } from "@/lib/utils";
 import MainFilterView from "../views/main-filter-view";
+
+/**
+ * What keeps a column heading under the toolbar as the rows scroll past it.
+ *
+ * The offset is every sticky thing above it stacked up — the app header, the
+ * title bar, the toolbar — read from the variables `main-view.tsx` declares, so
+ * the headings follow the header when the sidebar collapses and shortens it.
+ *
+ * `md:` on every part of it, and not as a nicety: below that breakpoint the
+ * table keeps the `overflow-x-auto` container it ships with, which makes that
+ * container the scrollport these would stick to. Sticking to a box that never
+ * scrolls vertically does not leave the heading where it was — the scrollport's
+ * top *is* the container's top, so the offset is measured from there and the
+ * heading gets shoved a full 10rem down into the table, surfacing a few rows
+ * in. So this has to be gated to exactly where the overflow is taken off, and
+ * the two belong together: see the listing wrapper below.
+ *
+ * The rule underneath is an inset shadow rather than the `border-b` the table
+ * gives its header row. Preflight puts tables in `border-collapse: collapse`,
+ * where a border belongs to the table's own grid rather than to the cell, and
+ * so stays behind at the row's original place once the cell starts sticking.
+ * A shadow is painted by the cell and travels with it.
+ */
+const STICKY_HEAD =
+  "md:sticky md:top-[calc(var(--drive-sticky-top)+var(--drive-title-h)+var(--drive-toolbar-h))] md:z-10 md:bg-background md:shadow-[inset_0_-1px_0_0_var(--border)]";
 
 export function MainContent({ serverView }: { serverView: DriveViewType }) {
   const {
@@ -92,18 +118,43 @@ export function MainContent({ serverView }: { serverView: DriveViewType }) {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className={cn(isMoving && "pointer-events-none opacity-60")}>
+      {/*
+        A flex column that fills what the view gives it, so the empty state can
+        centre itself in the space left over rather than sitting just under the
+        toolbar. `Empty` already asks for that with `flex-1`; the ask only
+        reaches the page if every wrapper between the two passes the height on.
+      */}
+      <div
+        className={cn(
+          "flex flex-1 flex-col",
+          isMoving && "pointer-events-none opacity-60",
+        )}
+      >
         {/*
-          Both bars sit in the one grid cell, stacked, so the header is always
-          as tall as the taller of them and the listing underneath never steps
-          up or down when a selection starts or ends. They cross-fade in place
-          rather than swapping, which is what made this flick: mounting one
-          subtree and unmounting the other let the header collapse to nothing
+          Both bars sit in the one grid cell, stacked, so the listing underneath
+          never steps up or down when a selection starts or ends. They cross-fade
+          in place rather than swapping, which is what made this flick: mounting
+          one subtree and unmounting the other let the header collapse to nothing
           for a frame in between. `inert` takes the hidden one out of the tab
           order and off the pointer's hit-test the moment it starts to leave,
           so only the live bar can be reached however long the fade runs.
+
+          Sticky under the title bar, so the filters — and, mid-selection, the
+          count and the delete — stay reachable however far down the folder you
+          are. The offset is the title bar's height added to where the sticky
+          region starts; both are declared on the view's root (`main-view.tsx`),
+          which is also what makes this follow the header when it shrinks. The
+          height is declared rather than measured for the same reason: the
+          column headings below stick under this bar and have to name how tall
+          it is. `3rem` is the taller of the two bars (the filter row's `h-8`
+          selects plus its padding), so neither is cramped by it.
+
+          `z-20` puts it under the title bar rather than over it, and no
+          `w-full`: with `-mx-4` pulling the bar out over the page padding, an
+          explicit 100% width would measure from the old edge and hang off the
+          right instead of stretching to both.
         */}
-        <div className="grid w-full grid-cols-1 grid-rows-1 *:col-start-1 *:row-start-1">
+        <div className="sticky top-[calc(var(--drive-sticky-top)+var(--drive-title-h))] z-20 -mx-4 grid h-(--drive-toolbar-h) grid-cols-1 grid-rows-1 bg-background px-4 *:col-start-1 *:row-start-1">
           <div
             inert={isSelecting}
             className={cn(
@@ -161,19 +212,24 @@ export function MainContent({ serverView }: { serverView: DriveViewType }) {
           </div>
         </div>
 
-        {/*
-          The listing runs under the floating breadcrumb bar, so it fades out
-          into the page rather than being cut off mid-row behind it. Absolute
-          against the view's `relative` wrapper, and drawn before the bar in the
-          DOM so the bar stays legible on top of it. `pointer-events-none` keeps
-          the rows underneath clickable right up to the bar.
-        */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-background via-background/80 to-transparent" />
-
         <div
+          // What makes the sticky column headings above actually stick. The
+          // table ships inside an `overflow-x-auto` container, and a box that
+          // scrolls on one axis scrolls on both as far as CSS is concerned —
+          // which would make that container the scrollport the headings stick
+          // to, and it never scrolls vertically. Taking the overflow off hands
+          // them back to the page. Reached through the `data-slot` the table
+          // exposes rather than by changing the shared component, and only from
+          // `md` up: below that the row is genuinely too wide for the screen
+          // and scrolling it sideways is worth more than a pinned heading.
+          // `STICKY_HEAD` is gated to the same breakpoint and has to stay that
+          // way — a heading left sticky here would be displaced, not ignored.
+          // `flex-1` for the same reason as the wrapper above: it carries the
+          // height down to the empty state, which centres itself in it.
+          className="flex flex-1 flex-col md:[&_[data-slot=table-container]]:overflow-x-visible"
           // Clicking past the listing drops the selection, the way clicking
           // empty space in a file manager does. Rows and cards both carry
-          // `data-drive-row` and answer their own clicks; buttons and menus
+          // a row key and answer their own clicks; buttons and menus
           // speak for themselves. Anything else here is background.
           //
           // Wrapped around the listing alone rather than the whole view,
@@ -182,7 +238,7 @@ export function MainContent({ serverView }: { serverView: DriveViewType }) {
           onClick={(event) => {
             const target = event.target as HTMLElement;
             if (
-              target.closest("[data-drive-row], button, a, [role='menuitem']")
+              target.closest(`[${ROW_ATTRIBUTE}], button, a, [role='menuitem']`)
             )
               return;
             clearSelection();
@@ -201,10 +257,12 @@ export function MainContent({ serverView }: { serverView: DriveViewType }) {
               {hasItems && (
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Modified</TableHead>
-                    <TableHead className="w-24 text-right">Actions</TableHead>
+                    <TableHead className={STICKY_HEAD}>Name</TableHead>
+                    <TableHead className={STICKY_HEAD}>Status</TableHead>
+                    <TableHead className={STICKY_HEAD}>Modified</TableHead>
+                    <TableHead className={cn(STICKY_HEAD, "w-24 text-right")}>
+                      Actions
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
               )}

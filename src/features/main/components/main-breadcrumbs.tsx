@@ -153,8 +153,32 @@ const MainBreadCrumbs = () => {
   return (
     <div
       ref={containerRef}
-      className="flex items-center gap-2 absolute bottom-0 inset-x-0 bg-muted p-3 m-2 rounded-lg shadow-sm ring-1 ring-sidebar-border "
+      /*
+        Sticky rather than absolute. `absolute bottom-0` measures from the
+        bottom of the containing block, and the drive view grows with its
+        listing — so the bar only looked pinned while the folder was short
+        enough to fit, and wandered off the end of the page as soon as it was
+        not. Sticky pins it to the bottom of the *viewport* instead, and being
+        in flow it takes the view's own width with it rather than needing to be
+        told where the sidebar ends, the way `fixed` would.
+
+        `mt-auto` is what holds it down when the listing is short: as the last
+        item in the view's flex column it takes up the slack, so the bar sits at
+        the bottom whether the page scrolls or not. `-mx-2`, `-mb-2` and
+        `bottom-2` put back the inset the old `m-2` gave it, and keep it the
+        same 8px whether the bar is floating or settled at the end.
+      */
+      className="sticky bottom-2 z-20 -mx-2 -mb-2 mt-auto flex items-center gap-2 rounded-lg bg-muted p-3 shadow-sm ring-1 ring-sidebar-border"
     >
+      {/*
+        The listing fades out into the page above the bar rather than being cut
+        off mid-row behind it. Anchored to the bar so it travels with it —
+        parked at the bottom of the view instead, it would sit at the end of the
+        content while the bar floated, which is the same trap as above.
+        `-inset-x-2` undoes this element's own inset so the fade spans the full
+        width of the view.
+      */}
+      <div className="pointer-events-none absolute -inset-x-2 bottom-full h-4 bg-linear-to-t from-background via-background/80 to-transparent" />
       <Breadcrumb className="min-w-0 flex-1">
         {/*
           `nowrap` and a hidden overflow are what make the row measurable: left

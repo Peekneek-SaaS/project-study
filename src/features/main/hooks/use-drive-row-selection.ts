@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo } from "react";
 
 import type { SelectRow } from "@/features/main/hooks/use-drive-row-interaction";
+import { focusRow } from "@/hooks/use-row-interaction";
 import { useOpenDocument } from "@/features/main/hooks/use-open-document";
 import type { DriveDocument, DriveFolder } from "@/features/main/types";
 import {
@@ -28,14 +29,8 @@ const split = (items: DriveItemKey[]) => ({
   documentIds: items.filter((i) => i.kind === "document").map((i) => i.id),
 });
 
-/** Follows the selection with the browser's focus, so Enter has something to act on. */
-const focusRow = ({ kind, id }: DriveItemKey) => {
-  const row = document.querySelector<HTMLElement>(
-    `[data-drive-row="${kind}:${id}"]`,
-  );
-  row?.focus({ preventScroll: true });
-  row?.scrollIntoView({ block: "nearest" });
-};
+/** The key the row carries in the DOM — see `useRowInteraction`. */
+const rowKey = ({ kind, id }: DriveItemKey) => `${kind}:${id}`;
 
 /**
  * Selection for one listing: what a click means, and what the keyboard does.
@@ -171,7 +166,7 @@ export function useDriveRowSelection(
             : Math.min(Math.max(current + step, 0), rows.length - 1);
 
         selectOnly(rows[next].key);
-        focusRow(rows[next].key);
+        focusRow(rowKey(rows[next].key));
       }
     };
 

@@ -57,7 +57,7 @@ const MainSelectFilter = <Value extends string>({
         // An active filter is worth seeing from across the toolbar, since it is
         // the reason the listing is short.
         className={cn(
-          "h-8 dark:border-muted",
+          "h-8 dark:border-muted hover:border-primary",
           value !== null && "border-primary/40 bg-primary/5 text-foreground",
         )}
       >

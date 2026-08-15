@@ -7,10 +7,8 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import MainSelectFilter from "@/features/main/components/main-select-filters";
-import {
-  DRIVE_MODIFIED_FILTERS,
-  DRIVE_TYPE_FILTERS,
-} from "@/features/main/lib/drive-filters";
+import { DRIVE_TYPE_FILTERS } from "@/features/main/lib/drive-filters";
+import { MODIFIED_FILTERS } from "@/lib/list-filters";
 import { driveFilterParsers } from "@/features/main/lib/params";
 import { cn } from "@/lib/utils";
 
@@ -52,7 +50,7 @@ const MainFilterView = () => {
         anyLabel="Any time"
         value={filters.modified}
         onValueChange={(modified) => setFilters({ modified })}
-        values={DRIVE_MODIFIED_FILTERS}
+        values={MODIFIED_FILTERS}
       />
 
       {/* One reach for "show me everything again", rather than two dropdowns. */}

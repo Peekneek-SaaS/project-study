@@ -4,7 +4,10 @@ import { useCallback, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { UploadProgressToast } from "@/features/main/components/upload-progress-toast";
+import {
+  UploadToastProgress,
+  UploadToastTitle,
+} from "@/features/main/components/upload-progress-toast";
 import {
   selectCurrentFolderId,
   useDriveStore,
@@ -37,9 +40,26 @@ export function useDocumentUpload() {
   const toastId = useRef<string | number | null>(null);
   const label = useRef("");
 
-  const dismissProgressToast = () => {
-    if (toastId.current !== null) toast.dismiss(toastId.current);
-    toastId.current = null;
+  /**
+   * Puts the upload on screen, or moves the bar it is already showing.
+   *
+   * A plain loading toast: sonner draws the surface and the spinner, and the
+   * name, the percentage and the bar go in as its title and description. Under
+   * the same id this updates in place — and because there is no custom body
+   * involved, the finish below can turn this very toast into the success one
+   * rather than having to replace it.
+   */
+  const showProgress = (progress: number) => {
+    toastId.current = toast.loading(
+      <UploadToastTitle label={label.current} progress={progress} />,
+      {
+        id: toastId.current ?? undefined,
+        description: (
+          <UploadToastProgress label={label.current} progress={progress} />
+        ),
+        duration: Infinity,
+      },
+    );
   };
 
   const { startUpload, isUploading } = useUploadThing("documentUploader", {
@@ -48,30 +68,32 @@ export function useDocumentUpload() {
 
     onUploadProgress: (progress) => {
       if (toastId.current === null) return;
-      // Re-issuing under the same id replaces the toast's contents in place.
-      toast.custom(
-        () => <UploadProgressToast label={label.current} progress={progress} />,
-        { id: toastId.current, duration: Infinity },
-      );
+      showProgress(progress);
     },
 
     onClientUploadComplete: async () => {
-      // A new toast rather than an update of the progress one: sonner merges
-      // updates onto the existing toast, so the custom body would survive and
-      // the success toast would render the finished bar with the tick above it.
-      dismissProgressToast();
-      toast.success(`Uploaded ${label.current}`, { duration: 4000 });
+      toast.success(`Uploaded ${label.current}`, {
+        id: toastId.current ?? undefined,
+        // Cleared by hand. An update merges onto the toast already on screen,
+        // and nothing in a success toast mentions a description — so left
+        // alone, the finished bar would ride along underneath the message.
+        description: undefined,
+        duration: 4000,
+      });
+      toastId.current = null;
       // The whole router, not just the listing: the search palette's flat index
       // is a `folder` query too, and it holds its answer for minutes.
       await queryClient.invalidateQueries(trpc.folder.pathFilter());
     },
 
     onUploadError: (error) => {
-      dismissProgressToast();
+      // Replaces the bar rather than clearing it, but for the same reason.
       toast.error(`Could not upload ${label.current}`, {
+        id: toastId.current ?? undefined,
         description: error.message,
         duration: 6000,
       });
+      toastId.current = null;
     },
   });
 
@@ -80,10 +102,7 @@ export function useDocumentUpload() {
       if (files.length === 0) return;
 
       label.current = batchLabel(files);
-      toastId.current = toast.custom(
-        () => <UploadProgressToast label={batchLabel(files)} progress={0} />,
-        { duration: Infinity },
-      );
+      showProgress(0);
 
       await startUpload(files, { folderId });
     },

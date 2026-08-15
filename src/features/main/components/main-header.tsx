@@ -28,7 +28,11 @@ const MainHeader = () => {
   // renders the collapsed header, then grows it a frame later once hydration
   // corrects the guess — with a transition on `height` to make sure it is seen.
   return (
-    <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear md:group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 px-4 border-b">
+    // `bg-background` rather than nothing: the header is sticky, so the page
+    // scrolls *behind* it, and a transparent one shows the rows sliding through
+    // the logo and the buttons. The inset it sits in paints the same colour, so
+    // this only ever shows where something would otherwise pass underneath.
+    <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center justify-between gap-2 bg-background transition-[width,height] ease-linear md:group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 px-4 border-b">
       <div className="flex items-center gap-2">
         <SidebarTrigger className="-ml-1" />
         {/* <Separator

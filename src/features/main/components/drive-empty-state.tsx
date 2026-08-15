@@ -38,7 +38,7 @@ export function DriveEmptyState({
   // there answers a question nobody asked — the way out is the filter.
   if (isFiltering) {
     return (
-      <Empty className="border py-16">
+      <Empty className="">
         <EmptyHeader>
           <EmptyMedia variant="icon">
             <SearchXIcon />
@@ -62,7 +62,7 @@ export function DriveEmptyState({
   }
 
   return (
-    <Empty className="border py-16">
+    <Empty className="">
       <EmptyHeader>
         <EmptyMedia variant="icon">
           <FolderIcon />

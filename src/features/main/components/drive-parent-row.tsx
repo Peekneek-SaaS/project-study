@@ -13,6 +13,7 @@ import {
 } from "@/features/main/types";
 import { useDriveStore } from "@/lib/stores/drive-store";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 /**
  * The way back out of a folder — and the only drop target for the parent, which
@@ -39,15 +40,15 @@ export function DriveParentRow({
       className={cn(
         // A way out rather than a row you can hold: one click, as with any
         // other button on the page.
-        "cursor-pointer text-muted-foreground select-none",
+        "cursor-pointer text-muted-foreground select-none py-2",
         isDropTarget && DROP_TARGET_ROW_CLASS,
       )}
     >
       <TableCell colSpan={4}>
-        <div className="flex items-center gap-2">
-          <CornerUpLeft className="size-4 shrink-0" />
-          <span>..</span>
-        </div>
+        <Button className="flex items-center gap-2 space-y-2">
+          <CornerUpLeft className="size-3.5 shrink-0" />
+          Back
+        </Button>
       </TableCell>
     </TableRow>
   );

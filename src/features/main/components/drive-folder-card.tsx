@@ -79,7 +79,7 @@ export function DriveFolderCard({
       className={cn(
         // The border is transparent until it is needed, so selecting a card
         // outlines it without nudging the grid a pixel.
-        "flex select-none items-center gap-3 rounded-xl border border-transparent bg-input/20 px-3 py-3 transition-colors",
+        "flex select-none items-center gap-3 rounded-xl border dark:border-muted border-transparent bg-input/20 dark:hover:bg-muted px-3 py-3 transition-colors",
         "hover:bg-input/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         isSelected && "border-primary bg-muted",
         isDragging && "cursor-grabbing",
