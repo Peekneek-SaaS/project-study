@@ -191,6 +191,81 @@
   --input-label-color: var(--muted-foreground);
 }
 
+/*
+  Sticky note colours.
+
+  Kept apart from the shadcn tokens on purpose: those describe a neutral UI,
+  and a wall of notes is the one place in this app that is meant to be
+  colourful. What they share is the discipline — every colour is named once per
+  mode here, and a note stores only the name, so a note picked in light mode is
+  re-derived rather than re-coloured when the theme flips.
+
+  `-edge` is the border and the ruled lines: the same hue, far enough along to
+  read against its own fill in either mode.
+*/
+:root {
+  --note-amber: oklch(0.94 0.06 85);
+  --note-amber-edge: oklch(0.84 0.09 85);
+  --note-rose: oklch(0.93 0.05 15);
+  --note-rose-edge: oklch(0.83 0.08 15);
+  --note-violet: oklch(0.93 0.05 300);
+  --note-violet-edge: oklch(0.83 0.08 300);
+  --note-sky: oklch(0.93 0.05 230);
+  --note-sky-edge: oklch(0.83 0.08 230);
+  --note-emerald: oklch(0.93 0.05 160);
+  --note-emerald-edge: oklch(0.83 0.08 160);
+  --note-slate: oklch(0.94 0.01 260);
+  --note-slate-edge: oklch(0.84 0.02 260);
+
+  --note-ink-ink: oklch(0.22 0.01 260);
+  --note-ink-muted: oklch(0.48 0.01 260);
+  --note-ink-crimson: oklch(0.45 0.17 20);
+  --note-ink-indigo: oklch(0.44 0.15 275);
+}
+
+.dark {
+  /* Darkened rather than inverted: a note is still a coloured square, just one
+     that belongs on a dark page. The hue is the one thing held constant, so
+     "amber" stays recognisably amber across the switch. */
+  --note-amber: oklch(0.32 0.05 85);
+  --note-amber-edge: oklch(0.46 0.07 85);
+  --note-rose: oklch(0.31 0.05 15);
+  --note-rose-edge: oklch(0.45 0.07 15);
+  --note-violet: oklch(0.31 0.05 300);
+  --note-violet-edge: oklch(0.45 0.07 300);
+  --note-sky: oklch(0.31 0.05 230);
+  --note-sky-edge: oklch(0.45 0.07 230);
+  --note-emerald: oklch(0.31 0.05 160);
+  --note-emerald-edge: oklch(0.45 0.07 160);
+  --note-slate: oklch(0.3 0.01 260);
+  --note-slate-edge: oklch(0.44 0.02 260);
+
+  --note-ink-ink: oklch(0.95 0.01 260);
+  --note-ink-muted: oklch(0.72 0.01 260);
+  --note-ink-crimson: oklch(0.78 0.13 20);
+  --note-ink-indigo: oklch(0.78 0.11 275);
+}
+
+/*
+  The ruled lines inside a note.
+
+  Two things make this work. The period is `--note-line-height`, the same value
+  the text is set in, so writing sits on the lines instead of drifting off them
+  as the size changes. And `background-attachment: local` ties the background to
+  the content rather than the box, so the lines scroll with the text — without
+  it a full note scrolls its words across a fixed set of rules.
+*/
+.note-ruled {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(var(--note-line-height) - 1px),
+    var(--note-edge) calc(var(--note-line-height) - 1px),
+    var(--note-edge) var(--note-line-height)
+  );
+  background-attachment: local;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

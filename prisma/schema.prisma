@@ -49,6 +49,11 @@ model Document {
   /// back half of `Board.documentId` — no column of its own.
   board     Board?
 
+  /// Notes taken against this document, once per-document notes are built.
+  /// Plural where `board` is singular: a document gets one canvas, but as many
+  /// notes as it earns.
+  stickyNotes StickyNote[]
+
   @@index([userId, folderId])
 }
 
@@ -74,4 +79,36 @@ model Board {
   document   Document? @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   @@index([userId, documentId])
+}
+
+/// One sticky note.
+///
+/// `documentId` works as it does on `Board` — null means standalone, set means
+/// it belongs to a document — but without `@unique`, because a document can
+/// collect as many notes as it likes. Only standalone notes are built for now;
+/// nothing writes a `documentId` yet.
+///
+/// Appearance lives on the row rather than in a stylesheet because it is the
+/// user's, not the designer's: `color`, `textColor`, `fontSize` and `showGrid`
+/// are all changeable per note at any time. They are stored as palette *keys*
+/// rather than as CSS, so a note picked in light mode still reads correctly in
+/// dark mode — see `note-appearance.ts`, which owns the names.
+model StickyNote {
+  id         String    @id @default(cuid())
+  userId     String
+  documentId String?
+  content    String    @default("")
+  color      String    @default("amber")
+  textColor  String    @default("ink")
+  fontSize   Int       @default(14)
+  showGrid   Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  document   Document? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  /// The grid reads newest first within a day, and groups by day — so the
+  /// index carries `createdAt` rather than `updatedAt`. Editing an old note
+  /// leaves it under the date it was written, which is what makes "Yesterday"
+  /// mean anything.
+  @@index([userId, documentId, createdAt])
 }

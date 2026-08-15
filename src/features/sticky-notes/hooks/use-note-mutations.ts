@@ -1,0 +1,123 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+
+import type { NoteAppearance } from "@/features/sticky-notes/lib/note-appearance";
+import type { StickyNote } from "@/features/sticky-notes/types";
+import { useTRPC } from "@/trpc/client";
+
+/** Long enough to cover a sentence, short enough that a closed tab keeps it. */
+const CONTENT_DEBOUNCE_MS = 800;
+
+/**
+ * Writing a note back, in the two rhythms it actually changes in.
+ *
+ * Typing is continuous and cheap to lose a moment of, so it is debounced and
+ * never invalidates: the textarea already holds the newest text, and refetching
+ * the list mid-sentence would only invite the server's older copy to argue with
+ * it. Appearance is a single deliberate click, so it is written immediately and
+ * painted optimistically — a colour that waits for a round trip feels broken.
+ */
+export function useNoteMutations(noteId: string) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  const update = useMutation(trpc.stickyNote.update.mutationOptions());
+  const remove = useMutation(trpc.stickyNote.remove.mutationOptions());
+
+  const timer = useRef<number | null>(null);
+  const pending = useRef<string | null>(null);
+
+  const updateRef = useRef(update.mutateAsync);
+  useEffect(() => {
+    updateRef.current = update.mutateAsync;
+  });
+
+  const listFilter = trpc.stickyNote.list.queryFilter();
+  const listKey = trpc.stickyNote.list.queryKey();
+
+  const flushContent = async () => {
+    if (timer.current !== null) {
+      window.clearTimeout(timer.current);
+      timer.current = null;
+    }
+
+    const content = pending.current;
+    if (content === null) return;
+    pending.current = null;
+
+    try {
+      await updateRef.current({ id: noteId, content });
+    } catch (error) {
+      // Put it back, so the next keystroke's debounce carries it again rather
+      // than the text living only in a textarea the user may be about to close.
+      pending.current ??= content;
+      toast.error(
+        error instanceof Error ? error.message : "Could not save the note",
+      );
+    }
+  };
+
+  const saveContent = (content: string) => {
+    pending.current = content;
+    if (timer.current !== null) window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(
+      () => void flushContent(),
+      CONTENT_DEBOUNCE_MS,
+    );
+  };
+
+  // Closing the page mid-debounce would otherwise drop the last sentence.
+  // Written in an effect rather than during the render that reads it: a render
+  // can be thrown away, and this one is about what to do after the last.
+  const flushRef = useRef(flushContent);
+  useEffect(() => {
+    flushRef.current = flushContent;
+  });
+  useEffect(() => {
+    return () => {
+      void flushRef.current();
+    };
+  }, []);
+
+  const patchAppearance = async (patch: Partial<NoteAppearance>) => {
+    // Painted first: the cached list is what the grid renders from, so writing
+    // through it is what makes the colour land on the click rather than on the
+    // response.
+    const previous = queryClient.getQueryData<StickyNote[]>(listKey);
+    queryClient.setQueryData<StickyNote[]>(listKey, (notes) =>
+      notes?.map((note) => (note.id === noteId ? { ...note, ...patch } : note)),
+    );
+
+    try {
+      await update.mutateAsync({ id: noteId, ...patch });
+    } catch (error) {
+      // Straight back to what it was — an optimistic paint that failed is worse
+      // than one that never happened, because it looks saved.
+      if (previous) queryClient.setQueryData(listKey, previous);
+      toast.error(
+        error instanceof Error ? error.message : "Could not update the note",
+      );
+    }
+  };
+
+  const removeNote = async () => {
+    try {
+      await remove.mutateAsync({ id: noteId });
+      await queryClient.invalidateQueries(listFilter);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not delete the note",
+      );
+    }
+  };
+
+  return {
+    saveContent,
+    patchAppearance,
+    removeNote,
+    isRemoving: remove.isPending,
+  };
+}
