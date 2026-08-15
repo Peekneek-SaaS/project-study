@@ -7,9 +7,13 @@
  * edit the defaults through the same names and the same controls. Neither has
  * to know about the other.
  *
- * Values are stored as *keys*, never as CSS. `amber` resolves to one colour in
- * light mode and another in dark, so a note chosen at midnight still reads at
- * noon — see the `--note-*` tokens in `globals.css`.
+ * Values are stored as *keys*, never as CSS: a row says `amber`, and the
+ * `--note-*` tokens in `globals.css` say what amber is. That indirection is
+ * what lets the whole palette be retuned without touching a single row.
+ *
+ * It is not there to make notes follow the theme, and they do not — amber is
+ * the same amber in dark mode as in light. A note is meant to be the colour it
+ * was written on. See the tokens for the longer version.
  */
 
 export const NOTE_COLORS = [

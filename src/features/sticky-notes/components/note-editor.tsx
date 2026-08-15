@@ -9,6 +9,8 @@ import {
 } from "@/features/sticky-notes/lib/note-content";
 import type { NoteAppearance } from "@/features/sticky-notes/lib/note-appearance";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 /**
  * A note's text, in the two fields it is written in.
@@ -45,7 +47,7 @@ export function NoteEditor({
 
   return (
     <div className={cn("flex min-h-0 flex-1 flex-col", className)}>
-      <input
+      <Input
         value={noteTitleLine(content)}
         onChange={(event) =>
           onChange(joinNote(event.target.value, noteBody(content)))
@@ -64,7 +66,7 @@ export function NoteEditor({
         data-note-field="title"
         style={fieldStyle}
         className={cn(
-          "shrink-0 truncate px-3 font-semibold outline-none placeholder:font-normal placeholder:opacity-50",
+          "shrink-0 truncate px-3 font-semibold outline-none placeholder:font-normal placeholder:opacity-50 border-none",
           // A read-only card is something to click, not something to select
           // into — without this a double-click highlights a word on its way to
           // opening the editor.
@@ -72,7 +74,7 @@ export function NoteEditor({
         )}
       />
 
-      <textarea
+      <Textarea
         ref={bodyRef}
         value={noteBody(content)}
         onChange={(event) =>
@@ -89,7 +91,7 @@ export function NoteEditor({
           // textarea takes what is left and scrolls the rest, instead of the
           // content deciding how tall the note is.
           "min-h-0 flex-1 resize-none px-3 pb-3 outline-none",
-          "placeholder:opacity-50",
+          "placeholder:opacity-50 border-none",
           readOnly && "cursor-pointer select-none",
           appearance.showGrid && "note-ruled",
         )}

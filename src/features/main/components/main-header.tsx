@@ -63,16 +63,29 @@ const MainHeader = () => {
           is injected at runtime, after this app's, so it wins the tie and the
           button arrives bigger than the avatar standing in for it. Sizing the
           descendants from out here outranks both.
+
+          The radius rides along for the same reason. An avatar is round by
+          construction in Clerk — a `borderRadius` variable will not square it,
+          because it is not asking for one — so squaring it takes a rule that
+          outranks the one drawing the circle. `rounded-md` rather than
+          `rounded-none` so it follows `--radius` if the theme ever softens.
         */}
-        <div className="flex size-8 shrink-0 items-center justify-center [&_.cl-avatarBox]:size-8 [&_.cl-userButtonBox]:size-8 [&_.cl-userButtonTrigger]:size-8 [&_.cl-userButtonTrigger]:p-0">
+        <div className="flex size-8 shrink-0 items-center justify-center [&_.cl-avatarBox]:size-8 [&_.cl-avatarBox]:rounded-md [&_.cl-avatarImage]:rounded-md [&_.cl-userButtonBox]:size-8 [&_.cl-userButtonTrigger]:size-8 [&_.cl-userButtonTrigger]:rounded-md [&_.cl-userButtonTrigger]:p-0">
           <UserButton
             fallback={
-              <Avatar className="size-8">
-                <AvatarFallback>
+              // Matched to the real thing, or the header would round off for
+              // the moment before Clerk loads and then square up.
+              <Avatar className="size-8 rounded-md after:rounded-md">
+                <AvatarFallback className="rounded-md">
                   <UserRound className="size-4" />
                 </AvatarFallback>
               </Avatar>
             }
+            appearance={{
+              elements: {
+                userButtonAvatarBox: "rounded-none! size-6",
+              },
+            }}
           />
         </div>
       </div>

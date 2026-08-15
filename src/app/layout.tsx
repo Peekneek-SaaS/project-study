@@ -50,6 +50,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <ClerkProvider
           appearance={{
             theme: shadcn,
+            variables: {
+              // The shadcn theme maps Clerk's colours and font weights onto
+              // this app's tokens but says nothing about radius, so Clerk keeps
+              // its own default of `0.375rem` — which is the curve that shows
+              // up against an app sitting at `--radius: 0rem`. Pointing it at
+              // the token rather than at a number means the two cannot drift:
+              // change the theme's radius and Clerk follows.
+              borderRadius: "var(--radius)",
+            },
             options: {
               elevation: "flush",
             },

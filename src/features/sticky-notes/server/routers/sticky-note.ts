@@ -9,6 +9,7 @@ import {
   NOTE_TEXT_COLORS,
   randomNoteColor,
 } from "@/features/sticky-notes/lib/note-appearance";
+import { MODIFIED_VALUES, modifiedRange } from "@/lib/list-filters";
 import { prisma } from "@/lib/prisma";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
@@ -71,14 +72,35 @@ export const StickyNoteRouter = createTRPCRouter({
    *
    * `documentId: null` is the whole of "standalone", so per-document notes will
    * not appear here when they arrive — they get their own way in.
+   *
+   * The "modified" filter narrows on `updatedAt` while the order and the
+   * grouping stay on `createdAt`. That is the point rather than an oversight:
+   * asking for what you touched today should hand back the notes you touched,
+   * still filed under the day each was written.
    */
-  list: protectedProcedure.query(async ({ ctx }) => {
-    return prisma.stickyNote.findMany({
-      where: { userId: ctx.userId, documentId: null },
-      orderBy: { createdAt: "desc" },
-      select: noteFields,
-    });
-  }),
+  list: protectedProcedure
+    .input(
+      z
+        .object({
+          modified: z.enum(MODIFIED_VALUES).nullable().default(null),
+        })
+        // Optional so the callers with nothing to filter by — the search
+        // palette, a bare prefetch — can go on calling `list()`.
+        .default({ modified: null }),
+    )
+    .query(async ({ ctx, input }) => {
+      const updatedAt = modifiedRange(input.modified);
+
+      return prisma.stickyNote.findMany({
+        where: {
+          userId: ctx.userId,
+          documentId: null,
+          ...(updatedAt && { updatedAt }),
+        },
+        orderBy: { createdAt: "desc" },
+        select: noteFields,
+      });
+    }),
 
   /**
    * Adds a note.
@@ -143,5 +165,25 @@ export const StickyNoteRouter = createTRPCRouter({
       await assertOwned(input.id, ctx.userId);
       await prisma.stickyNote.delete({ where: { id: input.id } });
       return { id: input.id };
+    }),
+
+  /**
+   * Deletes a whole selection at once.
+   *
+   * No `assertOwned` loop: `deleteMany` is scoped by `userId`, so ids that are
+   * not the caller's match nothing rather than erroring the whole batch — the
+   * same shape as `board.bulkRemove`, and one round trip, so a dropped request
+   * partway down the list cannot leave the delete half-finished.
+   */
+  bulkRemove: protectedProcedure
+    .input(z.object({ ids: z.array(z.string()) }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.ids.length === 0) return { count: 0 };
+
+      const { count } = await prisma.stickyNote.deleteMany({
+        where: { userId: ctx.userId, id: { in: input.ids } },
+      });
+
+      return { count };
     }),
 });

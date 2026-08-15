@@ -1,6 +1,6 @@
 "use client";
 
-import { MoreVertical, Palette, Trash2 } from "lucide-react";
+import { MoreVertical, Palette, Pen, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -15,6 +15,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { NoteAppearanceControls } from "@/features/sticky-notes/components/note-appearance-controls";
+import { NO_DRAG_ATTRIBUTE } from "@/features/main/lib/drive-sensors";
 import type { NoteAppearance } from "@/features/sticky-notes/lib/note-appearance";
 import { cn } from "@/lib/utils";
 
@@ -29,30 +30,57 @@ export function NoteToolbar({
   appearance,
   onAppearanceChange,
   onDelete,
+  onEdit,
   className,
 }: {
   appearance: NoteAppearance;
   onAppearanceChange: (patch: Partial<NoteAppearance>) => void;
   onDelete: () => void;
+  /**
+   * Write on the note where it sits. Absent in the modal, which is already an
+   * editor and has nothing to switch into.
+   */
+  onEdit?: () => void;
   className?: string;
 }) {
   return (
     <div
-      className={cn("flex items-center", className)}
-      // The toolbar sits on a note whose own click opens the modal; a click on
-      // a button here is about the button.
+      {...{ [NO_DRAG_ATTRIBUTE]: "" }}
+      className={cn("flex items-center text-muted", className)}
+      // The toolbar sits on a note that answers its own clicks — selecting on
+      // one, opening on two. A click on a button here is about the button.
       onClick={(event) => event.stopPropagation()}
       onDoubleClick={(event) => event.stopPropagation()}
+      onPointerDown={(event) => event.stopPropagation()}
     >
+      {/*
+        Editing in place used to be the card's double-click. Selection wants
+        that gesture now — it is what a click means everywhere else in the app —
+        so the note keeps the ability and gives up the shortcut.
+      */}
+      {onEdit && (
+        <Button
+          // variant="ghost"
+          size="icon-xs"
+          aria-label="Write on this note"
+          style={{ color: "var(--note-ink)" }}
+          onClick={onEdit}
+          className={cn("hover:bg-primary/90")}
+        >
+          <Pen className="text-muted " />
+        </Button>
+      )}
+
       <Popover>
         <PopoverTrigger asChild>
           <Button
-            variant="ghost"
-            size="icon-sm"
+            // variant="ghost"
+            size="icon-xs"
             aria-label="Change how this note looks"
             style={{ color: "var(--note-ink)" }}
+            className={cn("hover:bg-primary/70")}
           >
-            <Palette />
+            <Palette className="text-muted" />
           </Button>
         </PopoverTrigger>
         <PopoverContent align="end" className="w-64">
@@ -68,12 +96,13 @@ export function NoteToolbar({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
-            variant="ghost"
-            size="icon-sm"
+            // variant="ghost"
+            size="icon-xs"
             aria-label="Note actions"
             style={{ color: "var(--note-ink)" }}
+            className={cn("hover:bg-primary/90")}
           >
-            <MoreVertical />
+            <MoreVertical className="text-muted " />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-auto min-w-36">

@@ -45,11 +45,20 @@ export function useNoteTarget() {
       // target, which would run this effect's cleanup and cancel the frame
       // before it ever fired. Dropped even when the note is missing — deleted,
       // say — so a stale id does not sit in the URL.
-      router.replace(pathname || STICKY_NOTES_PATH, { scroll: false });
+      //
+      // Only this parameter, rather than the whole query string: the wall's
+      // filter lives there too, and following a link to a note used to take the
+      // filter down with it.
+      const rest = new URLSearchParams(searchParams);
+      rest.delete(NOTE_TARGET_PARAM);
+      const query = rest.toString();
+      const path = pathname || STICKY_NOTES_PATH;
+
+      router.replace(query ? `${path}?${query}` : path, { scroll: false });
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [pathname, router, targetId]);
+  }, [pathname, router, searchParams, targetId]);
 
   // Kept apart from the effect above so the countdown is not restarted by the
   // re-render that clearing the parameter causes.
