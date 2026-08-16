@@ -21,6 +21,8 @@ import { DriveParentRow } from "@/features/main/components/drive-parent-row";
 import { useDriveBrowser } from "@/features/main/hooks/use-drive-browser";
 import { useDriveRowSelection } from "@/features/main/hooks/use-drive-row-selection";
 import { driveSensors } from "@/features/main/lib/drive-sensors";
+import { MotionTableBody } from "@/components/motion/motion-table";
+import { listContainer, mountAnimation } from "@/lib/motion";
 import { ROW_ATTRIBUTE } from "@/hooks/use-row-interaction";
 import type { DriveDragData } from "@/features/main/types";
 import { useDriveSelectionStore } from "@/lib/stores/drive-selection-store";
@@ -266,7 +268,14 @@ export function MainContent({ serverView }: { serverView: DriveViewType }) {
                   </TableRow>
                 </TableHeader>
               )}
-              <TableBody>
+              {/*
+                The stagger lives on the body, not on the rows: a parent that
+                owns the timing deals its children in one after another, where
+                rows each naming their own delay would have to be told their
+                index and would fall out of step the moment one was filtered
+                away. The rows only say what arriving looks like.
+              */}
+              <MotionTableBody {...mountAnimation} variants={listContainer}>
                 {!isRoot && <DriveParentRow parentFolderId={parentFolderId} />}
                 {folders.map((folder) => (
                   <DriveFolderRow
@@ -282,7 +291,7 @@ export function MainContent({ serverView }: { serverView: DriveViewType }) {
                     onSelect={selectRow}
                   />
                 ))}
-              </TableBody>
+              </MotionTableBody>
             </Table>
           )}
           {!hasItems && (

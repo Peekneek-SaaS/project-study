@@ -1,5 +1,7 @@
 "use client";
 
+import { motion } from "motion/react";
+
 import { useDraggable } from "@dnd-kit/react";
 import { FileLock, FileText, Play, Presentation } from "lucide-react";
 
@@ -24,6 +26,7 @@ import {
   selectIsDocumentSelected,
   useDriveSelectionStore,
 } from "@/lib/stores/drive-selection-store";
+import { listItem } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 /**
@@ -68,7 +71,8 @@ export function DriveDocumentCard({
       : FileText;
 
   return (
-    <div
+    <motion.div
+      variants={listItem}
       ref={ref}
       {...cardProps}
       role="option"
@@ -108,6 +112,6 @@ export function DriveDocumentCard({
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }

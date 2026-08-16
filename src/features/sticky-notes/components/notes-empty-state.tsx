@@ -6,13 +6,14 @@ import { useQueryStates } from "nuqs";
 
 import { Button } from "@/components/ui/button";
 import {
-  Empty,
   EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { MotionEmpty } from "@/components/motion/motion-empty";
+import { mountAnimation, popIn } from "@/lib/motion";
 import { NoteCreateButton } from "@/features/sticky-notes/components/note-create-button";
 import { noteFilterParsers } from "@/features/sticky-notes/lib/params";
 
@@ -31,7 +32,7 @@ export function NotesEmptyState({ isFiltering }: { isFiltering: boolean }) {
   // there answers a question nobody asked — the way out is the filter.
   if (isFiltering) {
     return (
-      <Empty>
+      <MotionEmpty {...mountAnimation} variants={popIn}>
         <EmptyHeader>
           <EmptyMedia variant="icon">
             <SearchXIcon />
@@ -50,12 +51,12 @@ export function NotesEmptyState({ isFiltering }: { isFiltering: boolean }) {
             Clear filter
           </Button>
         </EmptyContent>
-      </Empty>
+      </MotionEmpty>
     );
   }
 
   return (
-    <Empty>
+    <MotionEmpty {...mountAnimation} variants={popIn}>
       <EmptyHeader>
         <EmptyMedia variant="icon">
           <NotebookPen />
@@ -68,6 +69,6 @@ export function NotesEmptyState({ isFiltering }: { isFiltering: boolean }) {
       <EmptyContent>
         <NoteCreateButton label="Write your first note" />
       </EmptyContent>
-    </Empty>
+    </MotionEmpty>
   );
 }

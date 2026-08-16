@@ -6,13 +6,14 @@ import { useQueryStates } from "nuqs";
 
 import { Button } from "@/components/ui/button";
 import {
-  Empty,
   EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { MotionEmpty } from "@/components/motion/motion-empty";
+import { mountAnimation, popIn } from "@/lib/motion";
 import { BoardCreateButton } from "@/features/board/components/board-create-button";
 import { boardFilterParsers } from "@/features/board/lib/params";
 
@@ -31,7 +32,7 @@ export function BoardsEmptyState({ isFiltering }: { isFiltering: boolean }) {
   // there answers a question nobody asked — the way out is the filter.
   if (isFiltering) {
     return (
-      <Empty className="">
+      <MotionEmpty {...mountAnimation} variants={popIn} className="">
         <EmptyHeader>
           <EmptyMedia variant="icon">
             <SearchXIcon />
@@ -50,12 +51,12 @@ export function BoardsEmptyState({ isFiltering }: { isFiltering: boolean }) {
             Clear filter
           </Button>
         </EmptyContent>
-      </Empty>
+      </MotionEmpty>
     );
   }
 
   return (
-    <Empty className="">
+    <MotionEmpty {...mountAnimation} variants={popIn} className="">
       <EmptyHeader>
         <EmptyMedia variant="icon">
           <SquareMousePointer className="text-purple-500" />
@@ -68,6 +69,6 @@ export function BoardsEmptyState({ isFiltering }: { isFiltering: boolean }) {
       <EmptyContent>
         <BoardCreateButton label="Create your first board" />
       </EmptyContent>
-    </Empty>
+    </MotionEmpty>
   );
 }

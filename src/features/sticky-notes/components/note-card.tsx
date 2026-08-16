@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { motion } from "motion/react";
 
 import { NoteEditor } from "@/features/sticky-notes/components/note-editor";
 import { NoteModal } from "@/features/sticky-notes/components/note-modal";
@@ -10,6 +11,7 @@ import {
   noteAppearanceStyle,
   toNoteAppearance,
 } from "@/features/sticky-notes/lib/note-appearance";
+import { noteDisplayTitle } from "@/features/sticky-notes/lib/note-content";
 import type { StickyNote } from "@/features/sticky-notes/types";
 import {
   ROW_ATTRIBUTE,
@@ -21,6 +23,7 @@ import {
   selectIsRowSelected,
 } from "@/lib/stores/create-selection-store";
 import { useNoteSelectionStore } from "@/lib/stores/note-selection-store";
+import { listItem } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 /**
@@ -103,8 +106,17 @@ export function NoteCard({
 
   return (
     <>
-      <article
+      <motion.article
         ref={articleRef}
+        variants={listItem}
+        // A note lifts a little under the pointer and presses in when clicked,
+        // which is most of what makes a card feel like an object. Spring rather
+        // than a duration: the weight is what reads as physical, and a hand
+        // moving on and off a card faster than any fixed timing can follow is
+        // exactly what a spring handles and a tween does not.
+        whileHover={isEditing ? undefined : { y: -3, scale: 1.01 }}
+        whileTap={isEditing ? undefined : { scale: 0.995 }}
+        transition={{ type: "spring", stiffness: 400, damping: 30, mass: 0.6 }}
         {...gestures}
         data-note-id={note.id}
         // `data-selected` rather than `aria-selected`: an `article` has no role
@@ -145,32 +157,41 @@ export function NoteCard({
           the editor below starts at the top of the card instead of under a
           strip that is invisible most of the time.
 
-          Four ways in, because a card can be reached four ways: hover for a
-          mouse, `focus-within` for a keyboard — `opacity-0` leaves a button
-          focusable but unseeable, which is worse than not having it —
-          always-on where the pointer cannot hover at all, since a phone would
-          otherwise never get the toolbar to appear, and `has-data-[state=open]`
-          for as long as one of its own menus is up.
+          Four ways in, because a card gets reached four ways.
 
-          That last one is not a nicety. The palette and the actions menu open
-          into portals at the far end of the document, so walking the pointer
-          across to one leaves the card, hover ends, and the toolbar it came
-          from fades out from under the menu still standing open. Radix leaves
-          `data-state="open"` on the trigger, which stays inside this toolbar —
-          so the toolbar can hold itself up for exactly as long as it is being
-          used.
+          `group-hover` is the mouse. `group-focus-within` is the keyboard —
+          `opacity-0` leaves a button focusable but unseeable, which is worse
+          than not having the button at all.
+
+          `group-data-[selected]` is the touch answer, and the reason there is
+          no `@media (hover: none)` rule here any more. A phone cannot hover, so
+          the toolbar used to be pinned open on every card at once — a wall of
+          chrome sitting on top of the notes it belongs to. Selecting one note
+          is the gesture that says "this one", so that is what shows its
+          toolbar. Hold to select, and it appears; the actions are also a tap
+          away inside the note, where the modal carries the same toolbar
+          permanently.
+
+          `has-data-[state=open]` holds it up while one of its own menus is
+          open, and is not a nicety: the palette and the actions menu open into
+          portals at the far end of the document, so walking the pointer across
+          to one leaves the card, hover ends, and the toolbar it came from fades
+          out from under a menu still standing open. Radix leaves
+          `data-state="open"` on the trigger, which stays inside this toolbar.
         */}
         <NoteToolbar
           appearance={appearance}
           onAppearanceChange={(patch) => void patchAppearance(patch)}
           onDelete={() => void removeNote()}
           onEdit={startEditing}
+          noteTitle={noteDisplayTitle(content)}
+          isDeleting={isRemoving}
           className={cn(
             "absolute top-0 right-0 z-10 gap-1 p-0.5",
             "opacity-0 transition-opacity",
             "group-hover/note:opacity-100 group-focus-within/note:opacity-100",
+            "group-data-selected/note:opacity-100",
             "has-data-[state=open]:opacity-100",
-            "[@media(hover:none)]:opacity-100",
           )}
         />
 
@@ -180,7 +201,7 @@ export function NoteCard({
           appearance={appearance}
           readOnly={!isEditing}
         />
-      </article>
+      </motion.article>
 
       <NoteModal
         open={isOpen}

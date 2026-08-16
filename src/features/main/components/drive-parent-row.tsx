@@ -3,7 +3,9 @@
 import { useDroppable } from "@dnd-kit/react";
 import { CornerLeftUp, CornerUpLeft } from "lucide-react";
 
-import { TableCell, TableRow } from "@/components/ui/table";
+import { MotionTableRow } from "@/components/motion/motion-table";
+import { TableCell } from "@/components/ui/table";
+import { listItem } from "@/lib/motion";
 import { DROP_TARGET_ROW_CLASS } from "@/features/main/lib/drive-row-classes";
 import {
   DRAG_TYPE,
@@ -34,7 +36,8 @@ export function DriveParentRow({
   });
 
   return (
-    <TableRow
+    <MotionTableRow
+      variants={listItem}
       ref={ref}
       onClick={() => goToCrumb(parentFolderId)}
       className={cn(
@@ -50,6 +53,6 @@ export function DriveParentRow({
           Back
         </Button>
       </TableCell>
-    </TableRow>
+    </MotionTableRow>
   );
 }

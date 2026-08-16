@@ -4,7 +4,9 @@ import { useDraggable } from "@dnd-kit/react";
 import { FileLock, FileText, Play } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { TableCell, TableRow } from "@/components/ui/table";
+import { MotionTableRow } from "@/components/motion/motion-table";
+import { TableCell } from "@/components/ui/table";
+import { listItem } from "@/lib/motion";
 import { DriveItemActions } from "@/features/main/components/drive-item-actions";
 import { DriveRowActions } from "@/features/main/components/drive-row-actions";
 import { DriveStatusBadge } from "@/features/main/components/drive-status-badge";
@@ -57,7 +59,8 @@ export function DriveDocumentRow({
   });
 
   return (
-    <TableRow
+    <MotionTableRow
+      variants={listItem}
       ref={ref}
       {...rowProps}
       aria-selected={isSelected}
@@ -104,6 +107,6 @@ export function DriveDocumentRow({
 
         <DriveItemActions kind="document" item={doc} />
       </DriveRowActions>
-    </TableRow>
+    </MotionTableRow>
   );
 }

@@ -1,13 +1,16 @@
 import { Suspense } from "react";
 import { ChevronDown } from "lucide-react";
+import * as motion from "motion/react-client";
 import type { SearchParams } from "nuqs/server";
+
+import { fade, mountAnimation } from "@/lib/motion";
 
 import { QueryErrorBoundary } from "@/components/query-error-boundary";
 import { DriveTableSkeleton } from "@/features/main/components/drive-table-skeleton";
 import { MainContent } from "@/features/main/components/main-content";
 import { loadDriveFilters } from "@/features/main/lib/params";
 import { readDriveViewCookie } from "@/features/main/lib/read-drive-view-cookie";
-import { HydrateClient, prefetch, trpc } from "@/trpc/server";
+import { HydrateClient, prefetchAwaited, trpc } from "@/trpc/server";
 
 import CreateDropdown from "../components/create-dropdown";
 import MainViewType from "../components/main-view-type";
@@ -29,7 +32,14 @@ export async function MainView({
   const filters = await loadDriveFilters(searchParams);
 
   // The drive always opens at the root; deeper folders are fetched on click.
-  prefetch(
+  // `prefetchAwaited`, never bare `prefetch`. The bare one hands the query to
+  // the dehydrator and returns, so `HydrateClient` snapshots it mid-flight —
+  // and this app has no streamed-hydration provider to deliver the result
+  // afterwards. The client then hydrates a query that claims to be fetching
+  // with nothing actually in flight, and `useSuspenseQuery` waits on a promise
+  // that will never arrive: the page hangs on its skeleton until a reload,
+  // where a full server render resolves it the ordinary way.
+  await prefetchAwaited(
     trpc.folder.getContents.queryOptions({ folderId: null, ...filters }),
   );
 
@@ -62,7 +72,17 @@ export async function MainView({
         rows pass behind it, and stretched back over the page padding with
         `-mx-4` so nothing shows through at the edges.
       */}
-      <div className="sticky top-(--drive-sticky-top) z-30 -mx-4 flex h-(--drive-title-h) items-center justify-between gap-3 bg-background px-4">
+      {/*
+        `motion/react-client` rather than `motion/react`: this view is a server
+        component, and that entry ships the DOM elements already marked as
+        client ones — so the header can move without the page around it having
+        to become a client component to allow it.
+      */}
+      <motion.div
+        {...mountAnimation}
+        variants={fade}
+        className="sticky top-(--drive-sticky-top) z-30 -mx-4 flex h-(--drive-title-h) items-center justify-between gap-3 bg-background px-4"
+      >
         <CreateDropdown
           buttonLabel="My Files"
           buttonIconPosition="end"
@@ -71,7 +91,7 @@ export async function MainView({
           className="sm:text-xl text-lg pl-0!"
         />
         <MainViewType serverView={serverView} />
-      </div>
+      </motion.div>
 
       <HydrateClient>
         <QueryErrorBoundary message="Something went wrong loading your files.">

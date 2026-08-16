@@ -8,6 +8,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
 import { ModalProvider } from "@/components/providers/modal-provider";
+import { MotionProvider } from "@/components/providers/motion-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { TRPCReactProvider } from "@/trpc/client";
@@ -72,7 +73,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           >
             <TRPCReactProvider>
               <TooltipProvider>
-                <NuqsAdapter>{children}</NuqsAdapter>
+                <MotionProvider>
+                  <NuqsAdapter>{children}</NuqsAdapter>
+                </MotionProvider>
               </TooltipProvider>
               {/* Above the toaster: uploads started from a modal report into it. */}
               <ModalProvider />

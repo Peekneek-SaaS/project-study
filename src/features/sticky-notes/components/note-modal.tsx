@@ -66,6 +66,7 @@ export function NoteModal({
           appearance={appearance}
           onAppearanceChange={onAppearanceChange}
           onDelete={onDelete}
+          noteTitle={noteDisplayTitle(content)}
           className="shrink-0 justify-end px-1.5 py-1 pr-11"
         />
 

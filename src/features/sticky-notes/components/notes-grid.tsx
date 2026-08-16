@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Trash2, X } from "lucide-react";
+import { motion } from "motion/react";
 
 import { Button } from "@/components/ui/button";
 import { DeleteNotesDialog } from "@/features/sticky-notes/components/delete-notes-dialog";
@@ -13,6 +14,7 @@ import { useNoteTarget } from "@/features/sticky-notes/hooks/use-note-target";
 import { groupNotesByDay } from "@/features/sticky-notes/lib/group-notes-by-day";
 import { ROW_ATTRIBUTE } from "@/hooks/use-row-interaction";
 import { useRowSelection } from "@/hooks/use-row-selection";
+import { listContainer, mountAnimation } from "@/lib/motion";
 import { useNoteSelectionStore } from "@/lib/stores/note-selection-store";
 import { cn } from "@/lib/utils";
 
@@ -150,7 +152,16 @@ export function NotesGrid() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-4  lg:grid-cols-3">
+              {/*
+                Each day deals its own notes in. Keyed by the day rather than
+                by position, so a new note arriving under "Today" does not
+                restart the wall underneath it.
+              */}
+              <motion.div
+                {...mountAnimation}
+                variants={listContainer}
+                className="grid grid-cols-2 gap-4  lg:grid-cols-3"
+              >
                 {group.notes.map((note) => (
                   <NoteCard
                     key={note.id}
@@ -159,7 +170,7 @@ export function NotesGrid() {
                     onSelect={selectRow}
                   />
                 ))}
-              </div>
+              </motion.div>
             </section>
           ))
         )}

@@ -1,10 +1,13 @@
 "use client";
 
+import { motion } from "motion/react";
+
 import { DriveDocumentCard } from "@/features/main/components/drive-document-card";
 import { DriveFolderCard } from "@/features/main/components/drive-folder-card";
 import { DriveParentCard } from "@/features/main/components/drive-parent-card";
 import type { SelectRow } from "@/features/main/hooks/use-drive-row-interaction";
 import type { DriveDocument, DriveFolder } from "@/features/main/types";
+import { listContainer, mountAnimation } from "@/lib/motion";
 
 /**
  * The drive as cards.
@@ -35,7 +38,11 @@ export function DriveGrid({
           <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
             Folders
           </h2>
-          <div
+          {/* The stagger lives on the grid, and the cards only say what
+              arriving looks like — see `main-content.tsx`. */}
+          <motion.div
+            {...mountAnimation}
+            variants={listContainer}
             role="listbox"
             aria-multiselectable
             aria-label="Folders"
@@ -48,7 +55,7 @@ export function DriveGrid({
                 onSelect={onSelect}
               />
             ))}
-          </div>
+          </motion.div>
         </section>
       )}
 
@@ -57,7 +64,9 @@ export function DriveGrid({
           <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
             Files
           </h2>
-          <div
+          <motion.div
+            {...mountAnimation}
+            variants={listContainer}
             role="listbox"
             aria-multiselectable
             aria-label="Files"
@@ -66,7 +75,7 @@ export function DriveGrid({
             {documents.map((doc) => (
               <DriveDocumentCard key={doc.id} doc={doc} onSelect={onSelect} />
             ))}
-          </div>
+          </motion.div>
         </section>
       )}
     </div>

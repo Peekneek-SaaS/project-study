@@ -19,10 +19,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DRIVE_PATH } from "@/features/main/types";
 import { useDriveStore } from "@/lib/stores/drive-store";
-
-/** The route whose breadcrumbs continue into the drive's folder trail. */
-const DRIVE_ROUTE = "/main";
 
 const SEGMENT_LABELS: Record<string, string> = {
   main: "Dashboard",
@@ -84,7 +82,7 @@ const MainBreadCrumbs = () => {
       href: `/${segments.slice(0, index + 1).join("/")}`,
     }));
 
-    if (pathName !== DRIVE_ROUTE) return routeCrumbs;
+    if (pathName !== DRIVE_PATH) return routeCrumbs;
 
     // On the drive, the route crumb doubles as "back to the root folder".
     return [

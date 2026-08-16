@@ -20,7 +20,9 @@ import { DeleteBoardsDialog } from "@/features/board/components/delete-boards-di
 import { RenameBoardDialog } from "@/features/board/components/rename-board-dialog";
 import { useBoardsBrowser } from "@/features/board/hooks/use-boards-browser";
 import { boardPath, type BoardListItem } from "@/features/board/types";
+import { MotionTableBody } from "@/components/motion/motion-table";
 import { ROW_ATTRIBUTE } from "@/hooks/use-row-interaction";
+import { listContainer, mountAnimation } from "@/lib/motion";
 import { useRowSelection } from "@/hooks/use-row-selection";
 import { useBoardSelectionStore } from "@/lib/stores/board-selection-store";
 import { cn } from "@/lib/utils";
@@ -181,7 +183,8 @@ export function BoardsTable() {
                 </TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
+            {/* The stagger lives on the body — see `main-content.tsx`. */}
+            <MotionTableBody {...mountAnimation} variants={listContainer}>
               {boards.map((board) => (
                 <BoardRow
                   key={board.id}
@@ -191,7 +194,7 @@ export function BoardsTable() {
                   onDelete={setDeleting}
                 />
               ))}
-            </TableBody>
+            </MotionTableBody>
           </Table>
         )}
       </div>

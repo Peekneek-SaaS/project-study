@@ -11,7 +11,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { TableCell, TableRow } from "@/components/ui/table";
+import { MotionTableRow } from "@/components/motion/motion-table";
+import { TableCell } from "@/components/ui/table";
+import { listItem } from "@/lib/motion";
 import { boardPath, type BoardListItem } from "@/features/board/types";
 import { DriveRowActions } from "@/features/main/components/drive-row-actions";
 import { SELECTED_ROW_CLASS } from "@/features/main/lib/drive-row-classes";
@@ -61,7 +63,8 @@ export function BoardRow({
   });
 
   return (
-    <TableRow
+    <MotionTableRow
+      variants={listItem}
       {...rowProps}
       aria-selected={isSelected}
       data-state={isSelected ? "selected" : undefined}
@@ -119,6 +122,6 @@ export function BoardRow({
           </DropdownMenuContent>
         </DropdownMenu>
       </DriveRowActions>
-    </TableRow>
+    </MotionTableRow>
   );
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { motion } from "motion/react";
+
 import { useDraggable, useDroppable } from "@dnd-kit/react";
 import { Folder as FolderIcon, FolderLock } from "lucide-react";
 
@@ -23,6 +25,7 @@ import {
   useDriveSelectionStore,
 } from "@/lib/stores/drive-selection-store";
 import { useDriveStore } from "@/lib/stores/drive-store";
+import { listItem } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 /**
@@ -68,7 +71,8 @@ export function DriveFolderCard({
   });
 
   return (
-    <div
+    <motion.div
+      variants={listItem}
       ref={(node) => {
         dragRef(node);
         dropRef(node);
@@ -98,6 +102,6 @@ export function DriveFolderCard({
       <DriveActionsShield>
         <DriveItemActions kind="folder" item={folder} />
       </DriveActionsShield>
-    </div>
+    </motion.div>
   );
 }

@@ -6,13 +6,14 @@ import { useQueryStates } from "nuqs";
 
 import { Button } from "@/components/ui/button";
 import {
-  Empty,
   EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { MotionEmpty } from "@/components/motion/motion-empty";
+import { mountAnimation, popIn } from "@/lib/motion";
 import { driveFilterParsers } from "@/features/main/lib/params";
 import { useModalStore } from "@/lib/stores/modal-store";
 
@@ -38,7 +39,7 @@ export function DriveEmptyState({
   // there answers a question nobody asked — the way out is the filter.
   if (isFiltering) {
     return (
-      <Empty className="">
+      <MotionEmpty {...mountAnimation} variants={popIn} className="">
         <EmptyHeader>
           <EmptyMedia variant="icon">
             <SearchXIcon />
@@ -57,12 +58,12 @@ export function DriveEmptyState({
             Clear filters
           </Button>
         </EmptyContent>
-      </Empty>
+      </MotionEmpty>
     );
   }
 
   return (
-    <Empty className="">
+    <MotionEmpty {...mountAnimation} variants={popIn} className="">
       <EmptyHeader>
         <EmptyMedia variant="icon">
           <FolderIcon />
@@ -77,6 +78,6 @@ export function DriveEmptyState({
       <EmptyContent>
         <Button onClick={() => openModal("upload-file")}>Upload file</Button>
       </EmptyContent>
-    </Empty>
+    </MotionEmpty>
   );
 }
