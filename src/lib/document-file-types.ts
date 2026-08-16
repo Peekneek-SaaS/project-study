@@ -51,7 +51,7 @@ export function isAcceptedDocument(file: File) {
   return DOCUMENT_EXTENSIONS.some((extension) => name.endsWith(extension));
 }
 
-/** Only PDFs have an in-app viewer; everything else is handed to the browser. */
+/** A PDF, read in-app by `PdfViewer`. */
 export function isPdf(fileName: string) {
   return fileName.toLowerCase().endsWith(".pdf");
 }
@@ -59,6 +59,39 @@ export function isPdf(fileName: string) {
 /** Slide decks, which get their own icon wherever a file is drawn. */
 export function isSlides(fileName: string) {
   return /\.pptx?$/i.test(fileName);
+}
+
+/** Which in-app viewer reads this file, or `null` for the ones none of them do. */
+export type DocumentViewerKind = "pdf" | "docx" | "pptx";
+
+/**
+ * Picks the viewer for a file, from its name.
+ *
+ * Each format is read as itself — a .docx is rebuilt from its OOXML, a .pptx
+ * from its slides — so this is a choice between three renderers, not a route
+ * into one of them via a conversion.
+ *
+ * `.doc` and `.ppt` return `null`, and that is the load-bearing part of this
+ * function. They look like their modern namesakes in a file listing and are
+ * nothing like them underneath: the pre-2007 formats are compound binary files,
+ * where `.docx`/`.pptx` are zipped XML. Both viewers can only read the latter,
+ * so the legacy pair keeps the download fallback rather than being handed to a
+ * renderer that would fail on them.
+ *
+ * Extension rather than MIME type, like everything else here — a document row
+ * records a name and no content type.
+ */
+export function documentViewerKind(fileName: string): DocumentViewerKind | null {
+  const name = fileName.toLowerCase();
+  if (name.endsWith(".pdf")) return "pdf";
+  if (name.endsWith(".docx")) return "docx";
+  if (name.endsWith(".pptx")) return "pptx";
+  return null;
+}
+
+/** Whether any in-app viewer can show this file at all. */
+export function isViewable(fileName: string) {
+  return documentViewerKind(fileName) !== null;
 }
 
 /**

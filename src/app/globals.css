@@ -372,16 +372,275 @@
   --island-bg-color: var(--popover);
   --default-bg-color: var(--background);
 
+  /* The selected tool in the toolbar — the single most Excalidraw-looking
+     thing on the screen, because it is the one element painted in the brand
+     violet at full strength rather than as a tint. `container` is the chip,
+     `on-primary-container` is the icon sitting in it, so the pair has to be
+     `--primary`/`--primary-foreground` and not two separate guesses. */
+  --color-surface-primary-container: var(--primary);
+  --color-on-primary-container: var(--primary-foreground);
+
+  /* Brand, in the two states Excalidraw asks for it. Same direction as the
+     `--color-primary-*` shades above: towards `--foreground`, so both modes
+     are covered by one pair of declarations. */
+  --color-brand-hover: color-mix(in oklch, var(--primary) 85%, var(--foreground));
+  --color-brand-active: color-mix(in oklch, var(--primary) 75%, var(--foreground));
+
+  /* The marquee and the ring around a selected shape. On the canvas rather
+     than in the chrome, but it is UI, not drawing — nothing exports it. */
+  --color-selection: var(--primary);
+
   --color-on-surface: var(--foreground);
   --popup-text-color: var(--popover-foreground);
+  --popup-secondary-bg-color: var(--muted);
 
   --color-border-outline: var(--border);
   --color-border-outline-variant: var(--border);
+
+  /* `--default-border-color` would otherwise inherit from
+     `--color-surface-high`, which is `--accent` — a fill, and too light to
+     read as an edge. Every button in the toolbar draws its border from it. */
+  --default-border-color: var(--border);
+  --dialog-border-color: var(--border);
+  --sidebar-border-color: var(--border);
+  --avatar-border-color: var(--border);
 
   --input-bg-color: var(--background);
   --input-border-color: var(--input);
   --input-hover-bg-color: var(--accent);
   --input-label-color: var(--muted-foreground);
+
+  /* Excalidraw's UI font is Assistant, and it is the reason the toolbars read
+     as someone else's product even once the colours match. This is the app's
+     font stack; it does not touch the fonts used *inside* a drawing, which are
+     Excalidraw's own and are part of the scene. */
+  --ui-font: var(--font-sans);
+
+  /* `--radius` is 0 in this app, so this squares Excalidraw off to match the
+     rest of the UI. Written against the token rather than hardcoded, so a
+     rounder theme later rounds the canvas chrome with it. `md` keeps its
+     smaller-of-the-two relationship without ever going negative. */
+  --border-radius-lg: var(--radius);
+  --border-radius-md: calc(var(--radius) * 0.6);
+
+  /* Excalidraw ships three hand-tuned multi-layer shadows. The app has its own
+     scale, and the islands are the same kind of object as a popover. */
+  --shadow-island: var(--shadow-md);
+  --modal-shadow: var(--shadow-xl);
+  --sidebar-shadow: var(--shadow-xl);
+
+  /* Matches `bg-black/80` on the shadcn dialog overlay — Excalidraw's default
+     is a near-white scrim in light mode, which is the opposite of what every
+     other dialog in this app does. */
+  --overlay-bg-color: rgb(0 0 0 / 0.8);
+
+  --focus-highlight-color: var(--ring);
+  --select-highlight-color: var(--ring);
+
+  --keybinding-color: var(--muted-foreground);
+  --color-disabled: var(--muted-foreground);
+  --link-color: var(--primary);
+  /* Only ever read as a border, on outlined buttons — not as muted text. */
+  --color-muted: var(--border);
+
+  --scrollbar-thumb: var(--border);
+  --scrollbar-thumb-hover: var(--muted-foreground);
+  --color-slider-track: var(--muted);
+  --color-slider-thumb: var(--primary);
+
+  /* Destructive surfaces, and only the ones that come as a pair.
+
+     This theme uses `--destructive` as the fill and `--destructive-foreground`
+     as what sits on it, and the two swap character between modes — a pale
+     wash with red text in light, solid red with white text in dark. That holds
+     up wherever both are used together, which is every declaration below.
+
+     Excalidraw's *standalone* danger text (`--color-danger`, `-text`) is
+     deliberately left alone: it is drawn on an ordinary surface with no
+     partner token, and neither half of this pair is red in both modes. Its
+     defaults are plain semantic reds that read as nobody's branding. */
+  --color-danger-background: var(--destructive);
+  --color-danger-color: var(--destructive-foreground);
+  --color-danger-icon-background: var(--destructive);
+  --color-danger-icon-color: var(--destructive-foreground);
+  --button-destructive-bg-color: var(--destructive);
+  --button-destructive-color: var(--destructive-foreground);
+}
+
+/*
+  Excalidraw chrome this app does without.
+
+  CSS rather than props, because neither of these is optional through the API.
+  `UIOptions.canvasActions` does not cover them, and the `__fallback` mechanism
+  the exported components use — `MainMenu`, `DefaultSidebar` — only *relocates*
+  a default: rendering your own instance suppresses Excalidraw's, but there is
+  no way to render none. The Help item in the main menu is gone properly, in
+  `board-wrapper.tsx`; these three have nowhere else to go.
+
+  Keyboard shortcuts survive this, deliberately left alone: `?` still opens the
+  help dialog and `0` still opens the library. Both are dialogs with their own
+  close button, so neither strands anyone — the buttons are what is being
+  removed, not the features behind them.
+*/
+.custom-styles .excalidraw .help-icon,
+.custom-styles .excalidraw .default-sidebar-trigger {
+  display: none;
+}
+
+/*
+  The third one, and the reason this is not a two-line rule: Excalidraw draws a
+  hand-sketched arrow on an empty canvas pointing at the help button. Every
+  board starts empty, so hiding the button on its own leaves an arrow aimed at
+  nothing — in the exact state a new board is always in.
+*/
+.custom-styles .excalidraw .welcome-screen-decor-hint--help {
+  display: none;
+}
+
+/*
+  "Mermaid to Excalidraw", and the "Generate" heading it sits under, in the
+  toolbar's extra-tools dropdown.
+
+  `aiEnabled={false}` already empties the rest of that section, but the Mermaid
+  item is not covered by it — Excalidraw renders that one unconditionally. So
+  the heading is left introducing a section with one item in it, and then no
+  items at all.
+
+  Anchoring on the heading is what makes this safe. It is an unclassed `div`
+  with an inline style, the only such child of the dropdown, and everything in
+  the Generate section follows it — so "the heading and its next siblings" is
+  the section, exactly. Positional selectors would say the same thing today and
+  quietly mean something else the moment a tool is added above; more to the
+  point, if Excalidraw restructures this, an anchor that no longer matches hides
+  nothing and the Mermaid item reappears in plain sight. The nth-child version
+  would fail the other way, and start hiding a real tool.
+*/
+.custom-styles
+  .excalidraw
+  .App-toolbar__extra-tools-dropdown
+  .dropdown-menu-container
+  > div[style],
+.custom-styles
+  .excalidraw
+  .App-toolbar__extra-tools-dropdown
+  .dropdown-menu-container
+  > div[style]
+  ~ * {
+  display: none;
+}
+
+/*
+  The library keeps its panel — saving your own shapes is the point of it — and
+  loses the two controls that leave the app.
+
+  So the tab trigger is deliberately *not* hidden here; only these are. The
+  browse button is an `<a>` out to libraries.excalidraw.com, and the other
+  publishes your shapes to a public Excalidraw library, which is a different act
+  entirely from saving them to your own.
+
+  `lib-dropdown--remove` is genuinely the publish item — Excalidraw's test id is
+  misnamed, its label is `buttons.publishLibrary`. Checked against the bundle
+  rather than guessed at, and it is the only element carrying that id.
+
+  What stays in that dropdown is import/export to a `.excalidrawlib` file, which
+  is a local round-trip and the escape hatch if anyone wants their shapes out.
+*/
+.custom-styles .excalidraw .library-menu-browse-button,
+.custom-styles .excalidraw [data-testid="lib-dropdown--remove"] {
+  display: none;
+}
+
+/*
+  A smaller toolbar, so more of it survives a narrow panel.
+
+  Excalidraw already does this — it steps the tool buttons down to 1.8rem and
+  then 1.5rem — but behind `@media screen and (max-width: …)`, which reads the
+  *window*. Here it is the panel that gets narrow while the window stays wide,
+  so those rules never fire and the toolbar runs out of room at full size.
+
+  A container query is the obvious fix and is the wrong one: `container-type`
+  brings `contain: layout` with it, and two things Excalidraw positions with
+  `position: fixed` live inside this wrapper — the laser-pointer trail layer
+  (`.SVGLayer`, sized 100vw/100vh) and the eye-dropper preview, both placed in
+  viewport coordinates. Containing the wrapper reparents their coordinate space
+  and shifts both by the panel's offset. Its modals and tooltips are fine, being
+  portalled to `document.body`, but those two are not.
+
+  So the size is just set, once. 1.8rem is Excalidraw's own first step down
+  rather than a number picked here, which keeps it a pairing they have already
+  tuned against the 1rem icon it holds.
+*/
+.custom-styles .excalidraw {
+  --lg-button-size: 1.8rem;
+}
+
+/*
+  The PowerPoint viewer's stage.
+
+  `pptx-preview` inline-styles its own wrapper — a black background and a fixed
+  pixel width — directly on the element, so these need the extra class to win.
+  The black is the library's idea of a presentation shell; the slide itself is
+  drawn white, and this app frames it with the same muted surface every other
+  document sits on.
+
+  The width is overridden to `100%` because the wrapper is already inside a box
+  this app sized and scaled: leaving both would centre a fixed-width element
+  inside a transformed one and lose the fit.
+*/
+.pptx-stage .pptx-preview-wrapper {
+  width: 100% !important;
+  margin: 0 !important;
+  background: transparent !important;
+}
+
+/*
+  The Word viewer's pages.
+
+  `docx-preview` sizes each `.docx-wrapper > section` from the document's own
+  paper size and margins, which is what makes this read like the PDF viewer.
+  Only the surround is restyled: its default is a hard grey with a flat border,
+  and these are the app's tokens and the same shadow the PDF pages carry.
+
+  Nothing inside a page is touched. The whole point is that the document looks
+  the way its author left it, so its own fonts, spacing and colours are left
+  exactly as the file describes them.
+*/
+.docx-stage .docx-wrapper {
+  background: transparent;
+  padding: 0;
+}
+
+.docx-stage .docx-wrapper > section.docx {
+  margin-bottom: 1rem;
+  border: none;
+  box-shadow: var(--shadow-lg);
+}
+
+/*
+  The same document on a drive card, where only the first page is wanted.
+
+  `docx-preview` renders the whole document or none of it, so the rest is hidden
+  here. `~ section` rather than `:not(:first-of-type)` because the wrapper's
+  first child is not always a section — a document with a cover image can put
+  something ahead of it, and `:first-of-type` would then keep two pages while
+  this keeps whichever page came first.
+
+  No shadow, no margin, no page gap: on a card the page *is* the picture, and
+  the card already supplies the frame and the rounding.
+*/
+.docx-thumb .docx-wrapper {
+  background: transparent;
+  padding: 0;
+}
+
+.docx-thumb .docx-wrapper > section.docx {
+  margin: 0;
+  border: none;
+  box-shadow: none;
+}
+
+.docx-thumb .docx-wrapper > section.docx ~ section.docx {
+  display: none;
 }
 
 /*

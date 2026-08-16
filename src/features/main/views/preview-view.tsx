@@ -5,9 +5,8 @@ import { ArrowLeft, Download, FileText } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { DocumentView } from "@/features/main/components/document-view";
 import { DriveStatusBadge } from "@/features/main/components/drive-status-badge";
-import { LazyPdfViewer } from "@/features/main/components/lazy-pdf-viewer";
-import { isPdf } from "@/lib/document-file-types";
 import { documentFilePath } from "@/lib/document-links";
 import { useTRPC } from "@/trpc/client";
 
@@ -59,22 +58,29 @@ export function PreviewView({ documentId }: { documentId: string }) {
               This document is not ready to read yet.
             </p>
           </div>
-        ) : isPdf(doc.name) ? (
-          <LazyPdfViewer url={fileHref} />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-            <FileText className="size-8 text-muted-foreground" />
-            <p className="font-medium">{doc.name}</p>
-            <p className="text-muted-foreground">
-              Only PDFs can be read here. Download it to open it.
-            </p>
-            <Button variant="outline" asChild>
-              <a href={fileHref} download={doc.name}>
-                <Download />
-                Download
-              </a>
-            </Button>
-          </div>
+          <DocumentView
+            name={doc.name}
+            url={fileHref}
+            fallback={
+              // `.doc` and `.ppt` only — everything else the drive accepts now
+              // has a viewer. See `documentViewerKind`.
+              <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+                <FileText className="size-8 text-muted-foreground" />
+                <p className="font-medium">{doc.name}</p>
+                <p className="text-muted-foreground">
+                  This older Office format can&apos;t be read here. Download it
+                  to open it.
+                </p>
+                <Button variant="outline" asChild>
+                  <a href={fileHref} download={doc.name}>
+                    <Download />
+                    Download
+                  </a>
+                </Button>
+              </div>
+            }
+          />
         )}
       </div>
     </>

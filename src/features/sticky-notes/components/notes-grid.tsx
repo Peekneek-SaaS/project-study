@@ -147,7 +147,7 @@ export function NotesGrid() {
                 <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                   {group.label}
                 </h2>
-                <span className="text-xs bg-primary py-1 px-2 text-muted dark:text-white tabular-nums">
+                <span className="text-xs py-1 px-2 text-muted-foreground  tabular-nums">
                   {group.notes.length}
                 </span>
               </div>

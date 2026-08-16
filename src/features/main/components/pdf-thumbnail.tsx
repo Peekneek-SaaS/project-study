@@ -20,12 +20,22 @@ export function PdfThumbnail({ url }: { url: string }) {
 
   // `<Page>` renders to a pixel width, so the card has to be measured rather
   // than handed a percentage.
+  //
+  // Captured once and then held, matching the Word and PowerPoint thumbnails
+  // and the viewers behind all three. It matters most here: this one does not
+  // scale a rendered page, it re-rasterises it, so following a window drag
+  // means pdf.js redrawing the canvas for every card on screen on every frame.
+  // The observer stops as soon as it has an answer, since nothing on a card
+  // ever asks for a second measurement.
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     const observer = new ResizeObserver(([entry]) => {
-      setWidth(entry.contentRect.width);
+      const measured = entry.contentRect.width;
+      if (measured <= 0) return;
+      setWidth(measured);
+      observer.disconnect();
     });
     observer.observe(container);
     return () => observer.disconnect();

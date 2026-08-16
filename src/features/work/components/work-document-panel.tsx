@@ -12,9 +12,8 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { LazyPdfViewer } from "@/features/main/components/lazy-pdf-viewer";
+import { DocumentView } from "@/features/main/components/document-view";
 import type { PdfLayout } from "@/features/main/components/pdf-viewer";
-import { isPdf } from "@/lib/document-file-types";
 import { documentFilePath } from "@/lib/document-links";
 import { cn } from "@/lib/utils";
 
@@ -61,7 +60,6 @@ export function WorkDocumentPanel({
   className?: string;
 }) {
   const url = documentFilePath(documentId);
-  const readable = isPdf(name);
 
   return (
     <div className={cn("flex h-full min-h-0 flex-col bg-card", className)}>
@@ -91,16 +89,18 @@ export function WorkDocumentPanel({
             </Button>
           )}
 
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            aria-label="Open in a new tab"
-            asChild
-          >
-            <a href={url} target="_blank" rel="noreferrer">
-              <ExternalLink />
-            </a>
-          </Button>
+          {onMinimize && (
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Open in a new tab"
+              asChild
+            >
+              <a href={url} target="_blank" rel="noreferrer">
+                <ExternalLink />
+              </a>
+            </Button>
+          )}
 
           {onMinimize && (
             <Button
@@ -127,33 +127,38 @@ export function WorkDocumentPanel({
       </div>
 
       <div className="min-h-0 flex-1">
-        {readable ? (
-          <LazyPdfViewer url={url} layout={pdfLayout} />
-        ) : (
-          /*
-            Word and PowerPoint have no viewer in this app. The panel says so
-            and offers the browser rather than being left out of the page
-            entirely: the board and the notes beside it are the point of a work
-            page, and they are just as useful for a deck as for a PDF.
-          */
-          <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-            <FileText className="size-8 text-muted-foreground" />
-            <div className="space-y-1">
-              <p className="text-sm font-medium">
-                This file can&apos;t be previewed here
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Your board and notes are still on the right.
-              </p>
+        <DocumentView
+          name={name}
+          url={url}
+          pdfLayout={pdfLayout}
+          fallback={
+            /*
+              Only the pre-2007 binary formats reach this now — `.doc` and
+              `.ppt`, which are not readable by the Word and PowerPoint viewers
+              (see `documentViewerKind`). The panel says so and offers the
+              browser rather than being left out of the page entirely: the board
+              and the notes beside it are the point of a work page, and they are
+              just as useful for a deck as for a PDF.
+            */
+            <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+              <FileText className="size-8 text-muted-foreground" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium">
+                  This file can&apos;t be previewed here
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Your board and notes are still on the right.
+                </p>
+              </div>
+              <Button variant="outline" size="sm" asChild>
+                <a href={url} target="_blank" rel="noreferrer">
+                  <ExternalLink />
+                  Open in a new tab
+                </a>
+              </Button>
             </div>
-            <Button variant="outline" size="sm" asChild>
-              <a href={url} target="_blank" rel="noreferrer">
-                <ExternalLink />
-                Open in a new tab
-              </a>
-            </Button>
-          </div>
-        )}
+          }
+        />
       </div>
     </div>
   );

@@ -206,7 +206,7 @@ export function DocumentPip({
           isDragging ? "cursor-grabbing" : "cursor-grab",
         )}
       >
-        <GripVertical className="size-3.5 shrink-0 text-muted-foreground" />
+        {/* <GripVertical className="size-3.5 shrink-0 text-muted-foreground" /> */}
         <span className="truncate text-xs text-muted-foreground" title={name}>
           {name}
         </span>
@@ -232,7 +232,7 @@ export function DocumentPip({
         One grip, on the corner facing into the container — the only corner
         whose edges are free to move. See `resizeGrip`.
       */}
-      <div
+      {/* <div
         onPointerDown={handleResizePointerDown}
         role="separator"
         aria-label="Resize the document window"
@@ -249,7 +249,7 @@ export function DocumentPip({
         )}
       >
         <div className="absolute inset-1 rounded-full border-2 border-primary/60" />
-      </div>
+      </div> */}
     </div>
   );
 }

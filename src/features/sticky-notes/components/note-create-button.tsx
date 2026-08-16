@@ -1,6 +1,6 @@
 "use client";
 
-import { PlusIcon } from "lucide-react";
+import { StickyNote } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useCreateNote } from "@/features/sticky-notes/hooks/use-create-note";
@@ -21,7 +21,7 @@ export function NoteCreateButton({
       onClick={() => void createNote()}
       disabled={isPending}
     >
-      <PlusIcon />
+      <StickyNote />
       {isPending ? "Adding…" : label}
     </Button>
   );

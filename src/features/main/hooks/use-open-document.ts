@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 import type { DriveDocument } from "@/features/main/types";
 import { workPath } from "@/features/work/types";
-import { isPdf } from "@/lib/document-file-types";
+import { isViewable } from "@/lib/document-file-types";
 import { documentFilePath } from "@/lib/document-links";
 import { useModalStore } from "@/lib/stores/modal-store";
 
@@ -39,7 +39,7 @@ export function useOpenDocument() {
     (doc: DriveDocument) => {
       if (doc.status !== "READY") return;
 
-      if (isPdf(doc.name)) {
+      if (isViewable(doc.name)) {
         openModal("preview-document", {
           id: doc.id,
           name: doc.name,
@@ -48,8 +48,8 @@ export function useOpenDocument() {
         return;
       }
 
-      // Word and PowerPoint have no viewer here, so a glance at one is the
-      // browser's job.
+      // Only `.doc` and `.ppt` land here now — the formats none of the three
+      // viewers can read — so a glance at one is still the browser's job.
       window.open(documentFilePath(doc.id), "_blank", "noopener,noreferrer");
     },
     [openModal],
