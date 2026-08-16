@@ -82,15 +82,28 @@ export function WorkWorkspace({ documentId }: { documentId: string }) {
       }}
       className="flex h-full min-h-0 flex-col gap-0"
     >
-      <div className="flex h-10 shrink-0 items-center gap-2 border-b px-2">
+      {/*
+        `@container` so the labels below answer to this panel's width rather
+        than the window's. `md:` could not see a panel dragged narrow — the
+        window has not changed size — so the labels stayed put and the toolbar
+        crushed. The same fix the notes grid needed.
+      */}
+      <div className="@container flex h-10 shrink-0 items-center gap-2 px-2">
         <TabsList>
-          <TabsTrigger value="board">
+          {/*
+            `aria-label` on the trigger rather than relying on the text: below
+            the threshold the label is `hidden`, which takes it out of the
+            accessibility tree as well as off the screen, leaving a tab with an
+            icon and no name. The attribute is carried at every width so the two
+            cannot disagree.
+          */}
+          <TabsTrigger value="board" aria-label="Board">
             <Shapes className="stroke-purple-500" />
-            <span className="hidden md:flex">Board</span>
+            <span className="hidden @sm:inline">Board</span>
           </TabsTrigger>
-          <TabsTrigger value="notes">
+          <TabsTrigger value="notes" aria-label="Sticky notes">
             <StickyNote className=" stroke-yellow-500" />
-            <span className="hidden md:flex">Sticky notes</span>
+            <span className="hidden @sm:inline">Sticky notes</span>
           </TabsTrigger>
         </TabsList>
 
@@ -98,19 +111,25 @@ export function WorkWorkspace({ documentId }: { documentId: string }) {
           {/* Restores the document without having to find the floating window,
               which may be parked behind whatever the user is working on. */}
           {layout.minimized && (
-            <Button size="sm" variant="ghost" onClick={layout.restore}>
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label="Show the document"
+              onClick={layout.restore}
+            >
               <FileText className="text-orange-500" />
-              Document
+              <span className="hidden @sm:inline">Document</span>
             </Button>
           )}
           {!layout.documentOpen && (
             <Button
               size="sm"
               variant="ghost"
+              aria-label="Show the document"
               onClick={() => layout.setDocumentOpen(true)}
             >
               <FileText className="text-orange-500" />
-              Document
+              <span className="hidden @sm:inline">Document</span>
             </Button>
           )}
           <Button
@@ -205,7 +224,11 @@ export function WorkWorkspace({ documentId }: { documentId: string }) {
                 id="work-document"
                 defaultSize="50"
                 minSize="20"
-                className="min-h-0"
+                // `overflow-hidden` so a panel's contents can never decide the
+                // panel's size. Whatever is inside scrolls itself or is clipped;
+                // neither one is allowed to push the group taller and drag the
+                // other panel along with it.
+                className="min-h-0 overflow-hidden"
               >
                 <WorkDocumentPanel
                   documentId={documentId}
@@ -240,7 +263,9 @@ export function WorkWorkspace({ documentId }: { documentId: string }) {
               id="work-sections"
               defaultSize="50"
               minSize="25"
-              className={cn("min-h-0")}
+              // As above, and this is the panel it matters for: the notes list
+              // is the one thing here with no natural ceiling on its height.
+              className={cn("min-h-0 overflow-hidden")}
             >
               {sections}
             </ResizablePanel>
