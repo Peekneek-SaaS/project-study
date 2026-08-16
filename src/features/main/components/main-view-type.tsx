@@ -21,8 +21,11 @@ const MainViewType = ({ serverView }: { serverView: DriveViewType }) => {
   const setView = useDriveViewStore((state) => state.setView);
 
   return (
-    <Tabs value={view} onValueChange={(value) => setView(value as DriveViewType)}>
-      <TabsList>
+    <Tabs
+      value={view}
+      onValueChange={(value) => setView(value as DriveViewType)}
+    >
+      <TabsList variant="custom">
         <TabsTrigger value="list">
           <List />
           List

@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Maximize,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
 import { Document, Page } from "react-pdf";
 
 import "react-pdf/dist/Page/AnnotationLayer.css";
@@ -85,11 +91,34 @@ export function PdfViewer({
   const [aspect, setAspect] = useState(DEFAULT_ASPECT);
   const [failed, setFailed] = useState(false);
 
-  // The room available, before zoom. Both axes are measured because which one
-  // sizes a page depends on the layout: pages are fitted to the width when they
-  // are stacked, and to the height when they run across.
-  const [available, setAvailable] = useState({ width: 0, height: 0 });
   const [scale, setScale] = useState(1);
+
+  /**
+   * The size a page is measured against — captured, not tracked.
+   *
+   * This is the whole of "the document does not resize with the panel". The
+   * container is still watched below, but only the *first* real measurement is
+   * taken as the page's size; every one after that is remembered and otherwise
+   * ignored. Dragging the panel therefore reveals or hides more of a page that
+   * stays exactly the size it was, instead of the page rescaling under the
+   * pointer on every frame of the drag.
+   *
+   * `null` until the container has been laid out once — zero is a real
+   * measurement to reject, not a size to anchor to.
+   */
+  const [base, setBase] = useState<{ width: number; height: number } | null>(
+    null,
+  );
+
+  /**
+   * The room there is right now, which is a different question from the size a
+   * page is drawn at. Only ever read when re-anchoring — see `base`.
+   *
+   * A panel drag re-renders this component through here, which is fine: `base`
+   * does not move, so every one of those renders produces the same page size
+   * and the DOM does not change.
+   */
+  const [available, setAvailable] = useState({ width: 0, height: 0 });
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -114,6 +143,36 @@ export function PdfViewer({
   }, []);
 
   /**
+   * Flipping between stacked and side-by-side pages forgets the anchor.
+   *
+   * The two layouts fit to different axes, so a base captured for one says
+   * nothing useful about the other — a page fitted to a tall panel's width is
+   * not a page fitted to a short panel's height. Dropped to `null` here and
+   * re-taken below from the current measurement.
+   *
+   * Adjusted during render rather than in an effect: this is the "a prop
+   * changed, derive from it" case React documents, and an effect would paint a
+   * frame at the stale size before correcting it.
+   */
+  const [renderedLayout, setRenderedLayout] = useState(layout);
+  if (renderedLayout !== layout) {
+    setRenderedLayout(layout);
+    setBase(null);
+  }
+
+  // Anchors on the first real measurement and then stands still. Every later
+  // one is the panel being dragged, which is not a reason to resize a document.
+  if (base === null && available.width > 0 && available.height > 0) {
+    setBase(available);
+  }
+
+  /** Re-anchors to whatever room there is now, and drops the zoom with it. */
+  const fitToPanel = () => {
+    if (available.width > 0 && available.height > 0) setBase(available);
+    setScale(1);
+  };
+
+  /**
    * The size a page takes up on the page, at the current zoom.
    *
    * Driven by whichever axis the layout fits pages to — the width when they are
@@ -122,10 +181,12 @@ export function PdfViewer({
    * passing both would let a rounding difference squash the render against the
    * box holding it.
    */
-  const boxHeight = isHorizontal ? available.height * scale : 0;
-  const boxWidth = isHorizontal ? boxHeight * aspect : available.width * scale;
+  const anchor = base ? (isHorizontal ? base.height : base.width) : 0;
+  const driving = anchor * scale;
 
-  const driving = isHorizontal ? boxHeight : boxWidth;
+  const boxHeight = isHorizontal ? driving : 0;
+  const boxWidth = isHorizontal ? driving * aspect : driving;
+
   const hasRoom = driving > 0;
 
   /**
@@ -405,6 +466,22 @@ export function PdfViewer({
             aria-label="Zoom in"
           >
             <ZoomIn />
+          </Button>
+          {/*
+            Earns its place now that the page no longer follows the panel. The
+            percentage beside it resets the *zoom*, which after a resize is no
+            longer the same thing as filling the panel — this is the one that
+            re-measures.
+          */}
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="rounded-full"
+            onClick={fitToPanel}
+            aria-label="Fit the page to the panel"
+            title="Fit to panel"
+          >
+            <Maximize />
           </Button>
         </div>
       </div>

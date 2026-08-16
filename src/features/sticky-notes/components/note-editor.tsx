@@ -66,7 +66,9 @@ export function NoteEditor({
         data-note-field="title"
         style={fieldStyle}
         className={cn(
-          "shrink-0 truncate px-3 font-semibold outline-none placeholder:font-normal placeholder:opacity-50 border-none",
+          "shrink-0 truncate border-none px-3 font-semibold outline-none placeholder:font-normal placeholder:opacity-50",
+          // `focus-visible:`, not `focus:` — see the textarea below.
+          "focus-visible:border-transparent focus-visible:ring-0",
           // A read-only card is something to click, not something to select
           // into — without this a double-click highlights a word on its way to
           // opening the editor.
@@ -90,8 +92,24 @@ export function NoteEditor({
           // `flex-1` with `min-h-0` is what keeps the card one height: the
           // textarea takes what is left and scrolls the rest, instead of the
           // content deciding how tall the note is.
-          "min-h-0 flex-1 resize-none px-3 pb-3 outline-none",
-          "placeholder:opacity-50 border-none",
+          "min-h-0 flex-1 resize-none border-none px-3 pb-3 outline-none",
+          "placeholder:opacity-50",
+          /*
+            `focus-visible:`, matching the variant the ring is actually written
+            under. `Input` and `Textarea` both carry
+            `focus-visible:border-ring focus-visible:ring-2`, so a `focus:`
+            override is not competing with that rule at all — it is a different
+            selector that happens to look like the right one, which is why the
+            ring survived being "turned off".
+
+            Worth knowing it applies on a plain click too: browsers treat text
+            fields as always matching `:focus-visible`, so this is not only
+            about keyboard focus. On a note that is the whole point — the card
+            *is* the field, and a ring drawn inside its own edge reads as
+            damage rather than as focus. The caret is the indicator instead,
+            and the card keeps its own ring for arrowing around the grid.
+          */
+          "focus-visible:border-transparent focus-visible:ring-0",
           readOnly && "cursor-pointer select-none",
           appearance.showGrid && "note-ruled",
         )}

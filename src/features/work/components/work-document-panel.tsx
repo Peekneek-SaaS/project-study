@@ -1,6 +1,15 @@
 "use client";
 
-import { ExternalLink, FileText, Minimize2, Minus, PanelRight, X } from "lucide-react";
+import {
+  ExternalLink,
+  FileText,
+  Minimize2,
+  Minus,
+  PanelRight,
+  Shapes,
+  StickyNote,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { LazyPdfViewer } from "@/features/main/components/lazy-pdf-viewer";
@@ -75,8 +84,9 @@ export function WorkDocumentPanel({
             the whole of the bar, which doubles as the drag handle's target. */}
         <div className="ml-auto flex items-center gap-1">
           {onShowSections && (
-            <Button size="sm" variant="ghost" onClick={onShowSections}>
-              <PanelRight />
+            <Button size="sm" variant="outline" onClick={onShowSections}>
+              <Shapes className="stroke-purple-500" />{" "}
+              <StickyNote className="stroke-yellow-500" />
               Board &amp; notes
             </Button>
           )}

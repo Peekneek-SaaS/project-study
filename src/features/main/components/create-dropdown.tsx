@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Folder,
   FolderPlus,
   NotebookPen,
   Shapes,
@@ -66,9 +67,9 @@ const CreateDropdown = ({
   const createActions: MenuItemsProps[] = [
     {
       label: "New Folder",
-      icon: FolderPlus,
+      icon: Folder,
       onClick: () => runFromSidebar(() => openModal("create-folder")),
-      iconClassName: "text-primary",
+      iconClassName: "fill-primary stroke-primary",
     },
     {
       label: "New Board",
@@ -81,7 +82,7 @@ const CreateDropdown = ({
         setOpenMobile(false);
         void createBoard();
       },
-      iconClassName: "text-purple-500",
+      iconClassName: "fill-purple-500 stroke-purple-500",
     },
     {
       label: "New Note",
@@ -95,7 +96,7 @@ const CreateDropdown = ({
           if (note) router.push(stickyNotePath(note.id));
         });
       },
-      iconClassName: "text-yellow-500",
+      iconClassName: "fill-yellow-400 stroke-yellow-200",
     },
   ];
 

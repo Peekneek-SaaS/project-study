@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Excalidraw } from "@excalidraw/excalidraw";
+import { Excalidraw, MainMenu } from "@excalidraw/excalidraw";
 import type { ExcalidrawInitialDataState } from "@excalidraw/excalidraw/types";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
@@ -31,6 +31,14 @@ const BoardWrapper: React.FC<{ boardId: string }> = ({ boardId }) => {
   // `resolvedTheme` rather than `theme`, which can be "system" — a value
   // Excalidraw has no reading of, and would fall back to light on.
   const { resolvedTheme } = useTheme();
+
+  const UIOptions = {
+    canvasActions: {
+      changeViewBackgroundColor: false,
+      clearCanvas: false,
+      loadScene: false,
+    },
+  };
 
   const trpc = useTRPC();
   const { data: board, isPending } = useQuery(
@@ -75,12 +83,15 @@ const BoardWrapper: React.FC<{ boardId: string }> = ({ boardId }) => {
         initialData={initialData}
         onChange={handleChange}
         theme={resolvedTheme === "dark" ? "dark" : "light"}
+        renderTopRightUI={() => {
+          return <BoardSaveBadge state={state} />;
+        }}
+        UIOptions={UIOptions}
       />
+
       {/* Above the canvas but out of the toolbars' way — Excalidraw owns the
           top and the left, and leaves the bottom-right corner clear. */}
-      <div className="pointer-events-none absolute right-4 bottom-4 z-10">
-        <BoardSaveBadge state={state} />
-      </div>
+      <div className="pointer-events-none absolute sm: md:right-1/2 md:left-1/2 md:bottom-4 z-10 w-fit"></div>
     </div>
   );
 };

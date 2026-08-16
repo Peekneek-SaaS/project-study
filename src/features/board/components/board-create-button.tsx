@@ -1,6 +1,6 @@
 "use client";
 
-import { PlusIcon } from "lucide-react";
+import { PlusIcon, Shapes } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useCreateBoard } from "@/features/board/hooks/use-create-board";
@@ -17,7 +17,8 @@ export function BoardCreateButton({
 
   return (
     <Button variant={variant} onClick={createBoard} disabled={isPending}>
-      <PlusIcon />
+      {/* <PlusIcon /> */}
+      <Shapes />
       {isPending ? "Creating…" : label}
     </Button>
   );

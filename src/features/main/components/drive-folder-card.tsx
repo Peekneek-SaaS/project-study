@@ -91,11 +91,12 @@ export function DriveFolderCard({
         isDropTarget && !isDragging && "border-primary bg-accent",
       )}
     >
-      {folder.isLocked ? (
+      {/* {folder.isLocked ? (
         <FolderLock className="size-5 shrink-0 text-primary" />
       ) : (
         <FolderIcon className="size-5 shrink-0 fill-foreground text-primary" />
-      )}
+      )} */}
+      <FolderIcon className="size-4 shrink-0 fill-primary stroke-primary" />
       <span className="min-w-0 flex-1 truncate text-sm font-medium">
         {folder.name}
       </span>

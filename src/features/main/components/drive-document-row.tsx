@@ -1,7 +1,7 @@
 "use client";
 
 import { useDraggable } from "@dnd-kit/react";
-import { FileLock, FileText, Play } from "lucide-react";
+import { ExternalLink, FileLock, FileText, Play } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { MotionTableRow } from "@/components/motion/motion-table";
@@ -81,11 +81,12 @@ export function DriveDocumentRow({
     >
       <TableCell>
         <div className="flex items-center gap-2">
-          {doc.isLocked ? (
+          {/* {doc.isLocked ? (
             <FileLock className="size-4 shrink-0 text-orange-400" />
           ) : (
             <FileText className="size-4 shrink-0 text-orange-400" />
-          )}
+          )} */}
+          <FileText className="size-4 shrink-0 fill-orange-400 stroke-orange-200" />
           <span className="truncate">{doc.name}</span>
         </div>
       </TableCell>
@@ -106,7 +107,7 @@ export function DriveDocumentRow({
           aria-label={`Preview ${doc.name}`}
           className={cn("")}
         >
-          <Play className="size-4 fill-emerald-400 stroke-emerald-400" />
+          <ExternalLink className="size-4 " />
         </Button>
 
         <DriveItemActions kind="document" item={doc} />

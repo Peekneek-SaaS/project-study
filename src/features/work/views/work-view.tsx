@@ -1,8 +1,13 @@
 import { Suspense } from "react";
+import { cookies } from "next/headers";
 
 import { QueryErrorBoundary } from "@/components/query-error-boundary";
 import { Spinner } from "@/components/ui/spinner";
 import { WorkWorkspace } from "@/features/work/components/work-workspace";
+import {
+  parsePanelSplits,
+  WORK_PANEL_COOKIE,
+} from "@/features/work/lib/panel-split";
 import { HydrateClient, prefetchAwaited, trpc } from "@/trpc/server";
 
 /**
@@ -32,6 +37,15 @@ import { HydrateClient, prefetchAwaited, trpc } from "@/trpc/server";
 export async function WorkView({ documentId }: { documentId: string }) {
   await prefetchAwaited(trpc.document.getWorkspace.queryOptions({ id: documentId }));
 
+  // Read here rather than in the browser so the panels are server-rendered at
+  // the size this document was left at. Looked up on the client instead, every
+  // work page would open at half and half and snap to the saved split a moment
+  // after hydration.
+  const cookieStore = await cookies();
+  const savedSplit =
+    parsePanelSplits(cookieStore.get(WORK_PANEL_COOKIE)?.value)[documentId] ??
+    null;
+
   return (
     <div className="flex min-h-0 flex-col overflow-hidden [--work-header-h:4rem] h-[calc(100svh-var(--work-header-h))] md:group-has-data-[collapsible=icon]/sidebar-wrapper:[--work-header-h:3rem]">
       <HydrateClient>
@@ -43,7 +57,7 @@ export async function WorkView({ documentId }: { documentId: string }) {
               </div>
             }
           >
-            <WorkWorkspace documentId={documentId} />
+            <WorkWorkspace documentId={documentId} savedSplit={savedSplit} />
           </Suspense>
         </QueryErrorBoundary>
       </HydrateClient>

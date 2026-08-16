@@ -3,7 +3,13 @@
 import { motion } from "motion/react";
 
 import { useDraggable } from "@dnd-kit/react";
-import { FileLock, FileText, Play, Presentation } from "lucide-react";
+import {
+  ExternalLink,
+  FileLock,
+  FileText,
+  Play,
+  Presentation,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { DocumentThumbnail } from "@/features/main/components/document-thumbnail";
@@ -65,11 +71,11 @@ export function DriveDocumentCard({
 
   const isReady = doc.status === "READY";
 
-  const Icon = doc.isLocked
-    ? FileLock
-    : isSlides(doc.name)
-      ? Presentation
-      : FileText;
+  // const Icon = doc.isLocked
+  //   ? FileLock
+  //   : isSlides(doc.name)
+  //     ? Presentation
+  //     : FileText;
 
   return (
     <motion.div
@@ -79,7 +85,7 @@ export function DriveDocumentCard({
       role="option"
       aria-selected={isSelected}
       className={cn(
-        "flex select-none flex-col overflow-hidden rounded-xl bg-input/20 transition-colors",
+        "flex select-none flex-col overflow-hidden rounded-xl bg-input/20 transition-colors border dark:hover:bg-muted",
         "hover:bg-input/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         isSelected && "bg-primary/10 ring-2 ring-primary ring-inset",
         isDragging && "cursor-grabbing",
@@ -87,19 +93,19 @@ export function DriveDocumentCard({
       )}
     >
       <div className="flex items-center gap-2 px-3 py-2.5">
-        <Icon className="size-5 shrink-0 text-muted-foreground" />
+        <FileText className="size-5 shrink-0 fill-orange-400 stroke-orange-200" />
         <span className="min-w-0 flex-1 truncate text-sm font-medium">
           {doc.name}
         </span>
         <DriveActionsShield className="gap-1">
           <Button
-            size="icon-sm"
+            size="icon"
             variant={isReady ? "ghost" : "secondary"}
             disabled={!isReady}
             onClick={() => preview(doc)}
             aria-label={`Preview ${doc.name}`}
           >
-            <Play className="size-3.5 fill-emerald-400 stroke-emerald-400" />
+            <ExternalLink className="size-4" />
           </Button>
           <DriveItemActions kind="document" item={doc} />
         </DriveActionsShield>

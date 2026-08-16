@@ -93,11 +93,12 @@ export function DriveFolderRow({
     >
       <TableCell>
         <div className="flex items-center gap-2">
-          {folder.isLocked ? (
-            <FolderLock className="size-4 shrink-0 text-primary" />
+          {/* {folder.isLocked ? (
+            <FolderLock className="size-4 shrink-0 fill-primary stroke-primary" />
           ) : (
-            <FolderIcon className="size-4 shrink-0 text-primary" />
-          )}
+            <FolderIcon className="size-4 shrink-0 fill-primary stroke-primary" />
+          )} */}
+          <FolderIcon className="size-4 shrink-0 fill-primary stroke-primary" />
 
           <span className="truncate">{folder.name}</span>
         </div>

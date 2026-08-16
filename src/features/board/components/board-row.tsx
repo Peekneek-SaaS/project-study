@@ -1,6 +1,6 @@
 "use client";
 
-import { MoreVertical, Pen, SquareArrowOutUpRight, SquareMousePointer, Trash2 } from "lucide-react";
+import { MoreVertical, Pen, Shapes, SquareArrowOutUpRight, SquareMousePointer, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -78,7 +78,7 @@ export function BoardRow({
     >
       <TableCell>
         <div className="flex items-center gap-2 font-medium">
-          <SquareMousePointer className="size-4 shrink-0 text-purple-500" />
+          <Shapes className="size-4 shrink-0 fill-purple-500 stroke-purple-500" />
           <span className="truncate">{board.name}</span>
         </div>
       </TableCell>

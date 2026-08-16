@@ -126,7 +126,15 @@ export function WorkNotesPanel({ documentId }: { documentId: string }) {
         inert={!isSelecting}
         className={cn(
           "absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-2",
-          "border-b bg-background/95 px-3 py-1.5 backdrop-blur",
+          // `h-10` to the pixel, matching the day heading it covers — see
+          // there. Border-box sizing means the border is inside that height,
+          // so the two boxes are exactly the same size rather than the border
+          // making this one a pixel taller.
+          "h-10 border-b px-3",
+          // Opaque, not a translucent blur. The heading underneath is the
+          // thing this is standing in for, so showing a ghost of it through
+          // the bar reads as a bug rather than as depth.
+          "bg-background",
           "transition-[opacity,visibility] duration-150 ease-out",
           !isSelecting && "invisible opacity-0",
         )}
@@ -178,7 +186,12 @@ export function WorkNotesPanel({ documentId }: { documentId: string }) {
         // down to 250px are a pair of slivers — and viewport breakpoints cannot
         // see that, because resizing a panel does not resize the window. This
         // makes the panel itself the thing the columns are measured against.
-        className="@container min-h-0 flex-1 overflow-y-auto p-3"
+        // `pb-3` and `px-3`, deliberately no `pt`. Top padding here is a strip
+        // above the pinned day heading: it leaves a gap between the tabs bar
+        // and the heading, and it pushes the heading down far enough that its
+        // bottom edge shows below the selection bar laid over it. With no top
+        // padding the heading starts and pins flush, and both go away.
+        className="@container min-h-0 flex-1 overflow-y-auto px-3 pb-3"
         // Clicking past the notes drops the selection, as on the wall.
         onClick={(event) => {
           const target = event.target as HTMLElement;
@@ -218,7 +231,12 @@ export function WorkNotesPanel({ documentId }: { documentId: string }) {
                     // `-mx-3 px-3` widens the background back out over the
                     // scroller's padding, so cards pass *under* the heading
                     // rather than beside it.
-                    "sticky top-0 z-10 -mx-3 bg-background px-3 py-1.5",
+                    //
+                    // `h-10` is not decoration: it is the same height as the
+                    // selection bar, which is laid over this exact spot. Sized
+                    // by its contents instead, the two drift by a pixel or two
+                    // and this heading shows below the bar covering it.
+                    "sticky top-0 z-10 -mx-3 h-10 bg-background px-3",
                     "flex items-center justify-between gap-2",
                   )}
                 >

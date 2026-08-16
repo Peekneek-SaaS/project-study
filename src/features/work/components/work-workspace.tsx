@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useCallback, useMemo } from "react";
 import {
   ArrowLeft,
   Columns2,
@@ -28,6 +28,11 @@ import { WorkDocumentPanel } from "@/features/work/components/work-document-pane
 import { WorkNotesPanel } from "@/features/work/components/work-notes-panel";
 import { useDocumentWorkspace } from "@/features/work/hooks/use-document-workspace";
 import { useWorkLayout } from "@/features/work/hooks/use-work-layout";
+import {
+  DEFAULT_SPLIT,
+  savePanelSplit,
+  splitToLayout,
+} from "@/features/work/lib/panel-split";
 import { isWorkTab } from "@/features/work/types";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -46,7 +51,23 @@ import { cn } from "@/lib/utils";
  * inside a panel, so it can be positioned against the whole workspace and is
  * not clipped by whichever panel happens to be under it.
  */
-export function WorkWorkspace({ documentId }: { documentId: string }) {
+/** The panel ids the saved split is keyed by — see `splitToLayout`. */
+const DOCUMENT_PANEL = "work-document";
+const SECTIONS_PANEL = "work-sections";
+
+export function WorkWorkspace({
+  documentId,
+  savedSplit,
+}: {
+  documentId: string;
+  /**
+   * Where this document's handle was last left, as the document panel's share
+   * of the group, or `null` for one that has never been dragged. Read from a
+   * cookie on the server so the first paint is already the right size — see
+   * `work-view`.
+   */
+  savedSplit: number | null;
+}) {
   const { workspace, isBuilding, hasFailed, retry, isRetrying } =
     useDocumentWorkspace(documentId);
 
@@ -74,6 +95,56 @@ export function WorkWorkspace({ documentId }: { documentId: string }) {
   const showPip =
     layout.documentOpen && layout.minimized && layout.sectionsOpen;
 
+  // A split only means something with two panels to split between. With one on
+  // screen it fills the group on its own, and handing the group a layout naming
+  // a panel that is not rendered is a saved size waiting to be misapplied.
+  const hasBothPanels = showDocumentPanel && layout.sectionsOpen;
+
+  const defaultLayout = useMemo(
+    () =>
+      hasBothPanels
+        ? splitToLayout(
+            savedSplit ?? DEFAULT_SPLIT,
+            DOCUMENT_PANEL,
+            SECTIONS_PANEL,
+          )
+        : undefined,
+    [hasBothPanels, savedSplit],
+  );
+
+  /**
+   * Remembers the split, once the drag is over.
+   *
+   * `onLayoutChanged` rather than `onLayoutChange`: the latter fires on every
+   * pointer move, which would rewrite the cookie a hundred times across one
+   * drag. `isUserInteraction` is what separates a drag from the layout the
+   * library recomputes on mount, on a constraint change, or when a panel opens
+   * and closes — saving those would overwrite a deliberate split with an
+   * incidental one.
+   */
+  const handleLayoutChanged = useCallback(
+    (next: Record<string, number>, meta: { isUserInteraction: boolean }) => {
+      if (!meta.isUserInteraction) return;
+
+      const documentGrow = next[DOCUMENT_PANEL];
+      const sectionsGrow = next[SECTIONS_PANEL];
+      if (
+        typeof documentGrow !== "number" ||
+        typeof sectionsGrow !== "number"
+      ) {
+        return;
+      }
+
+      // Normalised rather than taken at face value: these are flex-grow values,
+      // and what is worth keeping is their ratio, not the scale they arrived on.
+      const total = documentGrow + sectionsGrow;
+      if (total <= 0) return;
+
+      savePanelSplit(documentId, documentGrow / total);
+    },
+    [documentId],
+  );
+
   const sections = (
     <Tabs
       value={layout.tab}
@@ -89,7 +160,7 @@ export function WorkWorkspace({ documentId }: { documentId: string }) {
         crushed. The same fix the notes grid needed.
       */}
       <div className="@container flex h-10 shrink-0 items-center gap-2 px-2">
-        <TabsList>
+        <TabsList variant="custom">
           {/*
             `aria-label` on the trigger rather than relying on the text: below
             the threshold the label is `hidden`, which takes it out of the
@@ -98,11 +169,11 @@ export function WorkWorkspace({ documentId }: { documentId: string }) {
             cannot disagree.
           */}
           <TabsTrigger value="board" aria-label="Board">
-            <Shapes className="stroke-purple-500" />
+            <Shapes className="stroke-purple-500 fill-purple-500" />
             <span className="hidden @sm:inline">Board</span>
           </TabsTrigger>
           <TabsTrigger value="notes" aria-label="Sticky notes">
-            <StickyNote className=" stroke-yellow-500" />
+            <StickyNote className=" fill-yellow-400 stroke-yellow-200" />
             <span className="hidden @sm:inline">Sticky notes</span>
           </TabsTrigger>
         </TabsList>
@@ -202,8 +273,8 @@ export function WorkWorkspace({ documentId }: { documentId: string }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* <div className="flex h-11 shrink-0 items-center gap-2 border-b px-3">
-        <Button size="sm" variant="ghost" asChild>
+      <div className="flex h-11 shrink-0 items-center gap-2 border-b px-3">
+        <Button size="sm" variant="default" asChild>
           <Link href={DRIVE_PATH}>
             <ArrowLeft />
             Back
@@ -212,17 +283,23 @@ export function WorkWorkspace({ documentId }: { documentId: string }) {
         <span className="truncate text-sm font-medium" title={workspace.name}>
           {workspace.name}
         </span>
-      </div> */}
+      </div>
 
       {/* `relative` is what the floating window is positioned against — it
           measures and parks itself within its offset parent. */}
       <div className="relative min-h-0 flex-1">
-        <ResizablePanelGroup orientation={orientation}>
+        <ResizablePanelGroup
+          orientation={orientation}
+          // No `defaultSize` on the panels below: with a remembered split this
+          // would be a second opinion about the same thing, and the two would
+          // disagree on the first render after a drag.
+          defaultLayout={defaultLayout}
+          onLayoutChanged={handleLayoutChanged}
+        >
           {showDocumentPanel && (
             <>
               <ResizablePanel
-                id="work-document"
-                defaultSize="50"
+                id={DOCUMENT_PANEL}
                 minSize="20"
                 // `overflow-hidden` so a panel's contents can never decide the
                 // panel's size. Whatever is inside scrolls itself or is clipped;
@@ -260,8 +337,7 @@ export function WorkWorkspace({ documentId }: { documentId: string }) {
 
           {layout.sectionsOpen && (
             <ResizablePanel
-              id="work-sections"
-              defaultSize="50"
+              id={SECTIONS_PANEL}
               minSize="25"
               // As above, and this is the panel it matters for: the notes list
               // is the one thing here with no natural ceiling on its height.

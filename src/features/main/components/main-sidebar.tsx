@@ -65,19 +65,19 @@ const MainSidebar = () => {
       label: "Dashboard",
       href: "/main",
       icon: Home,
-      iconClassName: "text-blue-500",
+      iconClassName: "fill-blue-500 stroke-blue-400",
     },
     {
       label: "Board",
       href: "/board",
       icon: Shapes,
-      iconClassName: "text-purple-500",
+      iconClassName: "fill-purple-500 stroke-purple-500",
     },
     {
       label: "Sticky Notes",
       href: "/sticky-notes",
       icon: StickyNote,
-      iconClassName: "text-yellow-500",
+      iconClassName: "fill-yellow-400 stroke-yellow-200",
     },
   ];
 

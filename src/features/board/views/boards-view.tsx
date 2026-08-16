@@ -51,7 +51,7 @@ export async function BoardsView({
         variants={fade}
         className="sticky top-(--drive-sticky-top) z-30 -mx-4 flex h-(--drive-title-h) items-center justify-between gap-3 bg-background px-4"
       >
-        <h1 className="text-lg font-semibold sm:text-xl">Boards</h1>
+        <h1 className="text-lg font-semibold sm:text-xl ">Boards</h1>
         <BoardCreateButton />
       </motion.div>
 

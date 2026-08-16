@@ -7,7 +7,9 @@ import {
   Folder,
   LucideIcon,
   NotebookPen,
+  Shapes,
   SquareMousePointer,
+  StickyNote,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -220,7 +222,7 @@ export function SearchModal() {
                   onSelect={() => handleSelectFolder(folder.id)}
                   className={cn("")}
                 >
-                  <Folder className="text-primary hover:text-primary" />
+                  <Folder className="fill-primary stroke-primary" />
                   <span className="truncate">{folder.name}</span>
                   {/* <span className="ml-auto truncate pl-2 text-[0.625rem] text-muted-foreground ">
                     {locationLabel(trailTo(folders, folder.parentId))}
@@ -241,7 +243,7 @@ export function SearchModal() {
                   disabled={doc.status !== "READY"}
                   onSelect={() => handleSelectDocument(doc)}
                 >
-                  <FileText className="text-muted-foreground" />
+                  <FileText className="fill-orange-400 stroke-orange-200" />
                   <span className="truncate">{doc.name}</span>
                   {/* <div className="ml-auto flex shrink-0 items-center gap-2 pl-2">
                     <span className="truncate text-[0.625rem] text-muted-foreground">
@@ -262,7 +264,7 @@ export function SearchModal() {
                   value={`${board.name} ${board.id}`}
                   onSelect={() => handleSelectBoard(board.id)}
                 >
-                  <SquareMousePointer className="text-purple-500" />
+                  <Shapes className="fill-purple-500 stroke-purple-500" />
                   <span className="truncate">{board.name}</span>
                 </CommandItem>
               ))}
@@ -280,7 +282,7 @@ export function SearchModal() {
                   value={`${noteDisplayTitle(note.content)} ${note.content} ${note.id}`}
                   onSelect={() => handleSelectNote(note.id)}
                 >
-                  <NotebookPen className="text-yellow-500" />
+                  <StickyNote className="fill-yellow-400 stroke-yellow-200" />
                   <span className="truncate">
                     {noteDisplayTitle(note.content)}
                   </span>

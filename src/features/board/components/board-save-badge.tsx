@@ -33,7 +33,6 @@ export function BoardSaveBadge({ state }: { state: BoardSaveState }) {
       )}
     >
       <Icon className={cn("size-3.5", state === "saving" && "animate-spin")} />
-      {label}
     </div>
   );
 }
