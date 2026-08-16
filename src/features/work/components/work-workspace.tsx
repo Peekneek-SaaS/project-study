@@ -8,6 +8,7 @@ import {
   PanelRight,
   Shapes,
   StickyNote,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -168,6 +169,32 @@ export function WorkWorkspace({
             icon and no name. The attribute is carried at every width so the two
             cannot disagree.
           */}
+
+          {/* Restores the document without having to find the floating window,
+              which may be parked behind whatever the user is working on. */}
+          {layout.minimized && (
+            <Button
+              variant="ghost"
+              aria-label="Show the document"
+              onClick={layout.restore}
+              className="hover:bg-transparent"
+            >
+              <FileText className="fill-orange-400 stroke-orange-200" />
+              <span className="hidden @sm:inline">Document</span>
+            </Button>
+          )}
+          {!layout.documentOpen && (
+            <Button
+              variant="ghost"
+              aria-label="Show the document"
+              onClick={() => layout.setDocumentOpen(true)}
+              className="hover:bg-transparent"
+            >
+              <FileText className="fill-orange-400 stroke-orange-200" />
+              <span className="hidden @sm:inline">Document</span>
+            </Button>
+          )}
+
           <TabsTrigger value="board" aria-label="Board">
             <Shapes className="stroke-purple-500 fill-purple-500" />
             <span className="hidden @sm:inline">Board</span>
@@ -181,28 +208,7 @@ export function WorkWorkspace({
         <div className="ml-auto flex items-center gap-1">
           {/* Restores the document without having to find the floating window,
               which may be parked behind whatever the user is working on. */}
-          {layout.minimized && (
-            <Button
-              size="sm"
-              variant="ghost"
-              aria-label="Show the document"
-              onClick={layout.restore}
-            >
-              <FileText className="text-orange-500" />
-              <span className="hidden @sm:inline">Document</span>
-            </Button>
-          )}
-          {!layout.documentOpen && (
-            <Button
-              size="sm"
-              variant="ghost"
-              aria-label="Show the document"
-              onClick={() => layout.setDocumentOpen(true)}
-            >
-              <FileText className="text-orange-500" />
-              <span className="hidden @sm:inline">Document</span>
-            </Button>
-          )}
+
           <Button
             size="icon-sm"
             variant="ghost"
@@ -213,7 +219,7 @@ export function WorkWorkspace({
             disabled={!layout.documentOpen || layout.minimized}
             onClick={() => layout.setSectionsOpen(false)}
           >
-            <PanelRight />
+            <X />
           </Button>
         </div>
       </div>
@@ -274,7 +280,7 @@ export function WorkWorkspace({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex h-11 shrink-0 items-center gap-2 border-b px-3">
-        <Button size="sm" variant="default" asChild>
+        <Button size="sm" variant="ghost" asChild>
           <Link href={DRIVE_PATH}>
             <ArrowLeft />
             Back
@@ -324,10 +330,11 @@ export function WorkWorkspace({
                       ? () => layout.setDocumentOpen(false)
                       : undefined
                   }
+                  // Which tab the tabs in that bar mark as the current one, and
+                  // what pressing either of them reopens the panel on.
+                  tab={layout.tab}
                   onShowSections={
-                    layout.sectionsOpen
-                      ? undefined
-                      : () => layout.setSectionsOpen(true)
+                    layout.sectionsOpen ? undefined : layout.showSections
                   }
                 />
               </ResizablePanel>
@@ -353,8 +360,13 @@ export function WorkWorkspace({
             documentId={documentId}
             name={workspace.name}
             corner={layout.corner}
+            size={layout.pipSize}
             onCornerChange={layout.setCorner}
+            onSizeChange={layout.setPipSize}
             onRestore={layout.restore}
+            // The window only shows while the sections panel is open, so
+            // closing the document can never leave the page with no panel.
+            onClose={() => layout.setDocumentOpen(false)}
           />
         )}
       </div>

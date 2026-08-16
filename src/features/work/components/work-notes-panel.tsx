@@ -6,7 +6,13 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query";
-import { Plus, StickyNote as StickyNoteIcon, Trash2, X } from "lucide-react";
+import {
+  Plus,
+  StickyNote,
+  StickyNote as StickyNoteIcon,
+  Trash2,
+  X,
+} from "lucide-react";
 import { motion } from "motion/react";
 import { toast } from "sonner";
 
@@ -216,7 +222,7 @@ export function WorkNotesPanel({ documentId }: { documentId: string }) {
               disabled={create.isPending}
               onClick={() => create.mutate({ documentId })}
             >
-              <Plus />
+              <StickyNote />
               New note
             </Button>
           </div>
@@ -261,7 +267,7 @@ export function WorkNotesPanel({ documentId }: { documentId: string }) {
                     disabled={create.isPending}
                     onClick={() => create.mutate({ documentId })}
                   >
-                    <Plus />
+                    <StickyNote />
                     {/* The label goes before the button does. Narrow enough and
                         this is a plus on its own, which is still the same
                         button in the same place. */}

@@ -761,4 +761,37 @@
   input[type="reset"] {
     cursor: pointer;
   }
+
+  /*
+    Scrollbars, hidden everywhere. Only the bar is gone — nothing here touches
+    `overflow`, so every scroller still scrolls by wheel, trackpad, touch,
+    keyboard and `scrollIntoView` exactly as it did.
+
+    Both declarations are needed and neither is redundant: `scrollbar-width`
+    is the standard property and covers Firefox and current Chrome, while
+    `::-webkit-scrollbar` is what Safari answers to — it only learned
+    `scrollbar-width` recently, and the pseudo-element is what reaches the
+    versions that did not.
+
+    The same pair shadcn's own `no-scrollbar` utility uses, deliberately, so
+    there is one recipe in this codebase rather than two. That utility is now
+    redundant wherever it appears, but harmless, and left alone.
+
+    In `base` rather than unlayered so it stays overridable: a utility class
+    beats it, which is what lets one scroller opt back into a visible bar
+    without this rule having to grow exceptions.
+
+    Worth knowing what this costs — it is a real affordance, not just chrome.
+    A hidden bar cannot be dragged, and it no longer signals that a region
+    scrolls or how far along it is. The places where that reads worst are the
+    ones with a lot of content below the fold; a scroll-fade or a shadow is the
+    usual way to put the hint back without the bar.
+  */
+  * {
+    scrollbar-width: none;
+  }
+
+  *::-webkit-scrollbar {
+    display: none;
+  }
 }

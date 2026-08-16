@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { GripVertical, Maximize2 } from "lucide-react";
+import { GripVertical, Maximize2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { WorkDocumentPanel } from "@/features/work/components/work-document-panel";
@@ -9,8 +9,7 @@ import {
   clampSize,
   cornerOffsets,
   nearestCorner,
-  PIP_DEFAULT_HEIGHT,
-  PIP_DEFAULT_WIDTH,
+  type PipSize,
   resizeGrip,
 } from "@/features/work/lib/pip-geometry";
 import type { PipCorner } from "@/features/work/types";
@@ -36,38 +35,74 @@ export function DocumentPip({
   documentId,
   name,
   corner,
+  size: savedSize,
   onCornerChange,
+  onSizeChange,
   onRestore,
+  onClose,
 }: {
   documentId: string;
   name: string;
   corner: PipCorner;
+  /** How big it was last left. Remembered between visits — see `useWorkLayout`. */
+  size: PipSize;
   onCornerChange: (corner: PipCorner) => void;
+  /** Called once a resize is finished, not on every frame of one. */
+  onSizeChange: (size: PipSize) => void;
   onRestore: () => void;
+  onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
-  const [size, setSize] = useState({
-    width: PIP_DEFAULT_WIDTH,
-    height: PIP_DEFAULT_HEIGHT,
-  });
+  /**
+   * The size mid-resize, before it is worth remembering.
+   *
+   * `null` at rest, when the remembered size is the one that counts. A drag
+   * writes here on every frame and hands the result up once, on release, rather
+   * than saving a hundred sizes on the way to the one that was wanted.
+   */
+  const [draftSize, setDraftSize] = useState<PipSize | null>(null);
+
   // Where the window is relative to its parked corner, mid-drag. Zero at rest —
   // the corner offsets are what place it, and this is only the deviation.
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
 
+  /**
+   * How much room there is to float in. `null` until it has been measured once.
+   */
+  const [bounds, setBounds] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
+
   const grip = resizeGrip(corner);
 
-  // A window sized while the panel was wide can be too big for it once the
-  // panel narrows, which would leave it hanging over an edge with its grip off
-  // screen. Re-clamped whenever the container changes rather than only on
-  // resize, so it is corrected before it is ever drawn wrong.
+  /**
+   * The size actually drawn: what is remembered, held within what there is room
+   * for.
+   *
+   * Clamped here rather than written back, which is what lets a window dragged
+   * out on a wide screen survive a spell in a narrow one. A window sized for the
+   * room it had would otherwise be shrunk to fit the moment the page was made
+   * small and stay that way, having forgotten what it was asked for.
+   */
+  const size = bounds
+    ? clampSize(draftSize ?? savedSize, bounds)
+    : (draftSize ?? savedSize);
+
+  // The container is watched rather than only read on resize, so a window too
+  // big for it is corrected before it is ever drawn hanging over an edge with
+  // its grip off screen.
   useEffect(() => {
     const container = ref.current?.parentElement;
     if (!container) return;
 
     const observer = new ResizeObserver(([entry]) => {
-      setSize((current) => clampSize(current, entry.contentRect));
+      setBounds({
+        width: entry.contentRect.width,
+        height: entry.contentRect.height,
+      });
     });
     observer.observe(container);
     return () => observer.disconnect();
@@ -154,23 +189,37 @@ export function DocumentPip({
     const startY = event.clientY;
     const startSize = size;
 
+    // The last size the drag produced, kept here as well as in state: `handleUp`
+    // is a listener registered once and closes over the render it was made in,
+    // so the state it can see is the one from before the drag.
+    let latest: PipSize | null = null;
+
     const handleMove = (move: PointerEvent) => {
-      const bounds = container.getBoundingClientRect();
-      setSize(
-        clampSize(
-          {
-            width: startSize.width + (move.clientX - startX) * grip.signX,
-            height: startSize.height + (move.clientY - startY) * grip.signY,
-          },
-          bounds,
-        ),
+      latest = clampSize(
+        {
+          width: startSize.width + (move.clientX - startX) * grip.signX,
+          height: startSize.height + (move.clientY - startY) * grip.signY,
+        },
+        container.getBoundingClientRect(),
       );
+      setDraftSize(latest);
     };
 
     const handleUp = () => {
       handle.removeEventListener("pointermove", handleMove);
       handle.removeEventListener("pointerup", handleUp);
       handle.removeEventListener("pointercancel", handleUp);
+
+      // Nothing to remember from a grip that was pressed and let go: without
+      // this, a click on it would write back the size the window happens to be
+      // clamped to right now as if that were the size that had been asked for.
+      if (!latest) return;
+
+      // Handed up first and dropped after: the remembered size arrives back as
+      // a prop in the same render the draft is cleared in, so the window never
+      // flashes at its old size in between.
+      onSizeChange(latest);
+      setDraftSize(null);
     };
 
     handle.addEventListener("pointermove", handleMove);
@@ -185,7 +234,8 @@ export function DocumentPip({
         "absolute z-40 flex flex-col overflow-hidden rounded-lg border bg-card shadow-2xl",
         // Snapping back to a corner is worth watching; following a pointer is
         // not — a transition on a live drag would run a frame behind the finger.
-        !isDragging && "transition-[top,right,bottom,left] duration-200 ease-out",
+        !isDragging &&
+          "transition-[top,right,bottom,left] duration-200 ease-out",
       )}
       style={{
         ...cornerOffsets(corner),
@@ -210,18 +260,30 @@ export function DocumentPip({
         <span className="truncate text-xs text-muted-foreground" title={name}>
           {name}
         </span>
-        <Button
-          size="icon-xs"
-          variant="ghost"
-          className="ml-auto mr-1"
-          aria-label="Restore the document panel"
-          // The bar swallows pointer events to drag; without this the button
-          // would start a drag instead of being pressed.
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={onRestore}
-        >
-          <Maximize2 />
-        </Button>
+        {/*
+          The bar swallows pointer events to drag; without stopping propagation
+          each button would start a drag instead of being pressed.
+        */}
+        <div className="ml-auto flex items-center gap-1">
+          <Button
+            size="icon-xs"
+            variant="ghost"
+            aria-label="Restore the document panel"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={onRestore}
+          >
+            <Maximize2 />
+          </Button>
+          <Button
+            size="icon-xs"
+            variant="ghost"
+            aria-label="Close the document"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={onClose}
+          >
+            <X />
+          </Button>
+        </div>
       </div>
 
       <div className="min-h-0 flex-1">
@@ -231,13 +293,19 @@ export function DocumentPip({
       {/*
         One grip, on the corner facing into the container — the only corner
         whose edges are free to move. See `resizeGrip`.
+
+        The hit area is deliberately larger than the mark inside it: a corner
+        is an awkward thing to hit precisely, and the dot is only there to say
+        the corner does something. Muted rather than the accent colour, so a
+        floating window reads as one object instead of one with a bright pip
+        stuck in it.
       */}
-      {/* <div
+      <div
         onPointerDown={handleResizePointerDown}
         role="separator"
         aria-label="Resize the document window"
         className={cn(
-          "absolute size-4 touch-none",
+          "group absolute size-5 touch-none",
           grip.position.vertical === "top" ? "top-0" : "bottom-0",
           grip.position.horizontal === "left" ? "left-0" : "right-0",
           // A grip on the top-left or bottom-right corner is dragged along one
@@ -248,8 +316,8 @@ export function DocumentPip({
             : "cursor-nesw-resize",
         )}
       >
-        <div className="absolute inset-1 rounded-full border-2 border-primary/60" />
-      </div> */}
+        {/* <div className="absolute inset-1.5 rounded-full bg-muted-foreground/40 transition-colors group-hover:bg-muted-foreground/80" /> */}
+      </div>
     </div>
   );
 }

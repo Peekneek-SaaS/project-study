@@ -12,8 +12,14 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DocumentView } from "@/features/main/components/document-view";
 import type { PdfLayout } from "@/features/main/components/pdf-viewer";
+import {
+  DEFAULT_WORK_TAB,
+  isWorkTab,
+  type WorkTab,
+} from "@/features/work/types";
 import { documentFilePath } from "@/lib/document-links";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +38,7 @@ export function WorkDocumentPanel({
   compact = false,
   onMinimize,
   onClose,
+  tab = DEFAULT_WORK_TAB,
   onShowSections,
   pdfLayout = "vertical",
   className,
@@ -43,14 +50,24 @@ export function WorkDocumentPanel({
   onMinimize?: () => void;
   onClose?: () => void;
   /**
-   * Brings the board and notes back, and is passed *only* when they are
-   * closed — at which point this panel is the whole page, and the button that
-   * would otherwise reopen them went with them.
+   * Which section the panel would come back on — the one the user was last
+   * looking at. Only marks a tab as the current one; opening is `onShowSections`.
+   *
+   * Defaulted rather than required so a caller that shows no tabs at all — the
+   * floating window — has nothing to say about them.
+   */
+  tab?: WorkTab;
+  /**
+   * Brings the board and notes back on the section asked for, and is passed
+   * *only* when they are closed — at which point this panel is the whole page,
+   * and the tabs that would otherwise switch between them went with them.
    *
    * The mirror of the sections bar's "Show document": each panel is what offers
-   * the other, so whichever one is left standing always has a way back.
+   * the other, so whichever one is left standing always has a way back. The tabs
+   * are the sections panel's own, so reopening lands where it was aimed rather
+   * than wherever the panel was left.
    */
-  onShowSections?: () => void;
+  onShowSections?: (tab: WorkTab) => void;
   /**
    * Which way the pages run. Passed down rather than decided here, because the
    * thing that decides it is the panel arrangement — pages run across when the
@@ -61,70 +78,125 @@ export function WorkDocumentPanel({
 }) {
   const url = documentFilePath(documentId);
 
+  /**
+   * Whether the bar has anything to hold.
+   *
+   * With the name and icon commented out below, the button group is all that is
+   * left in it — and the floating window passes none of those callbacks, because
+   * its own title bar already carries the name and the restore button. Rendering
+   * the bar regardless left an empty strip of dead height between that title bar
+   * and the top of the document.
+   *
+   * Asked as a question about the content rather than about `compact`, so a
+   * caller that passes no controls never gets a bar, whichever size it is in.
+   */
+  const hasControls = Boolean(onShowSections || onMinimize || onClose);
+
   return (
     <div className={cn("flex h-full min-h-0 flex-col bg-card", className)}>
-      <div
-        className={cn(
-          "flex shrink-0 items-center gap-2  px-2",
-          compact ? "h-8" : "h-10 px-3",
-        )}
-      >
-        {/* {!compact && (
-          <>
-            <FileText className="size-4 shrink-0 text-orange-400" />
-            <span className="truncate text-sm font-medium" title={name}>
-              {name}
-            </span>
-          </>
-        )} */}
+      {hasControls && (
+        <div
+          className={cn(
+            // As short as the buttons in it allow: every row this bar takes is a
+            // row the document does not get.
+            //
+            // `@container` for the same reason the sections bar has one — the
+            // tab labels below answer to this panel's width, which a `md:` could
+            // not see: dragging the panel narrow does not change the window.
+            "@container flex shrink-0 items-center mt-2 gap-2 px-1",
+            compact ? "h-8" : "h-9 px-2",
+          )}
+        >
+          {/* {!compact && (
+            <>
+              <FileText className="size-4 shrink-0 text-orange-400" />
+              <span className="truncate text-sm font-medium" title={name}>
+                {name}
+              </span>
+            </>
+          )} */}
 
-        {/* Pushes the buttons right in both bars — in the compact one this is
-            the whole of the bar, which doubles as the drag handle's target. */}
-        <div className="ml-auto flex items-center gap-1">
+          {/*
+            The sections panel's own tabs, standing in for it while it is closed:
+            the same control in the same place, so reopening the board is one
+            press on the board tab rather than a press to open and another to
+            switch.
+
+            `activationMode="manual"` because activating a tab here opens a
+            panel — arrowing along the row to look at the options should not keep
+            doing that. `onClick` alongside `onValueChange` for the same reason
+            the two are not interchangeable here: `onValueChange` says nothing
+            when the tab pressed is already the current one, which is exactly the
+            press that has to still open the panel.
+          */}
           {onShowSections && (
-            <Button size="sm" variant="outline" onClick={onShowSections}>
-              <Shapes className="stroke-purple-500" />{" "}
-              <StickyNote className="stroke-yellow-500" />
-              Board &amp; notes
-            </Button>
+            <Tabs
+              value={tab}
+              activationMode="manual"
+              onValueChange={(value) => {
+                if (isWorkTab(value)) onShowSections(value);
+              }}
+            >
+              <TabsList variant="custom">
+                <TabsTrigger
+                  value="board"
+                  aria-label="Board"
+                  onClick={() => onShowSections("board")}
+                >
+                  <Shapes className="stroke-purple-500 fill-purple-500" />
+                  <span className="hidden @sm:inline">Board</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="notes"
+                  aria-label="Sticky notes"
+                  onClick={() => onShowSections("notes")}
+                >
+                  <StickyNote className="fill-yellow-400 stroke-yellow-200" />
+                  <span className="hidden @sm:inline">Sticky notes</span>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           )}
 
-          {onMinimize && (
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              aria-label="Open in a new tab"
-              asChild
-            >
-              <a href={url} target="_blank" rel="noreferrer">
-                <ExternalLink />
-              </a>
-            </Button>
-          )}
+          <div className="ml-auto flex items-center gap-1">
 
-          {onMinimize && (
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              aria-label="Minimize the document"
-              onClick={onMinimize}
-            >
-              <Minus />
-            </Button>
-          )}
+            {onMinimize && (
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                aria-label="Open in a new tab"
+                asChild
+              >
+                <a href={url} target="_blank" rel="noreferrer">
+                  <ExternalLink />
+                </a>
+              </Button>
+            )}
 
-          {onClose && (
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              aria-label="Close the document panel"
-              onClick={onClose}
-            >
-              <X />
-            </Button>
-          )}
+            {onMinimize && (
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                aria-label="Minimize the document"
+                onClick={onMinimize}
+              >
+                <Minus />
+              </Button>
+            )}
+
+            {onClose && (
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                aria-label="Close the document panel"
+                onClick={onClose}
+              >
+                <X />
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="min-h-0 flex-1">
         <DocumentView

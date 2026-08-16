@@ -9,6 +9,12 @@ import type { PipCorner } from "@/features/work/types";
  * means "bigger" — follows from the corner alone.
  */
 
+/** How big the window is, in px. */
+export interface PipSize {
+  width: number;
+  height: number;
+}
+
 /** How far the window is held off the edges it is parked against. */
 export const PIP_INSET = 16;
 
@@ -78,9 +84,9 @@ export function resizeGrip(corner: PipCorner) {
 
 /** Keeps a resize within both its own minimum and the room available. */
 export function clampSize(
-  size: { width: number; height: number },
+  size: PipSize,
   bounds: { width: number; height: number },
-) {
+): PipSize {
   // The inset is subtracted twice over: once for the edge the window is parked
   // against, once so a window grown to full size still clears the far edge.
   const maxWidth = Math.max(PIP_MIN_WIDTH, bounds.width - PIP_INSET * 2);

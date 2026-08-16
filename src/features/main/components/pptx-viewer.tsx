@@ -12,6 +12,13 @@ import { init } from "pptx-preview";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  ViewerControlButton,
+  ViewerControlReadout,
+  ViewerControls,
+  ViewerControlSeparator,
+  ViewerControlValue,
+} from "@/features/main/components/viewer-controls";
 import { cn } from "@/lib/utils";
 
 /**
@@ -42,9 +49,6 @@ import { cn } from "@/lib/utils";
  */
 const RENDER_WIDTH = 1600;
 
-/** Breathing room around the slide, in px, so it never touches the panel edge. */
-const STAGE_PADDING = 24;
-
 const ZOOM_FACTOR = 1.25;
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 4;
@@ -70,11 +74,11 @@ export function PptxViewer({ url }: { url: string }) {
    * The size the slide is fitted to — captured, not tracked, exactly as the PDF
    * viewer captures its own.
    *
-   * The panel is still measured below, but only the *first* real measurement
-   * becomes the slide's size; every one after that is remembered and otherwise
-   * ignored. Dragging the panel therefore reveals or hides more of a slide that
-   * stays exactly the size it was, rather than rescaling under the pointer on
-   * every frame of the drag.
+   * The panel is still measured below, but once the deck is on screen its
+   * measurement becomes the slide's size and every one after that is remembered
+   * and otherwise ignored. Dragging the panel therefore reveals or hides more of
+   * a slide that stays exactly the size it was, rather than rescaling under the
+   * pointer on every frame of the drag.
    *
    * `null` until the stage has been laid out once — zero is a measurement to
    * reject, not a size to anchor to.
@@ -90,19 +94,36 @@ export function PptxViewer({ url }: { url: string }) {
     const stage = stageRef.current;
     if (!stage) return;
 
+    // `contentRect` is the *content* box, so the stage's own padding is already
+    // out of these numbers. Subtracting a gutter here as well — as this used to
+    // — took it off twice and fitted every slide into a box a good deal smaller
+    // than the one it was drawn into.
     const observer = new ResizeObserver(([entry]) => {
       setAvailable({
-        width: Math.max(0, entry.contentRect.width - STAGE_PADDING * 2),
-        height: Math.max(0, entry.contentRect.height - STAGE_PADDING * 2),
+        width: Math.max(0, entry.contentRect.width),
+        height: Math.max(0, entry.contentRect.height),
       });
     });
     observer.observe(stage);
     return () => observer.disconnect();
   }, []);
 
-  // Anchors on the first real measurement and then stands still. Every later
-  // one is the panel being dragged, which is not a reason to resize a slide.
-  if (base === null && available.width > 0 && available.height > 0) {
+  /**
+   * Re-anchors until the first slide is actually on screen, and then stands
+   * still. Every measurement after that is the panel being dragged, which is not
+   * a reason to resize a slide.
+   *
+   * Anchoring on the very first measurement instead meant fitting to whatever
+   * the panel happened to be while the deck was still being fetched and parsed —
+   * a layout that is still settling, and a size the slide was then stuck at.
+   */
+  if (
+    available.width > 0 &&
+    available.height > 0 &&
+    (base === null ||
+      (loading &&
+        (base.width !== available.width || base.height !== available.height)))
+  ) {
     setBase(available);
   }
 
@@ -207,10 +228,14 @@ export function PptxViewer({ url }: { url: string }) {
   }
 
   return (
-    <div className="relative h-full min-h-0 overflow-hidden">
+    // `@container` so the controls below can size themselves to this frame —
+    // the panel, or the floating window, rather than the window.
+    <div className="@container relative h-full min-h-0 overflow-hidden">
       <div
         ref={stageRef}
-        className="absolute inset-0 grid place-items-center overflow-auto overscroll-contain p-6"
+        // Only enough padding to keep the slide's shadow off the panel edge:
+        // the slide is the point of this panel, so the room goes to it.
+        className="absolute inset-0 grid place-items-center overflow-auto overscroll-contain p-2"
       >
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -247,92 +272,61 @@ export function PptxViewer({ url }: { url: string }) {
         </div>
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center px-2">
-        <div className="pointer-events-auto flex max-w-full items-center gap-1 overflow-x-auto rounded-full bg-popover/95 p-1 shadow-lg ring-1 ring-foreground/10 backdrop-blur">
-          {slideCount > 1 && (
-            <>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="rounded-full"
-                disabled={slide <= 0}
-                onClick={() => show(slide - 1)}
-                aria-label="Previous slide"
-              >
-                <ChevronLeft />
-              </Button>
-              <span className="px-1 tabular-nums" aria-live="polite">
-                {slide + 1} / {slideCount}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="rounded-full"
-                disabled={slide >= slideCount - 1}
-                onClick={() => show(slide + 1)}
-                aria-label="Next slide"
-              >
-                <ChevronRight />
-              </Button>
+      <ViewerControls>
+        {slideCount > 1 && (
+          <>
+            <ViewerControlButton
+              label="Previous slide"
+              disabled={slide <= 0}
+              onClick={() => show(slide - 1)}
+            >
+              <ChevronLeft />
+            </ViewerControlButton>
+            <ViewerControlReadout>
+              {slide + 1} / {slideCount}
+            </ViewerControlReadout>
+            <ViewerControlButton
+              label="Next slide"
+              disabled={slide >= slideCount - 1}
+              onClick={() => show(slide + 1)}
+            >
+              <ChevronRight />
+            </ViewerControlButton>
 
-              <span
-                aria-hidden
-                className="mx-1 h-4 w-px shrink-0 bg-foreground/15"
-              />
-            </>
-          )}
+            <ViewerControlSeparator />
+          </>
+        )}
 
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="rounded-full"
-            disabled={zoom <= MIN_ZOOM}
-            onClick={() =>
-              setZoom((current) => Math.max(MIN_ZOOM, current / ZOOM_FACTOR))
-            }
-            aria-label="Zoom out"
-          >
-            <ZoomOut />
-          </Button>
-          {/* Doubles as the reset, as in the PDF viewer — 100% is the obvious
-              thing to press to mean "never mind". */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="rounded-full tabular-nums"
-            onClick={() => setZoom(1)}
-            aria-label="Reset zoom to fit"
-            title="Reset zoom"
-          >
-            {Math.round(zoom * 100)}%
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="rounded-full"
-            disabled={zoom >= MAX_ZOOM}
-            onClick={() =>
-              setZoom((current) => Math.min(MAX_ZOOM, current * ZOOM_FACTOR))
-            }
-            aria-label="Zoom in"
-          >
-            <ZoomIn />
-          </Button>
-          {/* The percentage beside it resets the *zoom*, which after a resize
-              is no longer the same thing as filling the panel — this is the one
-              that re-measures. As in the PDF viewer. */}
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="rounded-full"
-            onClick={fitToPanel}
-            aria-label="Fit the slide to the panel"
-            title="Fit to panel"
-          >
-            <Maximize />
-          </Button>
-        </div>
-      </div>
+        <ViewerControlButton
+          label="Zoom out"
+          disabled={zoom <= MIN_ZOOM}
+          onClick={() =>
+            setZoom((current) => Math.max(MIN_ZOOM, current / ZOOM_FACTOR))
+          }
+        >
+          <ZoomOut />
+        </ViewerControlButton>
+        {/* Doubles as the reset, as in the PDF viewer — 100% is the obvious
+            thing to press to mean "never mind". */}
+        <ViewerControlValue label="Reset zoom" onClick={() => setZoom(1)}>
+          {Math.round(zoom * 100)}%
+        </ViewerControlValue>
+        <ViewerControlButton
+          label="Zoom in"
+          disabled={zoom >= MAX_ZOOM}
+          onClick={() =>
+            setZoom((current) => Math.min(MAX_ZOOM, current * ZOOM_FACTOR))
+          }
+        >
+          <ZoomIn />
+        </ViewerControlButton>
+        {/* The percentage beside it resets the *zoom*, which after a resize is
+            no longer the same thing as filling the panel — this is the one that
+            re-measures. As in the PDF viewer. */}
+        <ViewerControlButton label="Fit to panel" onClick={fitToPanel}>
+          <Maximize />
+        </ViewerControlButton>
+      </ViewerControls>
     </div>
   );
 }

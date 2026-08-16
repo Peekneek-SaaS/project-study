@@ -72,14 +72,21 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             disableTransitionOnChange
           >
             <TRPCReactProvider>
+              {/*
+                Around the modals as well as the page, not just `children`. The
+                modals are mounted here rather than beside whatever opens them
+                (see `ModalProvider`), so anything inside one — the document
+                preview holds a whole viewer, controls and all — would otherwise
+                be the one part of the app without a tooltip context.
+              */}
               <TooltipProvider>
                 <MotionProvider>
                   <NuqsAdapter>{children}</NuqsAdapter>
                 </MotionProvider>
+                {/* Above the toaster: uploads started from a modal report into it. */}
+                <ModalProvider />
+                <Toaster position="top-center" />
               </TooltipProvider>
-              {/* Above the toaster: uploads started from a modal report into it. */}
-              <ModalProvider />
-              <Toaster position="top-center" />
             </TRPCReactProvider>
           </ThemeProvider>
         </ClerkProvider>

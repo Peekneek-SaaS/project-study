@@ -6,6 +6,11 @@ import { renderAsync } from "docx-preview";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  ViewerControlButton,
+  ViewerControls,
+  ViewerControlValue,
+} from "@/features/main/components/viewer-controls";
 import { cn } from "@/lib/utils";
 
 /**
@@ -23,9 +28,6 @@ import { cn } from "@/lib/utils";
 const ZOOM_FACTOR = 1.25;
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 4;
-
-/** Breathing room either side of the page, so it never touches the panel edge. */
-const STAGE_PADDING = 16;
 
 export function DocxViewer({ url }: { url: string }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -61,8 +63,11 @@ export function DocxViewer({ url }: { url: string }) {
     const scroller = scrollRef.current;
     if (!scroller) return;
 
+    // `contentRect` is the *content* box: the scroller's own padding is already
+    // out of this. Subtracting a gutter here as well — as this used to — took it
+    // off twice and fitted the page to a width narrower than the panel's.
     const observer = new ResizeObserver(([entry]) => {
-      setAvailable(Math.max(0, entry.contentRect.width - STAGE_PADDING * 2));
+      setAvailable(Math.max(0, entry.contentRect.width));
     });
     observer.observe(scroller);
     return () => observer.disconnect();
@@ -179,14 +184,18 @@ export function DocxViewer({ url }: { url: string }) {
   }
 
   return (
-    <div className="relative h-full min-h-0 overflow-hidden">
+    // `@container` so the controls below can size themselves to this frame —
+    // the panel, or the floating window, rather than the window.
+    <div className="@container relative h-full min-h-0 overflow-hidden">
       {/* Where docx-preview puts the document's own `<style>`. Kept out of the
           scroller so it is never part of what is laid out or measured. */}
       <div ref={styleRef} hidden />
 
       <div
         ref={scrollRef}
-        className="absolute inset-0 overflow-auto overscroll-contain p-4"
+        // Only enough to keep the page's edge off the panel's — the document is
+        // what the panel is for.
+        className="absolute inset-0 overflow-auto overscroll-contain p-2"
       >
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -220,56 +229,34 @@ export function DocxViewer({ url }: { url: string }) {
         </div>
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center px-2">
-        <div className="pointer-events-auto flex max-w-full items-center gap-1 overflow-x-auto rounded-full bg-popover/95 p-1 shadow-lg ring-1 ring-foreground/10 backdrop-blur">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="rounded-full"
-            disabled={zoom <= MIN_ZOOM}
-            onClick={() =>
-              setZoom((current) => Math.max(MIN_ZOOM, current / ZOOM_FACTOR))
-            }
-            aria-label="Zoom out"
-          >
-            <ZoomOut />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="rounded-full tabular-nums"
-            onClick={() => setZoom(1)}
-            aria-label="Reset zoom"
-            title="Reset zoom"
-          >
-            {Math.round(zoom * 100)}%
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="rounded-full"
-            disabled={zoom >= MAX_ZOOM}
-            onClick={() =>
-              setZoom((current) => Math.min(MAX_ZOOM, current * ZOOM_FACTOR))
-            }
-            aria-label="Zoom in"
-          >
-            <ZoomIn />
-          </Button>
-          {/* Re-measures the panel, which after a resize is no longer the same
-              thing as resetting the zoom. As in the PDF viewer. */}
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="rounded-full"
-            onClick={fitToPanel}
-            aria-label="Fit the page to the panel"
-            title="Fit to panel"
-          >
-            <Maximize />
-          </Button>
-        </div>
-      </div>
+      <ViewerControls>
+        <ViewerControlButton
+          label="Zoom out"
+          disabled={zoom <= MIN_ZOOM}
+          onClick={() =>
+            setZoom((current) => Math.max(MIN_ZOOM, current / ZOOM_FACTOR))
+          }
+        >
+          <ZoomOut />
+        </ViewerControlButton>
+        <ViewerControlValue label="Reset zoom" onClick={() => setZoom(1)}>
+          {Math.round(zoom * 100)}%
+        </ViewerControlValue>
+        <ViewerControlButton
+          label="Zoom in"
+          disabled={zoom >= MAX_ZOOM}
+          onClick={() =>
+            setZoom((current) => Math.min(MAX_ZOOM, current * ZOOM_FACTOR))
+          }
+        >
+          <ZoomIn />
+        </ViewerControlButton>
+        {/* Re-measures the panel, which after a resize is no longer the same
+            thing as resetting the zoom. As in the PDF viewer. */}
+        <ViewerControlButton label="Fit to panel" onClick={fitToPanel}>
+          <Maximize />
+        </ViewerControlButton>
+      </ViewerControls>
     </div>
   );
 }

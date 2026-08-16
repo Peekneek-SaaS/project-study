@@ -3,6 +3,13 @@
 import { useCallback, useSyncExternalStore } from "react";
 
 import {
+  PIP_DEFAULT_HEIGHT,
+  PIP_DEFAULT_WIDTH,
+  PIP_MIN_HEIGHT,
+  PIP_MIN_WIDTH,
+  type PipSize,
+} from "@/features/work/lib/pip-geometry";
+import {
   DEFAULT_PIP_CORNER,
   DEFAULT_WORK_TAB,
   isPipCorner,
@@ -29,6 +36,20 @@ export interface WorkLayout {
   /** Document reduced to a floating window over the sections. */
   minimized: boolean;
   corner: PipCorner;
+  /**
+   * How big the floating window was left, in px.
+   *
+   * Kept beside the corner because it is the other half of the same answer —
+   * where the window is and how big it is — and remembered for the same reason:
+   * someone who drags it out to read a slide properly should not have to do it
+   * again on the next document.
+   *
+   * Only ever a floor is enforced here. The ceiling belongs to whatever the
+   * window is floating over, which this has no way of knowing and which changes
+   * as the page is resized, so it is applied where that is measured — see
+   * `DocumentPip`.
+   */
+  pipSize: PipSize;
   tab: WorkTab;
 }
 
@@ -37,8 +58,37 @@ const DEFAULT_LAYOUT: WorkLayout = {
   sectionsOpen: true,
   minimized: false,
   corner: DEFAULT_PIP_CORNER,
+  pipSize: { width: PIP_DEFAULT_WIDTH, height: PIP_DEFAULT_HEIGHT },
   tab: DEFAULT_WORK_TAB,
 };
+
+/**
+ * Reads a stored size back.
+ *
+ * As with every other field, this is `localStorage` and so is not to be
+ * trusted: a `NaN`, a negative or a missing half would render a window with no
+ * width, which is a document that has vanished with no way to get it back.
+ */
+function parsePipSize(value: unknown): PipSize {
+  if (typeof value !== "object" || value === null) {
+    return DEFAULT_LAYOUT.pipSize;
+  }
+
+  const { width, height } = value as Partial<PipSize>;
+  if (
+    typeof width !== "number" ||
+    typeof height !== "number" ||
+    !Number.isFinite(width) ||
+    !Number.isFinite(height)
+  ) {
+    return DEFAULT_LAYOUT.pipSize;
+  }
+
+  return {
+    width: Math.max(PIP_MIN_WIDTH, width),
+    height: Math.max(PIP_MIN_HEIGHT, height),
+  };
+}
 
 /**
  * Reads a stored layout back, field by field.
@@ -68,6 +118,7 @@ function parseLayout(raw: string | null): WorkLayout {
           ? stored.minimized
           : DEFAULT_LAYOUT.minimized,
       corner: isPipCorner(stored.corner) ? stored.corner : DEFAULT_LAYOUT.corner,
+      pipSize: parsePipSize(stored.pipSize),
       tab: isWorkTab(stored.tab) ? stored.tab : DEFAULT_LAYOUT.tab,
     };
   } catch {
@@ -192,10 +243,32 @@ export function useWorkLayout() {
     [patch],
   );
 
+  /**
+   * Brings the board and notes back on the section asked for.
+   *
+   * One patch rather than a `setTab` followed by a `setSectionsOpen`: those are
+   * two writes to the same store, and the render between them would open the
+   * panel on the tab the user did not press before switching to the one they
+   * did. No guard, unlike the setters above — opening a panel can never be what
+   * empties the page.
+   */
+  const showSections = useCallback(
+    (tab: WorkTab) => patch({ sectionsOpen: true, tab }),
+    [patch],
+  );
+
   return {
     ...layout,
     setTab: useCallback((tab: WorkTab) => patch({ tab }), [patch]),
+    showSections,
     setCorner: useCallback((corner: PipCorner) => patch({ corner }), [patch]),
+    /**
+     * Written once a resize is over rather than on every pointer move — the
+     * same reason the panel split is saved on `onLayoutChanged`: a drag is a
+     * hundred frames, and each one of these is a `JSON.stringify` into
+     * `localStorage` and a re-render of every reader.
+     */
+    setPipSize: useCallback((pipSize: PipSize) => patch({ pipSize }), [patch]),
     setDocumentOpen,
     setSectionsOpen,
     minimize,

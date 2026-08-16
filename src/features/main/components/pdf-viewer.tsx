@@ -15,6 +15,13 @@ import "react-pdf/dist/Page/TextLayer.css";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  ViewerControlButton,
+  ViewerControlReadout,
+  ViewerControls,
+  ViewerControlSeparator,
+  ViewerControlValue,
+} from "@/features/main/components/viewer-controls";
 // Imported for its side effect: pdf.js needs its worker before anything renders.
 import "@/features/main/lib/pdfjs-worker";
 import { cn } from "@/lib/utils";
@@ -29,8 +36,6 @@ const RENDER_WINDOW = 2;
 
 /** A4, used to size placeholders until the first real page reports its own. */
 const DEFAULT_ASPECT = 1 / 1.4142;
-
-const PAGE_GAP = 16;
 
 /**
  * Zoom is unbounded in both directions, and steps by a factor rather than by a
@@ -131,11 +136,14 @@ export function PdfViewer({
     const container = scrollRef.current;
     if (!container) return;
 
+    // `contentRect` is the *content* box, so the gutter the page list is padded
+    // with is already out of these numbers. Subtracting it here as well — as
+    // this used to — took it off twice and left every page narrower than the
+    // panel it was fitted to.
     const observer = new ResizeObserver(([entry]) => {
-      // Leave room for the gutter the page list is padded with.
       setAvailable({
-        width: Math.max(0, entry.contentRect.width - PAGE_GAP * 2),
-        height: Math.max(0, entry.contentRect.height - PAGE_GAP * 2),
+        width: Math.max(0, entry.contentRect.width),
+        height: Math.max(0, entry.contentRect.height),
       });
     });
     observer.observe(container);
@@ -279,7 +287,9 @@ export function PdfViewer({
   }
 
   return (
-    <div className="relative h-full min-h-0 overflow-hidden">
+    // `@container` so the controls below can size themselves to this frame —
+    // the panel, or the floating window, rather than the window.
+    <div className="@container relative h-full min-h-0 overflow-hidden">
       <div
         ref={scrollRef}
         className={cn(
@@ -312,7 +322,9 @@ export function PdfViewer({
           }
           error={null}
           className={cn(
-            "flex items-center gap-4 p-4",
+            // The gap between pages stays; the gutter around them is only there
+            // to keep their shadows off the panel edge.
+            "flex items-center gap-4 p-2",
             /*
               `max-content`, emphatically not `fit-content`. Both look like
               "be as wide as the pages", but `fit-content` is capped at the
@@ -397,94 +409,63 @@ export function PdfViewer({
         back — while it is still working out how big it is — was the moment the
         controls were missing.
       */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center px-2">
-        <div className="pointer-events-auto flex max-w-full items-center gap-1 overflow-x-auto rounded-full bg-popover/95 p-1 shadow-lg ring-1 ring-foreground/10 backdrop-blur">
-          {pageCount > 1 && (
-            <>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="rounded-full"
-                disabled={currentPage <= 1}
-                onClick={() => goToPage(currentPage - 1)}
-                aria-label="Previous page"
-              >
-                <ChevronLeft />
-              </Button>
-              <span className="px-1 tabular-nums" aria-live="polite">
-                {currentPage} / {pageCount}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="rounded-full"
-                disabled={currentPage >= pageCount}
-                onClick={() => goToPage(currentPage + 1)}
-                aria-label="Next page"
-              >
-                <ChevronRight />
-              </Button>
+      <ViewerControls>
+        {pageCount > 1 && (
+          <>
+            <ViewerControlButton
+              label="Previous page"
+              disabled={currentPage <= 1}
+              onClick={() => goToPage(currentPage - 1)}
+            >
+              <ChevronLeft />
+            </ViewerControlButton>
+            <ViewerControlReadout>
+              {currentPage} / {pageCount}
+            </ViewerControlReadout>
+            <ViewerControlButton
+              label="Next page"
+              disabled={currentPage >= pageCount}
+              onClick={() => goToPage(currentPage + 1)}
+            >
+              <ChevronRight />
+            </ViewerControlButton>
 
-              <span
-                aria-hidden
-                className="mx-1 h-4 w-px shrink-0 bg-foreground/15"
-              />
-            </>
-          )}
+            <ViewerControlSeparator />
+          </>
+        )}
 
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="rounded-full"
-            disabled={scale <= MIN_SCALE}
-            onClick={() => zoomBy(1 / ZOOM_FACTOR)}
-            aria-label="Zoom out"
-          >
-            <ZoomOut />
-          </Button>
-          {/*
-            Doubles as the reset. A zoom control that can only step is a
-            nuisance to get back out of once you are ten presses in, and "100%"
-            is the obvious thing to press to mean "never mind".
-          */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="rounded-full tabular-nums"
-            onClick={() => setScale(1)}
-            aria-label="Reset zoom to fit"
-            title="Reset zoom"
-          >
-            {Math.round(scale * 100)}%
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="rounded-full"
-            disabled={scale >= MAX_SCALE}
-            onClick={() => zoomBy(ZOOM_FACTOR)}
-            aria-label="Zoom in"
-          >
-            <ZoomIn />
-          </Button>
-          {/*
-            Earns its place now that the page no longer follows the panel. The
-            percentage beside it resets the *zoom*, which after a resize is no
-            longer the same thing as filling the panel — this is the one that
-            re-measures.
-          */}
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="rounded-full"
-            onClick={fitToPanel}
-            aria-label="Fit the page to the panel"
-            title="Fit to panel"
-          >
-            <Maximize />
-          </Button>
-        </div>
-      </div>
+        <ViewerControlButton
+          label="Zoom out"
+          disabled={scale <= MIN_SCALE}
+          onClick={() => zoomBy(1 / ZOOM_FACTOR)}
+        >
+          <ZoomOut />
+        </ViewerControlButton>
+        {/*
+          Doubles as the reset. A zoom control that can only step is a nuisance
+          to get back out of once you are ten presses in, and "100%" is the
+          obvious thing to press to mean "never mind".
+        */}
+        <ViewerControlValue label="Reset zoom" onClick={() => setScale(1)}>
+          {Math.round(scale * 100)}%
+        </ViewerControlValue>
+        <ViewerControlButton
+          label="Zoom in"
+          disabled={scale >= MAX_SCALE}
+          onClick={() => zoomBy(ZOOM_FACTOR)}
+        >
+          <ZoomIn />
+        </ViewerControlButton>
+        {/*
+          Earns its place now that the page no longer follows the panel. The
+          percentage beside it resets the *zoom*, which after a resize is no
+          longer the same thing as filling the panel — this is the one that
+          re-measures.
+        */}
+        <ViewerControlButton label="Fit to panel" onClick={fitToPanel}>
+          <Maximize />
+        </ViewerControlButton>
+      </ViewerControls>
     </div>
   );
 }
