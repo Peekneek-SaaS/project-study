@@ -11,9 +11,18 @@ export function makeQueryClient() {
       },
       dehydrate: {
         // serializeData: superjson.serialize,
-        shouldDehydrateQuery: (query) =>
-          defaultShouldDehydrateQuery(query) ||
-          query.state.status === "pending",
+        //
+        // Settled queries only. Dehydrating pending ones is the tRPC docs'
+        // setup for streamed hydration, where the server keeps the request
+        // open and pushes each result down as it lands. This app has no such
+        // provider, so a pending query shipped to the client is a promise
+        // nothing will ever settle — and if it rejects after the snapshot was
+        // taken, React Query can only complain about it on the way past.
+        //
+        // Nothing is lost by waiting: every server prefetch here goes through
+        // `prefetchAwaited`, so the cache holds finished queries by the time
+        // any boundary dehydrates it.
+        shouldDehydrateQuery: defaultShouldDehydrateQuery,
       },
       hydrate: {
         // deserializeData: superjson.deserialize,

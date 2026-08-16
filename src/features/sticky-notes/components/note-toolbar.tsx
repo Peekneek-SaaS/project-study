@@ -105,7 +105,7 @@ export function NoteToolbar({
       </Popover>
 
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>x
+        <DropdownMenuTrigger asChild>
           <Button
             // variant="ghost"
             size="icon-xs"

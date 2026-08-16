@@ -4,7 +4,6 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import MainSidebar from "@/features/main/components/main-sidebar";
 
 import MainHeader from "@/features/main/components/main-header";
-import { HydrateClient } from "@/trpc/server";
 import { Suspense } from "react";
 import { QueryErrorBoundary } from "@/components/query-error-boundary";
 import { Spinner } from "@/components/ui/spinner";
@@ -35,23 +34,27 @@ const MainLayout: React.FC<MainLayoutProps> = async ({ children }) => {
       <SidebarInset>
         <MainHeader />
         <main className="flex flex-1 flex-col">
-          <HydrateClient>
-            {/*
-              Route-level safety net. The drive draws its own tighter boundaries
-              around the table, so this one only catches whatever escapes them.
-            */}
-            <QueryErrorBoundary message="Something went wrong loading your files.">
-              <Suspense
-                fallback={
-                  <div className="flex flex-1 items-center justify-center py-16">
-                    <Spinner />
-                  </div>
-                }
-              >
-                {children}
-              </Suspense>
-            </QueryErrorBoundary>
-          </HydrateClient>
+          {/*
+            No `HydrateClient` here. The layout warms nothing, so it would have
+            nothing of its own to hand over — and being an ancestor of the page,
+            it dehydrates the shared request cache while the page's prefetch is
+            still in it, snapshotting a query mid-flight. Each view wraps its
+            own already-awaited prefetch instead.
+
+            Route-level safety net. The drive draws its own tighter boundaries
+            around the table, so this one only catches whatever escapes them.
+          */}
+          <QueryErrorBoundary message="Something went wrong loading your files.">
+            <Suspense
+              fallback={
+                <div className="flex flex-1 items-center justify-center py-16">
+                  <Spinner />
+                </div>
+              }
+            >
+              {children}
+            </Suspense>
+          </QueryErrorBoundary>
         </main>
       </SidebarInset>
      
