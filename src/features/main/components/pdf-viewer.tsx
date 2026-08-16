@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from "lucide-react";
 import { Document, Page } from "react-pdf";
 
 import "react-pdf/dist/Page/AnnotationLayer.css";
@@ -26,36 +26,136 @@ const DEFAULT_ASPECT = 1 / 1.4142;
 
 const PAGE_GAP = 16;
 
-export function PdfViewer({ url }: { url: string }) {
+/**
+ * Zoom is unbounded in both directions, and steps by a factor rather than by a
+ * fixed amount.
+ *
+ * Multiplying is what makes that safe as well as what makes it feel right: a
+ * press moves the same *proportion* whether you are at 40% or at 900%, and
+ * repeatedly halving approaches zero without ever reaching it, so there is no
+ * cap to hit and no way to arrive at a zero-width page.
+ *
+ * `MIN_SCALE` is numeric safety rather than a limit anyone runs into — at 1% a
+ * page is a few pixels tall, and it exists only so hundreds of presses cannot
+ * underflow the float.
+ */
+const ZOOM_FACTOR = 1.25;
+const MIN_SCALE = 0.01;
+
+/**
+ * The ceiling, the same at every screen size.
+ *
+ * 500% is past the point where the canvas stops being redrawn (see
+ * `MAX_RENDER_PX`), so the last stretch is already CSS enlargement rather than
+ * detail — going further would cost memory for a blurrier picture.
+ */
+const MAX_SCALE = 5;
+
+/**
+ * The largest a page is ever *rasterised* at, in pixels along its driving axis.
+ *
+ * Not a zoom limit — see below. pdf.js draws each page into a canvas, and a
+ * canvas costs four bytes per pixel: a page rendered 6000px wide is around
+ * 200MB on its own, and this keeps several mounted at once. Past this size the
+ * canvas stops growing and CSS scales the result instead, so zooming carries on
+ * without limit and only gets softer rather than taking the tab down with it.
+ */
+const MAX_RENDER_PX = 2400;
+
+/**
+ * Which way the pages run.
+ *
+ * `vertical` is a document scrolled the way documents are scrolled, and is what
+ * a full-height panel or the preview modal wants. `horizontal` lays the pages
+ * out side by side and is for a panel that is wide but short — the stacked
+ * arrangement a small screen falls back to, where a vertically scrolling
+ * document would show a sliver of a page at a time.
+ */
+export type PdfLayout = "vertical" | "horizontal";
+
+export function PdfViewer({
+  url,
+  layout = "vertical",
+}: {
+  url: string;
+  layout?: PdfLayout;
+}) {
   const [pageCount, setPageCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [aspect, setAspect] = useState(DEFAULT_ASPECT);
-  const [pageWidth, setPageWidth] = useState(0);
   const [failed, setFailed] = useState(false);
+
+  // The room available, before zoom. Both axes are measured because which one
+  // sizes a page depends on the layout: pages are fitted to the width when they
+  // are stacked, and to the height when they run across.
+  const [available, setAvailable] = useState({ width: 0, height: 0 });
+  const [scale, setScale] = useState(1);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  // Pages are rendered to a fixed pixel width, so the container has to be
+  const isHorizontal = layout === "horizontal";
+
+  // Pages are rendered to a fixed pixel size, so the container has to be
   // measured rather than handed a percentage.
   useEffect(() => {
     const container = scrollRef.current;
     if (!container) return;
 
     const observer = new ResizeObserver(([entry]) => {
-      // Leave room for the gutter the scroll container is padded with.
-      setPageWidth(Math.max(0, entry.contentRect.width - PAGE_GAP * 2));
+      // Leave room for the gutter the page list is padded with.
+      setAvailable({
+        width: Math.max(0, entry.contentRect.width - PAGE_GAP * 2),
+        height: Math.max(0, entry.contentRect.height - PAGE_GAP * 2),
+      });
     });
     observer.observe(container);
     return () => observer.disconnect();
   }, []);
 
+  /**
+   * The size a page takes up on the page, at the current zoom.
+   *
+   * Driven by whichever axis the layout fits pages to — the width when they are
+   * stacked, the height when they run across — with the other following from
+   * the page's own aspect ratio. Only the driving one is handed to react-pdf:
+   * passing both would let a rounding difference squash the render against the
+   * box holding it.
+   */
+  const boxHeight = isHorizontal ? available.height * scale : 0;
+  const boxWidth = isHorizontal ? boxHeight * aspect : available.width * scale;
+
+  const driving = isHorizontal ? boxHeight : boxWidth;
+  const hasRoom = driving > 0;
+
+  /**
+   * How that size is split between the canvas and a CSS transform.
+   *
+   * Up to `MAX_RENDER_PX` the page is simply drawn at its full size and
+   * `cssScale` is 1. Past it the canvas stops growing and the transform makes
+   * up the difference, which is what lets the zoom keep going: the page gets
+   * blurrier beyond that point, but it never stops responding and never asks
+   * the browser for a canvas it cannot allocate.
+   */
+  const renderSize = Math.min(driving, MAX_RENDER_PX);
+  const cssScale = renderSize > 0 ? driving / renderSize : 1;
+
+  /**
+   * Fewer pages held in reserve once the canvases are at full size.
+   *
+   * `cssScale > 1` is exactly the condition "every mounted page is now as large
+   * as a canvas gets", where the neighbours either side cost as much as the one
+   * being read. Zoomed in that far you are looking at one page anyway, so the
+   * reserve shrinks rather than the ceiling dropping for everyone.
+   */
+  const renderWindow = cssScale > 1 ? 1 : RENDER_WINDOW;
+
   // Which page is being read, for the counter and for prev/next to step from.
-  // Depends on `pageWidth` too: the page elements this observes are only
+  // Depends on the measurement too: the page elements this observes are only
   // rendered once the container has been measured, whichever lands second.
   useEffect(() => {
     const container = scrollRef.current;
-    if (!container || pageCount === 0 || pageWidth === 0) return;
+    if (!container || pageCount === 0 || !hasRoom) return;
 
     const visibility = new Map<number, number>();
     const observer = new IntersectionObserver(
@@ -82,15 +182,24 @@ export function PdfViewer({ url }: { url: string }) {
       if (node) observer.observe(node);
     }
     return () => observer.disconnect();
-  }, [pageCount, pageWidth]);
+  }, [pageCount, hasRoom]);
 
   const goToPage = (page: number) => {
     const clamped = Math.min(Math.max(page, 1), pageCount);
     pageRefs.current[clamped - 1]?.scrollIntoView({
-      block: "start",
+      // Only the axis the pages run along is driven. Left to `start` on both,
+      // a zoomed-in page would be yanked back to its own left edge every time
+      // the reader stepped forward.
+      block: isHorizontal ? "nearest" : "start",
+      inline: isHorizontal ? "start" : "nearest",
       behavior: "smooth",
     });
   };
+
+  const zoomBy = (factor: number) =>
+    setScale((current) =>
+      Math.min(MAX_SCALE, Math.max(MIN_SCALE, current * factor)),
+    );
 
   if (failed) {
     return (
@@ -109,8 +218,27 @@ export function PdfViewer({ url }: { url: string }) {
   }
 
   return (
-    <div className="relative h-full">
-      <div ref={scrollRef} className="h-full overflow-y-auto overscroll-contain">
+    <div className="relative h-full min-h-0 overflow-hidden">
+      <div
+        ref={scrollRef}
+        className={cn(
+          // `absolute inset-0` rather than `h-full`: it makes the scroller
+          // exactly the size of this box and structurally unable to grow with
+          // its content. The zoom pill is positioned against the same box, so
+          // that is what keeps it pinned to the bottom of the *view* instead of
+          // being carried off the end of a zoomed-in page.
+          "absolute inset-0",
+          // Both axes scroll whatever the layout: zooming past the fit is
+          // exactly when the other axis needs to move too, which is the whole
+          // point of being able to zoom in a panel this size.
+          "overflow-auto overscroll-contain",
+          // The gutter is reserved even when nothing is scrolling, so a
+          // scrollbar appearing does not narrow the box this measures itself
+          // from. Without it, resizing the panel walks into a loop: narrower
+          // box, taller pages, scrollbar appears, box narrows again.
+          "scrollbar-gutter-stable",
+        )}
+      >
         <Document
           file={url}
           onLoadSuccess={({ numPages }) => setPageCount(numPages)}
@@ -122,13 +250,28 @@ export function PdfViewer({ url }: { url: string }) {
             </div>
           }
           error={null}
-          className="flex flex-col items-center gap-4 p-4"
+          className={cn(
+            "flex items-center gap-4 p-4",
+            /*
+              `max-content`, emphatically not `fit-content`. Both look like
+              "be as wide as the pages", but `fit-content` is capped at the
+              space available — it will never exceed the scroller, so a zoomed
+              page ends up centred inside a container that stayed panel-width
+              and spills out of both sides with no scrollable width to reach
+              it. `max-content` grows to the pages, which is what gives the
+              scroller something to scroll. The `min-*-full` floor keeps short
+              content centred in the panel rather than hugging one corner.
+            */
+            isHorizontal
+              ? "h-max min-h-full w-max flex-row"
+              : "w-max min-w-full flex-col",
+          )}
         >
-          {pageWidth > 0 &&
+          {hasRoom &&
             Array.from({ length: pageCount }, (_, index) => {
               const pageNumber = index + 1;
               const isNear =
-                Math.abs(pageNumber - currentPage) <= RENDER_WINDOW;
+                Math.abs(pageNumber - currentPage) <= renderWindow;
 
               return (
                 <div
@@ -139,21 +282,47 @@ export function PdfViewer({ url }: { url: string }) {
                   }}
                   // Placeholders hold the scrollbar honest, so scrolling past
                   // unrendered pages does not shuffle everything underneath.
-                  style={{ width: pageWidth, minHeight: pageWidth / aspect }}
+                  style={
+                    isHorizontal
+                      ? { width: boxWidth, height: boxHeight }
+                      : { width: boxWidth, minHeight: boxWidth / aspect }
+                  }
                   className={cn(
-                    "overflow-hidden rounded shadow-lg",
+                    "shrink-0 overflow-hidden rounded shadow-lg",
                     !isNear && "animate-pulse bg-muted",
                   )}
                 >
                   {isNear && (
-                    <Page
-                      pageNumber={pageNumber}
-                      width={pageWidth}
-                      onLoadSuccess={(page) => {
-                        if (pageNumber === 1) setAspect(page.width / page.height);
+                    /*
+                      The canvas is drawn at `renderSize` and stretched the rest
+                      of the way. `origin-top-left` so the growth pushes down
+                      and to the right into the box measured above, rather than
+                      spreading from the middle and out of both sides of it.
+                    */
+                    <div
+                      style={{
+                        transform: `scale(${cssScale})`,
+                        transformOrigin: "top left",
+                        // Sized so the transform has the render's own box to
+                        // scale from, not the zoomed one it is producing.
+                        ...(isHorizontal
+                          ? { height: renderSize }
+                          : { width: renderSize }),
                       }}
-                      loading={null}
-                    />
+                    >
+                      <Page
+                        pageNumber={pageNumber}
+                        // Only ever one of the two — see `boxWidth` above.
+                        {...(isHorizontal
+                          ? { height: renderSize }
+                          : { width: renderSize })}
+                        onLoadSuccess={(page) => {
+                          if (pageNumber === 1)
+                            setAspect(page.width / page.height);
+                        }}
+                        loading={null}
+                      />
+                    </div>
                   )}
                 </div>
               );
@@ -161,35 +330,84 @@ export function PdfViewer({ url }: { url: string }) {
         </Document>
       </div>
 
-      {pageCount > 1 && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
-          <div className="pointer-events-auto flex items-center gap-1 rounded-full bg-popover/95 p-1 shadow-lg ring-1 ring-foreground/10 backdrop-blur">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="rounded-full"
-              disabled={currentPage <= 1}
-              onClick={() => goToPage(currentPage - 1)}
-              aria-label="Previous page"
-            >
-              <ChevronLeft />
-            </Button>
-            <span className="px-1 tabular-nums" aria-live="polite">
-              {currentPage} / {pageCount}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="rounded-full"
-              disabled={currentPage >= pageCount}
-              onClick={() => goToPage(currentPage + 1)}
-              aria-label="Next page"
-            >
-              <ChevronRight />
-            </Button>
-          </div>
+      {/*
+        Always on screen, whatever state the document is in. It used to wait for
+        a page count, which meant the one moment you most want to pull a page
+        back — while it is still working out how big it is — was the moment the
+        controls were missing.
+      */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center px-2">
+        <div className="pointer-events-auto flex max-w-full items-center gap-1 overflow-x-auto rounded-full bg-popover/95 p-1 shadow-lg ring-1 ring-foreground/10 backdrop-blur">
+          {pageCount > 1 && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="rounded-full"
+                disabled={currentPage <= 1}
+                onClick={() => goToPage(currentPage - 1)}
+                aria-label="Previous page"
+              >
+                <ChevronLeft />
+              </Button>
+              <span className="px-1 tabular-nums" aria-live="polite">
+                {currentPage} / {pageCount}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="rounded-full"
+                disabled={currentPage >= pageCount}
+                onClick={() => goToPage(currentPage + 1)}
+                aria-label="Next page"
+              >
+                <ChevronRight />
+              </Button>
+
+              <span
+                aria-hidden
+                className="mx-1 h-4 w-px shrink-0 bg-foreground/15"
+              />
+            </>
+          )}
+
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="rounded-full"
+            disabled={scale <= MIN_SCALE}
+            onClick={() => zoomBy(1 / ZOOM_FACTOR)}
+            aria-label="Zoom out"
+          >
+            <ZoomOut />
+          </Button>
+          {/*
+            Doubles as the reset. A zoom control that can only step is a
+            nuisance to get back out of once you are ten presses in, and "100%"
+            is the obvious thing to press to mean "never mind".
+          */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-full tabular-nums"
+            onClick={() => setScale(1)}
+            aria-label="Reset zoom to fit"
+            title="Reset zoom"
+          >
+            {Math.round(scale * 100)}%
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="rounded-full"
+            disabled={scale >= MAX_SCALE}
+            onClick={() => zoomBy(ZOOM_FACTOR)}
+            aria-label="Zoom in"
+          >
+            <ZoomIn />
+          </Button>
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -29,6 +29,7 @@ import { WorkNotesPanel } from "@/features/work/components/work-notes-panel";
 import { useDocumentWorkspace } from "@/features/work/hooks/use-document-workspace";
 import { useWorkLayout } from "@/features/work/hooks/use-work-layout";
 import { isWorkTab } from "@/features/work/types";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 /**
@@ -51,7 +52,24 @@ export function WorkWorkspace({ documentId }: { documentId: string }) {
 
   const layout = useWorkLayout();
 
-  // The floating window replaces the left panel rather than sitting beside it.
+  /**
+   * Side by side on a desktop, stacked on a phone.
+   *
+   * Two panels split across a narrow screen leave neither of them wide enough
+   * to be anything — a canvas you cannot draw on next to a page you cannot
+   * read. Stacked, each gets the full width and gives up height instead, which
+   * is the cheaper thing to lose.
+   *
+   * `useIsMobile` reports false until its effect runs, so a phone renders the
+   * side-by-side split for one frame and corrects it on hydration. That is the
+   * same guess the header makes, and it costs a reflow rather than a wrong
+   * layout that sticks.
+   */
+  const isMobile = useIsMobile();
+  const orientation = isMobile ? "vertical" : "horizontal";
+
+  // The floating window replaces the document panel rather than sitting beside
+  // it, whichever way round the two are.
   const showDocumentPanel = layout.documentOpen && !layout.minimized;
   const showPip =
     layout.documentOpen && layout.minimized && layout.sectionsOpen;
@@ -180,7 +198,7 @@ export function WorkWorkspace({ documentId }: { documentId: string }) {
       {/* `relative` is what the floating window is positioned against — it
           measures and parks itself within its offset parent. */}
       <div className="relative min-h-0 flex-1">
-        <ResizablePanelGroup orientation="horizontal">
+        <ResizablePanelGroup orientation={orientation}>
           {showDocumentPanel && (
             <>
               <ResizablePanel
@@ -192,6 +210,10 @@ export function WorkWorkspace({ documentId }: { documentId: string }) {
                 <WorkDocumentPanel
                   documentId={documentId}
                   name={workspace.name}
+                  // Stacked, this panel is a wide strip: pages run across it
+                  // rather than down, so a page fits its height instead of
+                  // being cropped to a sliver of one.
+                  pdfLayout={isMobile ? "horizontal" : "vertical"}
                   // Minimising and closing both need somewhere for the page to
                   // carry on being: with the sections closed this panel is all
                   // there is, so neither is offered and the way back to them

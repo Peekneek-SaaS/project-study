@@ -1,9 +1,10 @@
 "use client";
 
-import { ExternalLink, FileText, Minimize2, PanelRight, X } from "lucide-react";
+import { ExternalLink, FileText, Minimize2, Minus, PanelRight, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { LazyPdfViewer } from "@/features/main/components/lazy-pdf-viewer";
+import type { PdfLayout } from "@/features/main/components/pdf-viewer";
 import { isPdf } from "@/lib/document-file-types";
 import { documentFilePath } from "@/lib/document-links";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,7 @@ export function WorkDocumentPanel({
   onMinimize,
   onClose,
   onShowSections,
+  pdfLayout = "vertical",
   className,
 }: {
   documentId: string;
@@ -41,6 +43,12 @@ export function WorkDocumentPanel({
    * the other, so whichever one is left standing always has a way back.
    */
   onShowSections?: () => void;
+  /**
+   * Which way the pages run. Passed down rather than decided here, because the
+   * thing that decides it is the panel arrangement — pages run across when the
+   * panels are stacked and this one is a wide, short strip.
+   */
+  pdfLayout?: PdfLayout;
   className?: string;
 }) {
   const url = documentFilePath(documentId);
@@ -50,7 +58,7 @@ export function WorkDocumentPanel({
     <div className={cn("flex h-full min-h-0 flex-col bg-card", className)}>
       <div
         className={cn(
-          "flex shrink-0 items-center gap-2 border-b px-2",
+          "flex shrink-0 items-center gap-2  px-2",
           compact ? "h-8" : "h-10 px-3",
         )}
       >
@@ -91,7 +99,7 @@ export function WorkDocumentPanel({
               aria-label="Minimize the document"
               onClick={onMinimize}
             >
-              <Minimize2 />
+              <Minus />
             </Button>
           )}
 
@@ -110,7 +118,7 @@ export function WorkDocumentPanel({
 
       <div className="min-h-0 flex-1">
         {readable ? (
-          <LazyPdfViewer url={url} />
+          <LazyPdfViewer url={url} layout={pdfLayout} />
         ) : (
           /*
             Word and PowerPoint have no viewer in this app. The panel says so

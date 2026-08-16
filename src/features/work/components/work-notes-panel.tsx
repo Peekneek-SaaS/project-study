@@ -98,6 +98,14 @@ export function WorkNotesPanel({ documentId }: { documentId: string }) {
                 Anything you write here stays with it.
               </p>
             </div>
+            <Button
+              size="sm"
+              disabled={create.isPending}
+              onClick={() => create.mutate({ documentId })}
+            >
+              <Plus />
+              New note
+            </Button>
           </div>
         ) : (
           <div className="flex flex-col gap-6">
@@ -114,13 +122,12 @@ export function WorkNotesPanel({ documentId }: { documentId: string }) {
                   </div>
                   <Button
                     size="sm"
-                    variant="outline"
                     disabled={create.isPending}
                     onClick={() => create.mutate({ documentId })}
                   >
                     <Plus />
                     New note
-                  </Button>
+                  </Button> 
                 </div>
 
                 <motion.div
