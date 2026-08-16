@@ -2,6 +2,7 @@
 
 import {
   FileSearch,
+  FileText,
   FolderOpen,
   Link2,
   Lock,
@@ -87,14 +88,23 @@ function documentItems(
   confirmDelete: () => void,
   promptRename: () => void,
   openDocument: (doc: DriveDocument) => void,
+  previewDocument: (doc: DriveDocument) => void,
 ): MenuItemConfig[] {
+  // Nothing to open or glance at until the workspace has been built.
+  const notReady = doc.status !== "READY";
+
   return [
     {
-      icon: FileSearch,
+      icon: FileText,
       label: "Open",
       onSelect: () => openDocument(doc),
-      // Nothing to open until the upload has landed.
-      disabled: doc.status !== "READY",
+      disabled: notReady,
+    },
+    {
+      icon: FileSearch,
+      label: "Quick preview",
+      onSelect: () => previewDocument(doc),
+      disabled: notReady,
     },
     {
       icon: Pen,
@@ -153,7 +163,7 @@ function folderItems(
 export function DriveItemActions(props: DriveItemActionsProps) {
   const openModal = useModalStore((state) => state.open);
   const openFolder = useDriveStore((state) => state.openFolder);
-  const openDocument = useOpenDocument();
+  const { open: openDocument, preview: previewDocument } = useOpenDocument();
 
   // Both dialogs live in `ModalProvider`, so they outlive this row being
   // re-rendered away by the refetch that follows the delete or the rename.
@@ -167,7 +177,13 @@ export function DriveItemActions(props: DriveItemActionsProps) {
 
   const menuItems =
     props.kind === "document"
-      ? documentItems(props.item, confirmDelete, promptRename, openDocument)
+      ? documentItems(
+          props.item,
+          confirmDelete,
+          promptRename,
+          openDocument,
+          previewDocument,
+        )
       : folderItems(props.item, confirmDelete, promptRename, openFolder);
 
   return (

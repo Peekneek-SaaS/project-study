@@ -42,7 +42,7 @@ export function DriveDocumentCard({
   doc: DriveDocument;
   onSelect: SelectRow;
 }) {
-  const openDocument = useOpenDocument();
+  const { open, preview } = useOpenDocument();
 
   const isSelected = useDriveSelectionStore(selectIsDocumentSelected(doc.id));
   const isDraggingSelection = useDriveSelectionStore(
@@ -58,7 +58,8 @@ export function DriveDocumentCard({
   const cardProps = useDriveRowInteraction({
     item: { kind: "document", id: doc.id },
     isDragging,
-    onOpen: () => openDocument(doc),
+    // The work page, matching the row — see `drive-document-row`.
+    onOpen: () => open(doc),
     onSelect,
   });
 
@@ -95,8 +96,8 @@ export function DriveDocumentCard({
             size="icon-sm"
             variant={isReady ? "ghost" : "secondary"}
             disabled={!isReady}
-            onClick={() => openDocument(doc)}
-            aria-label={`Open ${doc.name}`}
+            onClick={() => preview(doc)}
+            aria-label={`Preview ${doc.name}`}
           >
             <Play className="size-3.5 fill-emerald-400 stroke-emerald-400" />
           </Button>

@@ -1,11 +1,84 @@
 import { keepExtension } from "@/lib/document-file-types";
 import { prisma } from "@/lib/prisma";
+import { queueWorkspaceBuild } from "@/lib/workspace-jobs";
 import { deleteUploadedFiles } from "@/lib/uploadthing-server";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { TRPCError } from "@trpc/server";
 import z from "zod";
 
 export const DocumentRouter = createTRPCRouter({
+  /**
+   * A document and the workspace built around it, for its work page.
+   *
+   * `boardId` is the whole reason this is not `getPreview`: the page needs to
+   * know *which* board to open before it can render the canvas, and asking the
+   * board router would mean a second round trip to learn something this row
+   * already knows.
+   *
+   * `pdfUrl` stays server-side here as everywhere else — the viewer reaches the
+   * bytes through `/api/documents/[id]/file`.
+   */
+  getWorkspace: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const doc = await prisma.document.findFirst({
+        where: { id: input.id, userId: ctx.userId },
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          board: { select: { id: true } },
+        },
+      });
+
+      if (!doc) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "This document does not exist, or is not shared with you.",
+        });
+      }
+
+      // Flattened rather than passed through as a relation: every caller wants
+      // "which board", and none of them want to know it arrived nested.
+      const { board, ...rest } = doc;
+      return { ...rest, boardId: board?.id ?? null };
+    }),
+
+  /**
+   * Queues the workspace build for a document that has no board yet.
+   *
+   * Two callers, one path. Documents uploaded since workspaces existed are
+   * queued by the upload route and never reach this; documents that predate
+   * them are `READY` with nothing beside them, and their work page calls this
+   * the first time it is opened. It is also what a failed build retries with.
+   *
+   * A no-op for a document that already has a board, so an accidental second
+   * call cannot walk a finished workspace back to `QUEUED`.
+   */
+  buildWorkspace: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const doc = await prisma.document.findFirst({
+        where: { id: input.id, userId: ctx.userId },
+        select: { id: true, status: true, board: { select: { id: true } } },
+      });
+      if (!doc) throw new TRPCError({ code: "NOT_FOUND" });
+
+      if (doc.board) return { id: doc.id, queued: false as const };
+
+      // Marked before the trigger, not after: the client refetches the moment
+      // this returns, and a row still saying `READY` would flash "Complete"
+      // over a workspace that does not exist yet.
+      await prisma.document.update({
+        where: { id: doc.id },
+        data: { status: "QUEUED" },
+      });
+
+      await queueWorkspaceBuild(doc.id);
+
+      return { id: doc.id, queued: true as const };
+    }),
+
   /**
    * A single document, for its preview page.
    *

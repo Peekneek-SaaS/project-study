@@ -45,7 +45,7 @@ export function useDriveRowSelection(
   documents: DriveDocument[],
 ) {
   const openFolder = useDriveStore((state) => state.openFolder);
-  const openDocument = useOpenDocument();
+  const { open: openDocument } = useOpenDocument();
 
   const rows = useMemo<DriveRowEntry[]>(
     () => [

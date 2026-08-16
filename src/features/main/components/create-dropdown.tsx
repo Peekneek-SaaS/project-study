@@ -11,7 +11,9 @@ import {
 import {
   FolderPlus,
   NotebookPen,
+  Shapes,
   SquareMousePointer,
+  StickyNote,
   Upload,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -70,7 +72,7 @@ const CreateDropdown = ({
     },
     {
       label: "New Board",
-      icon: SquareMousePointer,
+      icon: Shapes,
       // Not `runFromSidebar`: this navigates rather than opening an overlay, so
       // there is nothing for the sheet to fight with and no reason to hold the
       // request back until it has finished animating. It does still have to
@@ -83,7 +85,7 @@ const CreateDropdown = ({
     },
     {
       label: "New Note",
-      icon: NotebookPen,
+      icon: StickyNote,
       // Travels, like the board above — the note is added wherever you are, so
       // the page that shows it has to be the next thing you see. Pointed at the
       // new note so the grid scrolls to it rather than leaving it to be found.

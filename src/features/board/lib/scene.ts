@@ -13,3 +13,16 @@ export interface StoredScene {
   appState?: Record<string, unknown>;
   files?: Record<string, unknown>;
 }
+
+/**
+ * What a board starts as, so `snapshot` is never null and always restorable.
+ *
+ * Lives here rather than in the board router because it is no longer the
+ * router's alone: the workspace job writes the boards that belong to documents,
+ * and a board built by the job has to open exactly like one made by hand.
+ */
+export const EMPTY_SNAPSHOT = {
+  elements: [],
+  appState: {},
+  files: {},
+} as const satisfies StoredScene;

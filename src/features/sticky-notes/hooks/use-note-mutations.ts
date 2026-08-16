@@ -19,8 +19,15 @@ const CONTENT_DEBOUNCE_MS = 800;
  * the list mid-sentence would only invite the server's older copy to argue with
  * it. Appearance is a single deliberate click, so it is written immediately and
  * painted optimistically — a colour that waits for a round trip feels broken.
+ *
+ * `documentId` says which list the note is *in*, and every cache write below
+ * goes through it. A note on a document's work page lives under
+ * `listForDocument`, and painting a colour into `list` instead would optimistic
+ * -update a query the note is not in: the click would appear to do nothing
+ * until a refetch, and the wall of standalone notes would briefly hold a note
+ * that does not belong to it.
  */
-export function useNoteMutations(noteId: string) {
+export function useNoteMutations(noteId: string, documentId?: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
@@ -35,8 +42,16 @@ export function useNoteMutations(noteId: string) {
     updateRef.current = update.mutateAsync;
   });
 
-  const listFilter = trpc.stickyNote.list.queryFilter();
-  const listKey = trpc.stickyNote.list.queryKey();
+  // Whichever list this note is in. The filter is deliberately broader than the
+  // key: `list` is cached per `modified` filter, so an unfiltered `queryFilter`
+  // is what reaches every variant of the wall, while the key has to be the exact
+  // one the grid is rendering from for an optimistic write to be seen.
+  const listFilter = documentId
+    ? trpc.stickyNote.listForDocument.queryFilter({ documentId })
+    : trpc.stickyNote.list.queryFilter();
+  const listKey = documentId
+    ? trpc.stickyNote.listForDocument.queryKey({ documentId })
+    : trpc.stickyNote.list.queryKey();
 
   const flushContent = async () => {
     if (timer.current !== null) {

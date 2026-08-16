@@ -62,6 +62,18 @@ export function isSlides(fileName: string) {
 }
 
 /**
+ * A file's name without its extension, for the places that are labelling the
+ * *subject* rather than the file — a document's board, a heading above it.
+ *
+ * The mirror of `keepExtension`, and it draws the line in the same place: a
+ * leading dot is a hidden file rather than an extension, so it is kept.
+ */
+export function stripExtension(fileName: string) {
+  const dot = fileName.lastIndexOf(".");
+  return dot <= 0 ? fileName : fileName.slice(0, dot);
+}
+
+/**
  * Puts a file's extension back on a name that dropped it.
  *
  * Nothing records a document's type but its name — `isPdf` and `isSlides` read

@@ -10,6 +10,7 @@ import {
 import { useQueryStates } from "nuqs";
 import { toast } from "sonner";
 
+import { isTransientStatus } from "@/features/main/lib/document-status";
 import { driveFilterParsers } from "@/features/main/lib/params";
 import type { DriveDragData, DriveDropData } from "@/features/main/types";
 import { useDriveSelectionStore } from "@/lib/stores/drive-selection-store";
@@ -19,6 +20,16 @@ import {
   useDriveStore,
 } from "@/lib/stores/drive-store";
 import { useTRPC } from "@/trpc/client";
+
+/**
+ * How often the listing re-asks while a workspace is being built.
+ *
+ * Short enough that "Building" turning into "Complete" feels like it happened
+ * on its own, long enough that a folder of ten uploads is not a request a
+ * second. The job itself takes about a second, so most builds are caught on the
+ * first or second poll.
+ */
+const WORKSPACE_POLL_MS = 2_000;
 
 /**
  * Contents of the folder being browsed, plus the drag-and-drop wiring that
@@ -40,12 +51,27 @@ export function useDriveBrowser() {
   // an already-seen one is instant.
   const [filters] = useQueryStates(driveFilterParsers);
 
-  const { data } = useSuspenseQuery(
-    trpc.folder.getContents.queryOptions({
+  const { data } = useSuspenseQuery({
+    ...trpc.folder.getContents.queryOptions({
       folderId: currentFolderId,
       ...filters,
     }),
-  );
+    /**
+     * Workspaces are built by a background job, and nothing tells this listing
+     * when one finishes — so while any row is still queued or building, the
+     * listing asks again.
+     *
+     * A function rather than a number so it reads the *answer* each time: the
+     * polling stops on its own the moment the last row settles, and a folder of
+     * finished documents never polls at all. `refetchIntervalInBackground` is
+     * left off, so a tab nobody is looking at goes quiet and catches up when it
+     * is focused again.
+     */
+    refetchInterval: ({ state }) =>
+      state.data?.documents.some((doc) => isTransientStatus(doc.status))
+        ? WORKSPACE_POLL_MS
+        : false,
+  });
 
   // A move rewrites two folders' listings, so refresh them all rather than
   // guessing which ones are cached — and the whole router with them, since the

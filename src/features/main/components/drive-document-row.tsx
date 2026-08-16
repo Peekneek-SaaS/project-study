@@ -36,7 +36,7 @@ export function DriveDocumentRow({
   doc: DriveDocument;
   onSelect: SelectRow;
 }) {
-  const openDocument = useOpenDocument();
+  const { open, preview } = useOpenDocument();
 
   const isSelected = useDriveSelectionStore(selectIsDocumentSelected(doc.id));
   const isDraggingSelection = useDriveSelectionStore(
@@ -54,7 +54,9 @@ export function DriveDocumentRow({
   const rowProps = useDriveRowInteraction({
     item: { kind: "document", id: doc.id },
     isDragging,
-    onOpen: () => openDocument(doc),
+    // Double-click goes to the work page now, not the preview modal — the
+    // document beside its board and its notes.
+    onOpen: () => open(doc),
     onSelect,
   });
 
@@ -98,8 +100,10 @@ export function DriveDocumentRow({
           size="icon"
           variant={isReady ? "ghost" : "secondary"}
           disabled={!isReady}
-          onClick={() => openDocument(doc)}
-          aria-label={`Open ${doc.name}`}
+          // The quick look, kept on the play button now that the double-click
+          // has been given to the work page.
+          onClick={() => preview(doc)}
+          aria-label={`Preview ${doc.name}`}
           className={cn("")}
         >
           <Play className="size-4 fill-emerald-400 stroke-emerald-400" />

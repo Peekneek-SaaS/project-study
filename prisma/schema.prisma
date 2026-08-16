@@ -25,9 +25,20 @@ model Folder {
   @@index([userId, parentId])
 }
 
+/// Where a document is on its way to being workable.
+///
+/// The order is the order it happens in: the bytes arrive (`UPLOADING`), the
+/// row is written and the workspace job is queued (`QUEUED`), the job picks it
+/// up (`BUILDING`), and the board and notes exist (`READY`).
+///
+/// `QUEUED` and `BUILDING` are separate states rather than one "working"
+/// because they fail differently and the user can act on the difference: a
+/// document stuck in `QUEUED` means nothing is consuming the queue, while one
+/// stuck in `BUILDING` means the job itself is wedged.
 enum DocumentStatus {
   UPLOADING
-  PROCESSING
+  QUEUED
+  BUILDING
   READY
   FAILED
 }

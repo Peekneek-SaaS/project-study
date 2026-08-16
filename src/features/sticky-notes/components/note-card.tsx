@@ -48,15 +48,21 @@ export function NoteCard({
   note,
   isFlashing = false,
   onSelect,
+  documentId,
 }: {
   note: StickyNote;
   /** Briefly ringed after being arrived at from search — see `NotesGrid`. */
   isFlashing?: boolean;
   /** Selection, resolved against the wall's order — see `useRowSelection`. */
   onSelect: (modifiers: RowSelectModifiers, id: string) => void;
+  /**
+   * Set when this card is on a document's work page, so edits are written back
+   * to that document's list rather than to the wall of standalone notes.
+   */
+  documentId?: string;
 }) {
   const { saveContent, patchAppearance, removeNote, isRemoving } =
-    useNoteMutations(note.id);
+    useNoteMutations(note.id, documentId);
 
   // Seeded once. The row's `content` is not read again for the life of this
   // card, deliberately — see above.

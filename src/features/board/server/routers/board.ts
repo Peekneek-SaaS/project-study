@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import z from "zod";
 
-import type { StoredScene } from "@/features/board/lib/scene";
+import { EMPTY_SNAPSHOT, type StoredScene } from "@/features/board/lib/scene";
 import { MODIFIED_VALUES, modifiedRange } from "@/lib/list-filters";
 import { prisma } from "@/lib/prisma";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
@@ -23,9 +23,6 @@ const snapshotSchema = z
   // "anything" as far as validation goes, but it types as something a JSON
   // column will accept, which `unknown` does not.
   .catchall(z.json());
-
-/** What a board starts as, so `snapshot` is never null and always restorable. */
-const EMPTY_SNAPSHOT = { elements: [], appState: {}, files: {} };
 
 /** Columns the list needs. `snapshot` is deliberately absent — see `list`. */
 const listFields = {

@@ -9,7 +9,9 @@ import {
   NotebookPen,
   PlusIcon,
   Settings,
+  Shapes,
   SquareMousePointer,
+  StickyNote,
   Volume2,
 } from "lucide-react";
 import Link from "next/link";
@@ -68,13 +70,13 @@ const MainSidebar = () => {
     {
       label: "Board",
       href: "/board",
-      icon: SquareMousePointer,
+      icon: Shapes,
       iconClassName: "text-purple-500",
     },
     {
       label: "Sticky Notes",
       href: "/sticky-notes",
-      icon: NotebookPen,
+      icon: StickyNote,
       iconClassName: "text-yellow-500",
     },
   ];

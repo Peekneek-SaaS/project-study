@@ -9,6 +9,7 @@ import {
   DOCUMENT_MIME_TYPES,
 } from "@/lib/document-file-types";
 import { prisma } from "@/lib/prisma";
+import { queueWorkspaceBuild } from "@/lib/workspace-jobs";
 
 const f = createUploadthing();
 
@@ -73,10 +74,16 @@ export const ourFileRouter = {
           // Named `pdfUrl` from when PDFs were the only accepted type; it holds
           // the file URL whatever the format.
           pdfUrl: file.ufsUrl,
-          // Nothing post-processes documents yet, so they land readable.
-          status: "READY",
+          // The bytes have landed but the board and notes beside them have not,
+          // so the document arrives queued rather than ready. `READY` is the
+          // workspace job's to write — see `trigger/document.ts`.
+          status: "QUEUED",
         },
       });
+
+      // After the row exists, so the job can never start looking for a document
+      // that has not been written yet.
+      await queueWorkspaceBuild(document.id);
 
       // !!! Whatever is returned here is sent to the clientside `onClientUploadComplete` callback
       return { documentId: document.id, name: document.name };

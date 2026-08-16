@@ -61,6 +61,28 @@ async function assertOwned(id: string, userId: string) {
   }
 }
 
+/**
+ * The same for the document a note is being filed under.
+ *
+ * Checked separately from the note itself: a `documentId` arrives from the
+ * client, and without this a user could hang their notes off someone else's
+ * document — the note row would still be theirs, so no later ownership check
+ * would ever catch it.
+ */
+async function assertOwnsDocument(documentId: string, userId: string) {
+  const document = await prisma.document.findFirst({
+    where: { id: documentId, userId },
+    select: { id: true },
+  });
+
+  if (!document) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "This document does not exist, or is not yours.",
+    });
+  }
+}
+
 export const StickyNoteRouter = createTRPCRouter({
   /**
    * Every standalone note, newest first.
@@ -103,26 +125,57 @@ export const StickyNoteRouter = createTRPCRouter({
     }),
 
   /**
+   * The notes taken against one document, newest first.
+   *
+   * The mirror of `list`: that one is everything standing on its own, this one
+   * is everything belonging to a document, and no note is in both. Kept as its
+   * own procedure rather than a `documentId` filter on `list` so the two have
+   * separate cache keys — the notes wall and a work page are open at the same
+   * time, and one invalidating the other would refetch a screen nobody changed.
+   *
+   * No `modified` filter: a work page shows the notes for the document in front
+   * of you, and there is no toolbar there to narrow them with.
+   */
+  listForDocument: protectedProcedure
+    .input(z.object({ documentId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      return prisma.stickyNote.findMany({
+        where: { userId: ctx.userId, documentId: input.documentId },
+        orderBy: { createdAt: "desc" },
+        select: noteFields,
+      });
+    }),
+
+  /**
    * Adds a note.
    *
    * The colour is random unless asked for, which is what makes a wall of them
    * look like a wall of them. Everything else starts from the shared defaults —
    * the same object the settings modal will eventually be editing.
+   *
+   * `documentId` is what decides where the note lands: absent, it stands on its
+   * own and shows on the notes wall; present, it belongs to that document and
+   * shows only on its work page.
    */
   create: protectedProcedure
     .input(
       z
         .object({
           content: z.string().max(MAX_CONTENT).optional(),
+          documentId: z.string().nullish(),
           ...appearanceInput,
         })
         .optional(),
     )
     .mutation(async ({ ctx, input }) => {
+      if (input?.documentId) {
+        await assertOwnsDocument(input.documentId, ctx.userId);
+      }
+
       return prisma.stickyNote.create({
-        // No `documentId`: everything this router creates stands on its own.
         data: {
           userId: ctx.userId,
+          documentId: input?.documentId ?? null,
           content: input?.content ?? "",
           color: input?.color ?? randomNoteColor(),
           textColor: input?.textColor ?? DEFAULT_NOTE_APPEARANCE.textColor,

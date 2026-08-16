@@ -107,7 +107,7 @@ export function SearchModal() {
   const pathname = usePathname();
   const openFolder = useDriveStore((state) => state.openFolder);
   const goToCrumb = useDriveStore((state) => state.goToCrumb);
-  const openDocument = useOpenDocument();
+  const { open: openDocument } = useOpenDocument();
 
   const trpc = useTRPC();
   // Normally already answered: the header warms this entry on idle and again on
@@ -153,8 +153,8 @@ export function SearchModal() {
   };
 
   const handleSelectDocument = (doc: (typeof documents)[number]) => {
-    // Closed first: the preview is a modal of its own, and stacking the palette
-    // over it traps focus in the one that is on its way out.
+    // Closed first, so the palette is gone before the work page arrives rather
+    // than left dismissing itself over the top of it.
     closeSearch();
     openDocument(doc);
   };
