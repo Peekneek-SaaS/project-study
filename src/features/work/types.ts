@@ -22,7 +22,7 @@ export const workPath = (documentId: string) => `/work/${documentId}`;
  * document — see `use-work-layout` — and a key read back from storage has to be
  * checked against something before it selects a tab that no longer exists.
  */
-export const WORK_TABS = ["board", "notes"] as const;
+export const WORK_TABS = ["board", "notes", "chat"] as const;
 
 export type WorkTab = (typeof WORK_TABS)[number];
 

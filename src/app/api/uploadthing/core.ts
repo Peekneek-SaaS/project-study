@@ -8,6 +8,7 @@ import {
   DOCUMENT_MAX_FILE_SIZE,
   DOCUMENT_MIME_TYPES,
 } from "@/lib/document-file-types";
+import { queueContentProcessing } from "@/lib/content-jobs";
 import { prisma } from "@/lib/prisma";
 import { queueWorkspaceBuild } from "@/lib/workspace-jobs";
 
@@ -81,9 +82,15 @@ export const ourFileRouter = {
         },
       });
 
-      // After the row exists, so the job can never start looking for a document
+      // After the row exists, so neither job can start looking for a document
       // that has not been written yet.
+      //
+      // Two jobs rather than one, queued together and independent from here on:
+      // the board and notes are ready in a second, while reading the document
+      // for chat takes as long as it takes. Sequencing them would hold a
+      // finished workspace behind a model call.
       await queueWorkspaceBuild(document.id);
+      await queueContentProcessing(document.id);
 
       // !!! Whatever is returned here is sent to the clientside `onClientUploadComplete` callback
       return { documentId: document.id, name: document.name };

@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   Columns2,
   FileText,
+  MessageSquare,
   PanelRight,
   Shapes,
   StickyNote,
@@ -22,6 +23,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BoardDynamic from "@/features/board/components/board-dynamic";
+import { DocumentChatPanel } from "@/features/chat/components/document-chat-panel";
 import { DRIVE_PATH } from "@/features/main/types";
 import { DocumentPip } from "@/features/work/components/document-pip";
 import { WorkBuildingState } from "@/features/work/components/work-building-state";
@@ -203,6 +205,10 @@ export function WorkWorkspace({
             <StickyNote className=" fill-yellow-400 stroke-yellow-200" />
             <span className="hidden @sm:inline">Sticky notes</span>
           </TabsTrigger>
+          <TabsTrigger value="chat" aria-label="Chat">
+            <MessageSquare className="fill-emerald-500 stroke-emerald-500" />
+            <span className="hidden @sm:inline">Chat</span>
+          </TabsTrigger>
         </TabsList>
 
         <div className="ml-auto flex items-center gap-1">
@@ -273,6 +279,34 @@ export function WorkWorkspace({
             </Suspense>
           </QueryErrorBoundary>
         )}
+      </TabsContent>
+
+      {/*
+        The one tab that is *not* force-mounted.
+
+        The other two are kept alive because unmounting them loses something the
+        user set up — the canvas viewport, a note being edited. A chat has the
+        opposite property: its transcript is on the server, and mounting it
+        starts a poll while the document is being read. Mounting it on every work
+        page whether or not anyone opens it would mean that poll running behind
+        a board nobody has left.
+
+        It is also the only panel whose state does not need to survive tab
+        switches, because there is nothing local to survive: `useChat` is seeded
+        from the stored conversation, which is refetched on the way back in.
+      */}
+      <TabsContent value="chat" className="min-h-0 flex-1">
+        <QueryErrorBoundary message="Something went wrong loading this chat.">
+          <Suspense
+            fallback={
+              <div className="flex h-full items-center justify-center">
+                <Spinner />
+              </div>
+            }
+          >
+            <DocumentChatPanel documentId={documentId} />
+          </Suspense>
+        </QueryErrorBoundary>
       </TabsContent>
     </Tabs>
   );

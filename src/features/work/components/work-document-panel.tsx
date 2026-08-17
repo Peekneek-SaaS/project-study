@@ -3,6 +3,7 @@
 import {
   ExternalLink,
   FileText,
+  MessageSquare,
   Minimize2,
   Minus,
   PanelRight,
@@ -153,6 +154,14 @@ export function WorkDocumentPanel({
                 >
                   <StickyNote className="fill-yellow-400 stroke-yellow-200" />
                   <span className="hidden @sm:inline">Sticky notes</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="chat"
+                  aria-label="Chat"
+                  onClick={() => onShowSections("chat")}
+                >
+                  <MessageSquare className="fill-emerald-500 stroke-emerald-500" />
+                  <span className="hidden @sm:inline">Chat</span>
                 </TabsTrigger>
               </TabsList>
             </Tabs>

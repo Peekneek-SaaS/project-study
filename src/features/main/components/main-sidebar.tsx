@@ -6,6 +6,7 @@ import {
   Home,
   LayoutGrid,
   type LucideIcon,
+  MessageSquare,
   NotebookPen,
   PlusIcon,
   Settings,
@@ -74,10 +75,16 @@ const MainSidebar = () => {
       iconClassName: "fill-purple-500 stroke-purple-500",
     },
     {
-      label: "Sticky Notes",
+      label: "Sticky Note",
       href: "/sticky-notes",
       icon: StickyNote,
       iconClassName: "fill-yellow-400 stroke-yellow-200",
+    },
+    {
+      label: "Chat",
+      href: "/chat",
+      icon: MessageSquare,
+      iconClassName: "fill-emerald-500 stroke-emerald-500",
     },
   ];
 

@@ -32,6 +32,17 @@ export default defineConfig({
     // The adapter and its driver are installed in the run environment rather
     // than bundled, so they resolve the same native/optional pieces they would
     // locally.
-    external: ["@prisma/adapter-pg", "pg"],
+    //
+    // The document readers join them for the same reason. `unpdf` carries a
+    // PDF.js build compiled for serverless runtimes, and `mammoth` and `jszip`
+    // both reach for optional native pieces — all three resolve those correctly
+    // when installed in the run environment and not when inlined into a bundle.
+    external: [
+      "@prisma/adapter-pg",
+      "pg",
+      "unpdf",
+      "mammoth",
+      "jszip",
+    ],
   },
 });

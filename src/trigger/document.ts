@@ -1,6 +1,9 @@
 import { AbortTaskRunError, logger, schemaTask } from "@trigger.dev/sdk";
 import z from "zod";
 
+import type { Prisma } from "@/generated/prisma/client";
+import { processDocument } from "@/lib/ai/document-processing";
+import { UnsupportedDocumentError } from "@/lib/ai/extraction";
 import { EMPTY_SNAPSHOT } from "@/features/board/lib/scene";
 import {
   DEFAULT_NOTE_APPEARANCE,
@@ -132,6 +135,199 @@ export const buildDocumentWorkspace = schemaTask({
         status: { in: ["QUEUED", "BUILDING"] },
       },
       data: { status: "FAILED" },
+    });
+  },
+});
+
+/**
+ * How many chunks go into one `createMany`.
+ *
+ * A textbook can produce hundreds, and a single statement carrying all of them
+ * builds a query long enough to upset the pooler. Batched, each insert is
+ * ordinary-sized and the whole thing still runs inside one transaction.
+ */
+const CHUNK_INSERT_BATCH = 200;
+
+/**
+ * Reads a document so the chat can answer from it.
+ *
+ * Separate from `buildDocumentWorkspace` — separate task, separate status
+ * column, separate failure — because they are separate promises to the user.
+ * The workspace is a board and some notes, built in three queries and done in a
+ * second; this fetches a file, parses it, and talks to a model, and may take
+ * minutes on a long book. Folding them together would mean a slow read holding
+ * up a canvas that was ready immediately, and a model outage marking a document
+ * `FAILED` when its workspace built perfectly well.
+ *
+ * Safe to run twice, like its sibling. The content row is an upsert on the
+ * unique `documentId`, and the chunks are deleted and rewritten inside the same
+ * transaction as the row that owns them — so a retry replaces a half-written
+ * reading rather than adding a second one beside it, and a search never sees
+ * the document in two states at once.
+ */
+export const processDocumentContent = schemaTask({
+  id: "process-document-content",
+  schema: z.object({
+    documentId: z.string(),
+    /**
+     * Which provider to start the chain at, when the run was asked for by
+     * someone who had picked one. Absent for the automatic run after upload,
+     * which takes the default order.
+     */
+    provider: z.enum(["openai", "anthropic", "google"]).nullish(),
+  }),
+  /**
+   * Fifteen minutes. Generous against the work — a long PDF, one structure
+   * call — but this is the task that talks to three providers in sequence when
+   * the first two are timing out, and the ceiling has to sit above that.
+   */
+  maxDuration: 900,
+  // Parsing a 16MB PDF holds the whole document and its page text in memory at
+  // once, which is more than the smallest machine has to spare.
+  machine: "small-2x",
+  run: async ({ documentId, provider }) => {
+    const document = await prisma.document.findUnique({
+      where: { id: documentId },
+      select: { id: true, userId: true, name: true, pdfUrl: true },
+    });
+
+    // Deleted between the upload finishing and the job starting. Nothing to
+    // read and nothing a retry would fix.
+    if (!document) {
+      throw new AbortTaskRunError(
+        `Document ${documentId} no longer exists; nothing to read.`,
+      );
+    }
+
+    logger.log("Reading document", { documentId, name: document.name });
+
+    // Written before the work rather than after it, so the document's chat tab
+    // can say "reading this document" for the minutes it takes rather than
+    // showing an empty state that looks like nothing is happening.
+    const content = await prisma.documentContent.upsert({
+      where: { documentId },
+      create: {
+        documentId,
+        userId: document.userId,
+        status: "PROCESSING",
+      },
+      update: { status: "PROCESSING", error: null },
+      select: { id: true },
+    });
+
+    try {
+      const response = await fetch(document.pdfUrl);
+      if (!response.ok) {
+        throw new Error(
+          `Could not fetch the uploaded file (${response.status}).`,
+        );
+      }
+      const bytes = new Uint8Array(await response.arrayBuffer());
+
+      const processed = await processDocument({
+        bytes,
+        fileName: document.name,
+        preferredProvider: provider ?? null,
+      });
+
+      logger.log("Read document", {
+        documentId,
+        pages: processed.pageCount,
+        chunks: processed.chunks.length,
+        provider: processed.provider,
+      });
+
+      await prisma.$transaction(async (tx) => {
+        // The old reading goes before the new one lands, in the same
+        // transaction: a search running concurrently sees either the previous
+        // reading or this one, never both stitched together.
+        await tx.documentChunk.deleteMany({ where: { documentId } });
+
+        await tx.documentContent.update({
+          where: { id: content.id },
+          data: {
+            status: "READY",
+            title: processed.title,
+            subject: processed.subject,
+            summary: processed.summary,
+            // Cast because Prisma types a Json column as an object or a
+            // primitive, and this is an array of them — which is valid JSON and
+            // valid for the column, just not expressible in that union.
+            outline: processed.outline as unknown as Prisma.InputJsonValue,
+            topics: processed.topics,
+            pageCount: processed.pageCount,
+            provider: processed.provider,
+            model: processed.model,
+            error: null,
+            processedAt: new Date(),
+          },
+        });
+
+        for (let at = 0; at < processed.chunks.length; at += CHUNK_INSERT_BATCH) {
+          await tx.documentChunk.createMany({
+            data: processed.chunks
+              .slice(at, at + CHUNK_INSERT_BATCH)
+              .map((chunk) => ({
+                documentId,
+                contentId: content.id,
+                userId: document.userId,
+                index: chunk.index,
+                pageStart: chunk.pageStart,
+                pageEnd: chunk.pageEnd,
+                section: chunk.section,
+                text: chunk.text,
+              })),
+          });
+        }
+      });
+
+      return {
+        documentId,
+        pageCount: processed.pageCount,
+        chunkCount: processed.chunks.length,
+      };
+    } catch (error) {
+      // A format nothing here can read is a finished answer, not a failure to
+      // retry: a .doc will still be a .doc on the third attempt. The row is
+      // marked with something the user can act on and the run ends cleanly.
+      if (error instanceof UnsupportedDocumentError) {
+        await prisma.documentContent.update({
+          where: { id: content.id },
+          data: { status: "FAILED", error: error.message },
+        });
+
+        logger.warn("Document format cannot be read", {
+          documentId,
+          name: document.name,
+        });
+
+        return { documentId, pageCount: 0, chunkCount: 0 };
+      }
+
+      throw error;
+    }
+  },
+
+  /**
+   * Runs once the last attempt has failed, so the document stops claiming to be
+   * mid-read forever.
+   *
+   * Not a `catch` inside `run` — that would mark it failed while two retries
+   * were still to come, and a provider that was briefly down is the ordinary
+   * reason to be here.
+   */
+  onFailure: async ({ payload, error }) => {
+    logger.error("Document read failed", { ...payload, error });
+
+    await prisma.documentContent.updateMany({
+      where: { documentId: payload.documentId, status: "PROCESSING" },
+      data: {
+        status: "FAILED",
+        // The user sees this, so it says what to do rather than what broke.
+        error:
+          "This document could not be read for chat. You can try again from " +
+          "its chat tab.",
+      },
     });
   },
 });

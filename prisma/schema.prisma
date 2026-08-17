@@ -65,7 +65,286 @@ model Document {
   /// notes as it earns.
   stickyNotes StickyNote[]
 
+  /// What the AI has read out of this document, once it has been through
+  /// `process-document-content`. Singular and optional: a document has one
+  /// reading of itself, and does not have it until the job has run.
+  content DocumentContent?
+
+  /// The passages that reading was cut into. Reachable through `content` as
+  /// well, but held here too so a chunk can be found by document without
+  /// joining through it — which is what every search does.
+  chunks DocumentChunk[]
+
+  /// The conversation held against this document. At most one — see `Chat`.
+  chat Chat?
+
   @@index([userId, folderId])
+}
+
+/// How far the AI has got with reading a document.
+///
+/// Deliberately separate from `DocumentStatus`, which tracks the board and the
+/// notes. The two jobs run independently and fail independently: a document
+/// whose workspace built fine can still be unreadable to the model, and one the
+/// model read perfectly can have had its board build wedge. Folding them into
+/// one column would mean a failure in either one hiding the other's success.
+enum ContentStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
+/// A document as the AI understands it: the whole of what chat knows.
+///
+/// One row per document, holding the *document-level* reading — what this
+/// thing is, what it covers, how it is laid out. The text itself lives next
+/// door in `DocumentChunk`, because that is what gets searched and this is what
+/// gets shown.
+///
+/// The universal chat and a document's own chat read the same rows. There is no
+/// second, combined copy of anything: "everything the user has uploaded" is
+/// just this table without a `documentId` filter, which is why processing
+/// happens exactly once per document.
+model DocumentContent {
+  id         String   @id @default(cuid())
+  documentId String   @unique
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  /// Denormalised from `Document` on purpose. Every retrieval query filters by
+  /// owner first, and reaching through the relation to prove ownership would
+  /// put a join in front of the one check that must never be skipped.
+  userId String
+
+  status ContentStatus @default(PENDING)
+
+  /// The document's real title, as the model read it off the page — which is
+  /// very often not the file name. "bio-ch4-final-v2.pdf" is what the user
+  /// called it; "Cell Structure and Function" is what it is, and the second one
+  /// is what a citation should say.
+  title String?
+
+  /// The field it belongs to — "Biology", "Macroeconomics". What lets the
+  /// universal chat say *which* subject an answer came from when three
+  /// documents all have a chapter 4.
+  subject String?
+
+  /// A few sentences on what the document covers. Cheap enough to put in front
+  /// of the model for every universal question, which is what makes the model
+  /// able to pick the right document to search before it searches it.
+  summary String @default("")
+
+  /// The chapters and sections, with the pages they run over, as
+  /// `{ title, pageStart, pageEnd }[]`. Json rather than a table: it is read
+  /// whole, written once, and never queried into.
+  outline Json?
+
+  /// Topic keywords, for the same reason as `summary` — a router hint, not a
+  /// search index.
+  topics String[] @default([])
+
+  /// How many pages the extractor found. The ceiling on any page a citation is
+  /// allowed to name, and what tells `readPages` when it has been asked for
+  /// something past the end.
+  pageCount Int @default(0)
+
+  /// Which provider and model actually produced this, after the fallback chain
+  /// had its say. Kept because "the answer is odd" and "the third provider
+  /// wrote it" are the same investigation, and without this there is no way to
+  /// tell the two apart after the fact.
+  provider String?
+  model    String?
+
+  /// Why it failed, in the user's words rather than a stack trace. Shown on the
+  /// document's chat tab, so it has to be something a person can act on.
+  error String?
+
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  chunks DocumentChunk[]
+
+  @@index([userId, status])
+}
+
+/// One searchable passage of a document.
+///
+/// The unit of retrieval and the unit of citation, which is why it carries a
+/// page range rather than an offset: an answer has to be able to say "page 5",
+/// and a chunk that only knows its character position in a blob cannot.
+///
+/// Chunks span a range rather than sitting on a single page because passages do
+/// — a paragraph that starts at the foot of page 4 and finishes at the head of
+/// page 5 is one thought, and splitting it at the page break is how a search
+/// finds half of it.
+model DocumentChunk {
+  id String @id @default(cuid())
+
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  contentId String
+  content   DocumentContent @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  /// As on `DocumentContent`, and for the same reason: search filters by owner
+  /// before it does anything else.
+  userId String
+
+  /// Position in the document, from zero. What puts search results back in
+  /// reading order, and what `readPages` walks.
+  index Int
+
+  /// Inclusive, 1-based — the numbers printed on the page, not array indices.
+  /// A citation reads these straight out, so they are kept in the form a person
+  /// would say them.
+  pageStart Int
+  pageEnd   Int
+
+  /// Which chapter or section this fell in, resolved from the outline when the
+  /// document was processed. Null when the model could not make out a
+  /// structure, in which case citations fall back to pages alone.
+  section String?
+
+  text String
+
+  createdAt DateTime @default(now())
+
+  /// The full-text index this is searched by.
+  ///
+  /// Never written by application code — a Postgres trigger recomputes it from
+  /// `text` on every insert and update, so it cannot fall out of step with the
+  /// passage it describes. `Unsupported` because Prisma has no `tsvector` type;
+  /// that also keeps it out of the generated create and update inputs, which is
+  /// what makes "never written by application code" true by construction rather
+  /// than by discipline.
+  ///
+  /// A trigger and not a `GENERATED ALWAYS AS` column, which is the obvious way
+  /// to do this and does not survive contact with Prisma: the migration engine
+  /// reads a generation expression as a column default, sees a default the
+  /// datamodel does not declare, and emits `ALTER COLUMN ... DROP DEFAULT` on
+  /// every `migrate dev` — a statement Postgres refuses on a generated column.
+  /// Triggers are invisible to the differ, so this arrangement produces no
+  /// drift at all. See the migration that installs it.
+  searchVector Unsupported("tsvector")?
+
+  /// Reading order within a document, and the index a document-scoped search
+  /// narrows on before it ranks.
+  @@index([documentId, index])
+  /// The universal search's first cut: everything this user owns.
+  @@index([userId])
+  /// The index the whole retrieval layer rests on — GIN over the vector above,
+  /// so `@@` is a lookup rather than a scan of every passage the user owns.
+  ///
+  /// Declared here rather than created in raw SQL, and that is the load-bearing
+  /// part: an index Prisma does not know about is one it drops the next time it
+  /// diffs the database. Naming the operator class explicitly is what lets it
+  /// describe an index on a type it otherwise has no name for.
+  @@index([searchVector(ops: raw("tsvector_ops"))], type: Gin)
+}
+
+/// Which documents a conversation can see.
+///
+/// The whole difference between the two chat surfaces, in one column. A
+/// `UNIVERSAL` chat searches everything its owner has uploaded and cites the
+/// document by name; a `DOCUMENT` chat searches one and refuses questions that
+/// fall outside it. The tools handed to the model differ by this and nothing
+/// else — see `chat/server/tools.ts`.
+enum ChatScope {
+  UNIVERSAL
+  DOCUMENT
+}
+
+/// A conversation.
+///
+/// `documentId` is both the scope's subject and its uniqueness: `@unique` on a
+/// nullable column means at most one chat per document — a document's chat is a
+/// place you return to, not a thing you accumulate — while any number of
+/// universal chats can sit alongside it, because Postgres does not consider two
+/// nulls equal. That is what lets the document chat live at the document's own
+/// URL with no id of its own, exactly as the drive's work page does.
+model Chat {
+  id     String    @id @default(cuid())
+  userId String
+  scope  ChatScope @default(UNIVERSAL)
+
+  documentId String?   @unique
+  document   Document? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  /// Written from the first question rather than asked for. A dialog demanding
+  /// a title before the user has said anything is a dialog in the way of the
+  /// thing they came to do; renaming later is one click.
+  title String @default("New chat")
+
+  /// Which provider this conversation was last held with, so reopening it picks
+  /// up where it left off instead of snapping back to the default. Per chat and
+  /// not per user: a document being read in one provider's voice should not
+  /// change what the next chat opens on.
+  provider String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages ChatMessage[]
+
+  /// Where to pick this conversation back up.
+  ///
+  /// Answering happens in a durable Trigger.dev run rather than inside a
+  /// request, so a turn outlives the tab that started it. These three fields are
+  /// what let a *different* tab — or the same one after a refresh, or tomorrow —
+  /// attach to that run and carry on watching it stream, instead of finding a
+  /// finished answer sitting there with no sign of how it arrived.
+  ///
+  /// `lastEventId` is the cursor into the run's output stream: it is what makes
+  /// reconnecting resume rather than replay. It is valid for the lifetime of the
+  /// session and deliberately kept across run boundaries — clearing it early
+  /// makes a reconnect start from zero and close on the previous turn's stale
+  /// completion record.
+  sessionRunId String?
+  lastEventId  String?
+
+  /// The session-scoped token the browser reconnects with.
+  ///
+  /// Not a secret in the ambient sense — it is scoped to this one chat's session
+  /// and expires — but it is still a credential, so it is only ever handed to
+  /// the owner of the row and is re-minted server-side when it lapses.
+  sessionToken String?
+
+  /// The recents list: this user's universal chats, most recently spoken to
+  /// first. `updatedAt` and not `createdAt`, because a chat returned to after a
+  /// week belongs at the top.
+  @@index([userId, scope, updatedAt])
+}
+
+/// One turn in a conversation, stored the way the client draws it.
+///
+/// `parts` is an AI SDK `UIMessage`'s parts array, verbatim — text, reasoning,
+/// tool calls and their results, all of it. Kept whole rather than flattened to
+/// a string because a reopened chat has to look like the one that was left: the
+/// sources the model cited and the searches it ran are part of the answer, and
+/// a schema that only kept the prose would throw them away.
+///
+/// Json, so the shape stays the SDK's to define. Nothing in the database reads
+/// into it.
+model ChatMessage {
+  id     String @id @default(cuid())
+  chatId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  /// `user` or `assistant`. A string rather than an enum: it is the SDK's
+  /// vocabulary, and a role it adds should not need a migration here.
+  role String
+
+  parts Json
+
+  /// Which provider answered this particular turn. Per message, not per chat,
+  /// because the picker can be changed mid-conversation — and when it is, the
+  /// transcript should be able to say which voice said what.
+  provider String?
+
+  createdAt DateTime @default(now())
+
+  @@index([chatId, createdAt])
 }
 
 /// An Excalidraw scene.
