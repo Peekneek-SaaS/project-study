@@ -7,7 +7,9 @@ import { ChatComposer } from "@/features/chat/components/chat-composer";
 import { ChatGreeting } from "@/features/chat/components/chat-greeting";
 import { useChatProvider } from "@/features/chat/hooks/use-chat-provider";
 import { chatPath, newChatId } from "@/features/chat/types";
+import { UNIVERSAL_SUGGESTIONS } from "@/features/chat/lib/suggestions";
 import { useChatDraftStore } from "@/lib/stores/chat-draft-store";
+import ChatSuggestions from "./chat-suggestions";
 
 /**
  * The chat page before anything has been asked.
@@ -22,20 +24,6 @@ import { useChatDraftStore } from "@/lib/stores/chat-draft-store";
  * anything, which is a visible stall at the exact moment the app should feel
  * fastest. The row is created by the streaming request itself.
  */
-
-/**
- * What a new user is offered.
- *
- * Deliberately about *their* documents rather than about the assistant. Each
- * one demonstrates a different thing it can do — find across documents,
- * summarise one, pull structure out — so the set doubles as an explanation of
- * what this page is for.
- */
-const SUGGESTIONS = [
-  "What are my documents about?",
-  "Summarise the key concepts I need to revise",
-  "Make me a study plan from my documents",
-];
 
 export function ChatLanding() {
   const router = useRouter();
@@ -67,9 +55,7 @@ export function ChatLanding() {
   return (
     <div className="flex w-full max-w-3xl flex-col items-center gap-6 px-4">
       <ChatGreeting
-        subtitle="Ask anything about the documents you have uploaded. I will search them and tell you which page the answer came from."
-        suggestions={SUGGESTIONS}
-        onSuggestion={start}
+        // subtitle="Ask anything about the documents you have uploaded. I will search them and tell you which page the answer came from."
       />
 
       <ChatComposer
@@ -77,6 +63,11 @@ export function ChatLanding() {
         provider={provider}
         onProviderChange={setProvider}
         autoFocus
+      />
+
+      <ChatSuggestions
+        suggestions={UNIVERSAL_SUGGESTIONS}
+        onSuggestion={start}
       />
     </div>
   );

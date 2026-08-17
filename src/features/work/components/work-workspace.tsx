@@ -382,7 +382,7 @@ export function WorkWorkspace({
               onClick={() => openTab("notes")}
             >
               <StickyNote className="fill-yellow-400 stroke-yellow-200" />
-              <span className="hidden @lg:inline">Notes</span>
+              <span className="hidden @lg:inline">Note</span>
             </TabsTrigger>
             <TabsTrigger
               value="chat"

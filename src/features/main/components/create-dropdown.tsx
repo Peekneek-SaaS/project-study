@@ -11,6 +11,7 @@ import {
 import {
   Folder,
   FolderPlus,
+  MessageSquare,
   NotebookPen,
   Shapes,
   SquareMousePointer,
@@ -21,6 +22,7 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useCreateBoard } from "@/features/board/hooks/use-create-board";
 import { useCreateNote } from "@/features/sticky-notes/hooks/use-create-note";
+import { chatPath, newChatId } from "@/features/chat/types";
 import { stickyNotePath } from "@/features/sticky-notes/types";
 import { MenuItemsProps } from "./main-sidebar";
 import { useModalStore } from "@/lib/stores/modal-store";
@@ -97,6 +99,29 @@ const CreateDropdown = ({
         });
       },
       iconClassName: "fill-yellow-400 stroke-yellow-200",
+    },
+    {
+      label: "New Chat",
+      icon: MessageSquare,
+      /**
+       * The only one of these that asks the server for nothing.
+       *
+       * A universal chat has no row until something is said in it: the id is
+       * minted here, the page opens on it, and `resolveChat` writes the row when
+       * the first question is sent. That is what keeps the recents list free of
+       * empty "New chat" entries from every time someone opened this menu and
+       * changed their mind — and it is why this navigates immediately instead of
+       * waiting on a round trip the way the board and the note do.
+       *
+       * Universal by construction rather than by a flag: a chat is scoped to a
+       * document only when it is opened from that document's page, which carries
+       * the `documentId`. There is none here, so there is nothing to narrow it.
+       */
+      onClick: () => {
+        setOpenMobile(false);
+        router.push(chatPath(newChatId()));
+      },
+      iconClassName: "fill-emerald-400 stroke-emerald-200",
     },
   ];
 

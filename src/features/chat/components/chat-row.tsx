@@ -4,6 +4,7 @@ import { formatDistanceToNow } from "date-fns";
 import {
   MessageSquare,
   MoreVertical,
+  Pen,
   SquareArrowOutUpRight,
   Trash2,
 } from "lucide-react";
@@ -53,11 +54,13 @@ import { cn } from "@/lib/utils";
 export function ChatRow({
   chat,
   onSelect,
+  onRename,
   onDelete,
   onWarm,
 }: {
   chat: ChatSummary;
   onSelect: (modifiers: RowSelectModifiers, id: string) => void;
+  onRename: (chat: ChatSummary) => void;
   onDelete: (chat: ChatSummary) => void;
   /** Prefetches the conversation on hover — see `RecentChats`. */
   onWarm: (id: string) => void;
@@ -94,15 +97,15 @@ export function ChatRow({
     >
       <TableCell className="max-w-0">
         <div className="flex items-center gap-2 font-medium">
-          <MessageSquare className="size-3.5 shrink-0 text-muted-foreground" />
+          <MessageSquare className="size-3.5 shrink-0 fill-emerald-500 stroke-emerald-500" />
           <span className="truncate">{chat.title}</span>
-          <span className="shrink-0 text-xs font-normal text-muted-foreground">
+          {/* <span className="shrink-0 text-xs font-normal text-muted-foreground">
             {chat.messageCount}
-          </span>
+          </span> */}
         </div>
       </TableCell>
 
-      <TableCell className="hidden text-muted-foreground sm:table-cell">
+      {/* <TableCell className="hidden text-muted-foreground sm:table-cell">
         {isAiProvider(chat.provider) ? (
           <span className="flex items-center gap-1.5">
             <ProviderLogo provider={chat.provider} labelled={false} />
@@ -111,7 +114,7 @@ export function ChatRow({
         ) : (
           "—"
         )}
-      </TableCell>
+      </TableCell> */}
 
       <TableCell className="whitespace-nowrap text-muted-foreground">
         {/* Wrapped because this arrives as an ISO string, not a `Date` — there
@@ -138,6 +141,10 @@ export function ChatRow({
                 <SquareArrowOutUpRight />
                 Open
               </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => onRename(chat)}>
+              <Pen />
+              Rename
             </DropdownMenuItem>
             <DropdownMenuItem
               variant="destructive"

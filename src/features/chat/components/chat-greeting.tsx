@@ -31,15 +31,12 @@ function greeting(): string {
 export function ChatGreeting({
   title,
   subtitle,
-  suggestions = [],
-  onSuggestion,
   className,
 }: {
   /** Overrides the time-of-day greeting — the document panel names a document. */
   title?: string;
   subtitle?: string;
-  suggestions?: string[];
-  onSuggestion?: (question: string) => void;
+
   className?: string;
 }) {
   const { user } = useUser();
@@ -47,7 +44,8 @@ export function ChatGreeting({
   // Computed during render rather than in state: it is read once as the page
   // mounts, and nobody is watching an empty chat at the moment the hour turns.
   const heading =
-    title ?? (user?.firstName ? `${greeting()}, ${user.firstName}` : greeting());
+    title ??
+    (user?.firstName ? `${greeting()}, ${user.firstName}` : greeting());
 
   return (
     <motion.div
@@ -69,28 +67,6 @@ export function ChatGreeting({
         >
           {subtitle}
         </motion.p>
-      )}
-
-      {suggestions.length > 0 && onSuggestion && (
-        <motion.div
-          variants={listContainer}
-          className="mt-1 flex flex-wrap items-center justify-center gap-2"
-        >
-          {suggestions.map((suggestion) => (
-            <motion.button
-              key={suggestion}
-              type="button"
-              variants={listItem}
-              onClick={() => onSuggestion(suggestion)}
-              // Sends immediately rather than filling the box. A suggestion the
-              // user has to press and then send again is two actions for
-              // something whose entire value is being one.
-              className="rounded-full border bg-card px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-ring/50 hover:text-foreground"
-            >
-              {suggestion}
-            </motion.button>
-          ))}
-        </motion.div>
       )}
     </motion.div>
   );

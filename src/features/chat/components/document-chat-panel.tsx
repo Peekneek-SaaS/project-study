@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { ChatComposer } from "@/features/chat/components/chat-composer";
 import { ChatGreeting } from "@/features/chat/components/chat-greeting";
+import ChatSuggestions from "@/features/chat/components/chat-suggestions";
 import { ChatThread } from "@/features/chat/components/chat-thread";
 import { useChatProvider } from "@/features/chat/hooks/use-chat-provider";
 import { providersById, toUIMessages } from "@/features/chat/lib/messages";
@@ -266,9 +267,15 @@ export function DocumentChatPanel({ documentId }: { documentId: string }) {
               data.content.title ?? stripExtension(data.documentName)
             }
             subtitle="Ask anything about this document. I only answer from this one — for questions across everything you have uploaded, use the main chat."
-            suggestions={SUGGESTIONS}
-            onSuggestion={(question) => sendMessage({ text: question }, requestOptions)}
             className="max-w-md"
+          />
+
+          <ChatSuggestions
+            suggestions={SUGGESTIONS}
+            onSuggestion={(question) =>
+              sendMessage({ text: question }, requestOptions)
+            }
+            className="mt-6"
           />
         </motion.div>
       ) : (

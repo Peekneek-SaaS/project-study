@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChatRow } from "@/features/chat/components/chat-row";
 import { DeleteChatsDialog } from "@/features/chat/components/delete-chats-dialog";
+import { RenameChatDialog } from "@/features/chat/components/rename-chat-dialog";
 import { chatPath, type ChatSummary } from "@/features/chat/types";
 import { ROW_ATTRIBUTE } from "@/hooks/use-row-interaction";
 import { useRowSelection } from "@/hooks/use-row-selection";
@@ -46,6 +47,9 @@ export function RecentChats() {
   const clearSelection = useChatSelectionStore((state) => state.clear);
 
   const [deletingMany, setDeletingMany] = useState<string[] | null>(null);
+  // The dialogs live here rather than in each row: a row unmounts the moment
+  // the list refetches after a rename, and it would take its dialog with it.
+  const [renaming, setRenaming] = useState<ChatSummary | null>(null);
 
   /**
    * Conversations warmed on hover rather than on mount.
@@ -194,12 +198,12 @@ export function RecentChats() {
             toolbar — but a table still owes its rows column names, and three
             unlabelled columns are three a screen reader cannot describe.
           */}
-          <TableHeader className="sr-only">
+          <TableHeader className="">
             <TableRow>
               <TableHead className={STICKY_HEAD}>Chat</TableHead>
-              <TableHead className={cn(STICKY_HEAD, "hidden sm:table-cell")}>
+              {/* <TableHead className={cn(STICKY_HEAD, "hidden sm:table-cell")}>
                 Model
-              </TableHead>
+              </TableHead> */}
               <TableHead className={STICKY_HEAD}>Last active</TableHead>
               <TableHead className={cn(STICKY_HEAD, "w-12 text-right")}>
                 Actions
@@ -215,6 +219,7 @@ export function RecentChats() {
                 key={chat.id}
                 chat={chat}
                 onSelect={selectRow}
+                onRename={setRenaming}
                 // One row's menu and a whole selection go to the same dialog:
                 // the copy is a count either way, so there is nothing a
                 // single-chat version would say differently.
@@ -225,6 +230,8 @@ export function RecentChats() {
           </MotionTableBody>
         </Table>
       </div>
+
+      <RenameChatDialog chat={renaming} onClose={() => setRenaming(null)} />
 
       <DeleteChatsDialog
         ids={deletingMany}

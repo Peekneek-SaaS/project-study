@@ -6,6 +6,7 @@ import {
   FileText,
   Folder,
   LucideIcon,
+  MessageSquare,
   NotebookPen,
   Shapes,
   SquareMousePointer,
@@ -26,10 +27,12 @@ import { Kbd } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
 import { DriveStatusBadge } from "@/features/main/components/drive-status-badge";
 import { boardPath } from "@/features/board/types";
+import { chatPath } from "@/features/chat/types";
 import { useOpenDocument } from "@/features/main/hooks/use-open-document";
 import { DRIVE_PATH } from "@/features/main/types";
 import {
   searchBoardsOptions,
+  searchChatsOptions,
   searchItemsOptions,
   searchNotesOptions,
 } from "@/features/main/hooks/use-search-items";
@@ -129,12 +132,18 @@ export function SearchModal() {
     ...searchNotesOptions(trpc),
     enabled: isOpen,
   });
+  const { data: chatData, isLoading: isLoadingChats } = useQuery({
+    ...searchChatsOptions(trpc),
+    enabled: isOpen,
+  });
 
-  const isLoading = isLoadingItems || isLoadingBoards || isLoadingNotes;
+  const isLoading =
+    isLoadingItems || isLoadingBoards || isLoadingNotes || isLoadingChats;
   const folders = data?.folders ?? [];
   const documents = data?.documents ?? [];
   const boards = boardData ?? [];
   const notes = noteData ?? [];
+  const chats = chatData ?? [];
 
   /**
    * Search can land on a folder several levels down, so the breadcrumb trail is
@@ -175,6 +184,13 @@ export function SearchModal() {
     router.push(stickyNotePath(noteId));
   };
 
+  // A conversation has a page of its own, like a board — so this navigates
+  // rather than handing off to a modal or moving a store.
+  const handleSelectChat = (chatId: string) => {
+    closeSearch();
+    router.push(chatPath(chatId));
+  };
+
   return (
     <CommandDialog
       open={isOpen}
@@ -182,7 +198,7 @@ export function SearchModal() {
         if (!open) closeSearch();
       }}
       title="Search"
-      description="Search your folders and files"
+      description="Search your files, boards, notes and chats"
       // Capped against the viewport rather than a pixel height, so a long
       // drive never pushes the palette off-screen. `flex` replaces the
       // dialog's own grid to let the list absorb the leftover space, and
@@ -196,7 +212,7 @@ export function SearchModal() {
       */}
       <Command className="min-h-0 flex-1">
         <CommandInput
-          placeholder="Search folders and files…"
+          placeholder="Search files, boards, notes and chats…"
           value={query}
           onValueChange={setQuery}
         />
@@ -286,6 +302,32 @@ export function SearchModal() {
                   <span className="truncate">
                     {noteDisplayTitle(note.content)}
                   </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+          {chats.length > 0 && (
+            <CommandGroup heading="Chats">
+              {chats.map((chat) => (
+                <CommandItem
+                  key={chat.id}
+                  /*
+                    Matched on the title alone, unlike a note — which is
+                    searched by everything written in it.
+
+                    A note has no name, so its body is the only handle there is.
+                    A chat's title *is* its first question, written down when the
+                    conversation started, so it already carries the words someone
+                    would search for. Shipping every transcript to the browser to
+                    match on the rest would be a great deal of text for a small
+                    gain, and it is the one group here where that text could run
+                    to megabytes.
+                  */
+                  value={`${chat.title} ${chat.id}`}
+                  onSelect={() => handleSelectChat(chat.id)}
+                >
+                  <MessageSquare className="fill-emerald-500 stroke-emerald-500" />
+                  <span className="truncate">{chat.title}</span>
                 </CommandItem>
               ))}
             </CommandGroup>

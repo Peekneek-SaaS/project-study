@@ -6,9 +6,12 @@ import { useTriggerChatTransport } from "@trigger.dev/sdk/chat/react";
 import { useEffect, useMemo } from "react";
 
 import { ChatComposer } from "@/features/chat/components/chat-composer";
+import { ChatGreeting } from "@/features/chat/components/chat-greeting";
+import ChatSuggestions from "@/features/chat/components/chat-suggestions";
 import { ChatThread } from "@/features/chat/components/chat-thread";
 import { useChatProvider } from "@/features/chat/hooks/use-chat-provider";
 import { providersById, toUIMessages } from "@/features/chat/lib/messages";
+import { UNIVERSAL_SUGGESTIONS } from "@/features/chat/lib/suggestions";
 import {
   clearChatSession,
   mintChatAccessToken,
@@ -156,13 +159,40 @@ export function ChatConversation({ chatId }: { chatId: string }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <ChatThread
-        messages={messages}
-        status={status}
-        error={error}
-        onRetry={() => regenerate(requestOptions)}
-        providers={providers}
-      />
+      {messages.length === 0 ? (
+        /*
+          A conversation nobody has spoken in yet.
+
+          Reachable two ways, and both of them need this: "New Chat" in the
+          create menu opens straight onto a fresh id, and so does a bookmarked
+          chat that was abandoned before its first question. Left as a bare
+          scroller it is an empty page with a box at the bottom, which reads as
+          something that failed to load rather than something waiting for you.
+
+          The same greeting the landing page shows, centred the same way the
+          document panel centres its own — the composer drops to the bottom the
+          moment there is a transcript to sit under.
+        */
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4">
+          <ChatGreeting className="max-w-xl" />
+
+          <ChatSuggestions
+            suggestions={UNIVERSAL_SUGGESTIONS}
+            onSuggestion={(question) =>
+              sendMessage({ text: question }, requestOptions)
+            }
+            className="mt-6"
+          />
+        </div>
+      ) : (
+        <ChatThread
+          messages={messages}
+          status={status}
+          error={error}
+          onRetry={() => regenerate(requestOptions)}
+          providers={providers}
+        />
+      )}
 
       <div className="shrink-0 px-4 pb-4">
         <ChatComposer
