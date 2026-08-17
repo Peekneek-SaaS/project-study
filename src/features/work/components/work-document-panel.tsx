@@ -1,26 +1,10 @@
 "use client";
 
-import {
-  ExternalLink,
-  FileText,
-  MessageSquare,
-  Minimize2,
-  Minus,
-  PanelRight,
-  Shapes,
-  StickyNote,
-  X,
-} from "lucide-react";
+import { ExternalLink, FileText, Minus, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DocumentView } from "@/features/main/components/document-view";
 import type { PdfLayout } from "@/features/main/components/pdf-viewer";
-import {
-  DEFAULT_WORK_TAB,
-  isWorkTab,
-  type WorkTab,
-} from "@/features/work/types";
 import { documentFilePath } from "@/lib/document-links";
 import { cn } from "@/lib/utils";
 
@@ -39,9 +23,8 @@ export function WorkDocumentPanel({
   compact = false,
   onMinimize,
   onClose,
-  tab = DEFAULT_WORK_TAB,
-  onShowSections,
   pdfLayout = "vertical",
+  page,
   className,
 }: {
   documentId: string;
@@ -51,30 +34,13 @@ export function WorkDocumentPanel({
   onMinimize?: () => void;
   onClose?: () => void;
   /**
-   * Which section the panel would come back on — the one the user was last
-   * looking at. Only marks a tab as the current one; opening is `onShowSections`.
-   *
-   * Defaulted rather than required so a caller that shows no tabs at all — the
-   * floating window — has nothing to say about them.
-   */
-  tab?: WorkTab;
-  /**
-   * Brings the board and notes back on the section asked for, and is passed
-   * *only* when they are closed — at which point this panel is the whole page,
-   * and the tabs that would otherwise switch between them went with them.
-   *
-   * The mirror of the sections bar's "Show document": each panel is what offers
-   * the other, so whichever one is left standing always has a way back. The tabs
-   * are the sections panel's own, so reopening lands where it was aimed rather
-   * than wherever the panel was left.
-   */
-  onShowSections?: (tab: WorkTab) => void;
-  /**
    * Which way the pages run. Passed down rather than decided here, because the
    * thing that decides it is the panel arrangement — pages run across when the
    * panels are stacked and this one is a wide, short strip.
    */
   pdfLayout?: PdfLayout;
+  /** A page to open at, when a chat citation asked for one. */
+  page?: number | null;
   className?: string;
 }) {
   const url = documentFilePath(documentId);
@@ -91,7 +57,7 @@ export function WorkDocumentPanel({
    * Asked as a question about the content rather than about `compact`, so a
    * caller that passes no controls never gets a bar, whichever size it is in.
    */
-  const hasControls = Boolean(onShowSections || onMinimize || onClose);
+  const hasControls = Boolean(onMinimize || onClose);
 
   return (
     <div className={cn("flex h-full min-h-0 flex-col bg-card", className)}>
@@ -116,56 +82,6 @@ export function WorkDocumentPanel({
               </span>
             </>
           )} */}
-
-          {/*
-            The sections panel's own tabs, standing in for it while it is closed:
-            the same control in the same place, so reopening the board is one
-            press on the board tab rather than a press to open and another to
-            switch.
-
-            `activationMode="manual"` because activating a tab here opens a
-            panel — arrowing along the row to look at the options should not keep
-            doing that. `onClick` alongside `onValueChange` for the same reason
-            the two are not interchangeable here: `onValueChange` says nothing
-            when the tab pressed is already the current one, which is exactly the
-            press that has to still open the panel.
-          */}
-          {onShowSections && (
-            <Tabs
-              value={tab}
-              activationMode="manual"
-              onValueChange={(value) => {
-                if (isWorkTab(value)) onShowSections(value);
-              }}
-            >
-              <TabsList variant="custom">
-                <TabsTrigger
-                  value="board"
-                  aria-label="Board"
-                  onClick={() => onShowSections("board")}
-                >
-                  <Shapes className="stroke-purple-500 fill-purple-500" />
-                  <span className="hidden @sm:inline">Board</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="notes"
-                  aria-label="Sticky notes"
-                  onClick={() => onShowSections("notes")}
-                >
-                  <StickyNote className="fill-yellow-400 stroke-yellow-200" />
-                  <span className="hidden @sm:inline">Sticky notes</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="chat"
-                  aria-label="Chat"
-                  onClick={() => onShowSections("chat")}
-                >
-                  <MessageSquare className="fill-emerald-500 stroke-emerald-500" />
-                  <span className="hidden @sm:inline">Chat</span>
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          )}
 
           <div className="ml-auto flex items-center gap-1">
 
@@ -212,6 +128,7 @@ export function WorkDocumentPanel({
           name={name}
           url={url}
           pdfLayout={pdfLayout}
+          page={page}
           fallback={
             /*
               Only the pre-2007 binary formats reach this now — `.doc` and

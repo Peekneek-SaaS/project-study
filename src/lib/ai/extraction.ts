@@ -76,9 +76,35 @@ export class UnsupportedDocumentError extends Error {
  */
 const SCANNED_CHARS_PER_PAGE = 40;
 
+/**
+ * Strips the bytes a database column cannot hold.
+ *
+ * PDF extraction produces these more often than it sounds: a document with a
+ * broken or subsetted font encoding yields NUL and other C0 control characters
+ * where glyphs failed to map. Postgres `text` cannot store a NUL at all — it
+ * rejects the whole statement with `invalid byte sequence for encoding "UTF8":
+ * 0x00` — so a single bad glyph anywhere in a book took down the entire
+ * `createMany`, rolled back the transaction, and left the document unreadable
+ * with an error that named encoding rather than the page it came from.
+ *
+ * Newlines and tabs survive because they are structure; everything else in the
+ * C0 range is a byte that was never text, and dropping it loses nothing a
+ * search or a citation could have used. The lone surrogates are here for the
+ * same reason — unpaired halves of a character are not valid UTF-8 either, and
+ * a mangled encoding tends to produce both.
+ */
+export function stripUnstorable(text: string): string {
+  return text
+    // C0 controls except \t and \n, plus DEL and the C1 range.
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, "")
+    // Surrogate halves with no partner.
+    .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, "")
+    .replace(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "");
+}
+
 /** Collapses the whitespace PDF extraction leaves behind. */
 function tidy(text: string): string {
-  return text
+  return stripUnstorable(text)
     .replace(/\r\n?/g, "\n")
     // Runs of blank lines become one. PDF extraction emits a lot of these.
     .replace(/\n{3,}/g, "\n\n")

@@ -113,9 +113,9 @@ export function DriveDocumentCard({
 
       <div className="relative mx-2 mb-2 h-44 overflow-hidden rounded-lg bg-background">
         <DocumentThumbnail doc={doc} />
-        {doc.status !== "READY" && (
+        {doc.overallStatus !== "READY" && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/70">
-            <DriveStatusBadge status={doc.status} />
+            <DriveStatusBadge status={doc.overallStatus} />
           </div>
         )}
       </div>

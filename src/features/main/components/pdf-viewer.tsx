@@ -87,9 +87,19 @@ export type PdfLayout = "vertical" | "horizontal";
 export function PdfViewer({
   url,
   layout = "vertical",
+  page,
 }: {
   url: string;
   layout?: PdfLayout;
+  /**
+   * A page to jump to, 1-based — how a chat citation lands on the passage it
+   * cites. Null or absent leaves the reader wherever they were.
+   *
+   * Not the *current* page: this viewer owns that, and taking it as a
+   * controlled value would fight the scroll observer that tracks it. This is a
+   * request to go somewhere, honoured once per distinct value.
+   */
+  page?: number | null;
 }) {
   const [pageCount, setPageCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
@@ -264,6 +274,27 @@ export function PdfViewer({
       behavior: "smooth",
     });
   };
+
+  /**
+   * Honours a requested page, once the document knows how many it has.
+   *
+   * Two conditions, and both are load-bearing. `pageCount` gates it because
+   * `goToPage` clamps against a count that is zero until the PDF has loaded —
+   * arriving from a citation would otherwise scroll nowhere and stay there. And
+   * the ref is what makes this a one-shot per value: without it, every re-render
+   * while the reader scrolls away would drag them back to the cited page.
+   */
+  const honoured = useRef<number | null>(null);
+  useEffect(() => {
+    if (!page || pageCount === 0) return;
+    if (honoured.current === page) return;
+
+    honoured.current = page;
+    goToPage(page);
+    // `goToPage` is redeclared every render and is deliberately not a
+    // dependency; the ref above is what controls when this runs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, pageCount]);
 
   const zoomBy = (factor: number) =>
     setScale((current) =>

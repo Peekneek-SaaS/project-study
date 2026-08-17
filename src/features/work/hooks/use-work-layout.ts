@@ -216,6 +216,20 @@ export function useWorkLayout() {
   const restore = useCallback(() => patch({ minimized: false }), [patch]);
 
   /**
+   * Puts the document back on screen, whatever state it was left in.
+   *
+   * The counterpart to `showSections`, and it exists for the citation links: a
+   * link that lands on page 5 of a document the reader had minimised or closed
+   * would appear to do nothing at all. One patch rather than an open followed by
+   * a restore, so there is no render in between showing the panel in the wrong
+   * state.
+   */
+  const showDocument = useCallback(
+    () => patch({ documentOpen: true, minimized: false }),
+    [patch],
+  );
+
+  /**
    * Closing the last panel is refused rather than allowed to empty the page.
    *
    * The buttons are also disabled at that point, so this is the second guard —
@@ -273,5 +287,6 @@ export function useWorkLayout() {
     setSectionsOpen,
     minimize,
     restore,
+    showDocument,
   };
 }

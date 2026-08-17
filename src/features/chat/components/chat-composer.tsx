@@ -16,6 +16,7 @@ import { CHAT_COLUMN } from "@/features/chat/types";
 import { fastTransition } from "@/lib/motion";
 import type { AiProvider } from "@/lib/ai/types";
 import { cn } from "@/lib/utils";
+import { Textarea } from "@/components/ui/textarea";
 
 /**
  * Where questions are written.
@@ -123,7 +124,7 @@ export function ChatComposer({
       className={cn(
         // The whole thing is one surface that reacts to focus, rather than a
         // bordered textarea with controls parked underneath it.
-        "group/composer relative flex flex-col gap-1 rounded-2xl border bg-card p-2 shadow-sm transition-[box-shadow,border-color] duration-200",
+        "group/composer relative flex flex-col gap-1 border bg-card p-2 shadow-sm transition-[box-shadow,border-color] duration-200",
         "focus-within:border-ring/60 focus-within:shadow-md",
         // The measure lives here rather than on each caller. Left to the
         // callers it was forgotten in the document panel, so the box ran the
@@ -134,7 +135,7 @@ export function ChatComposer({
         className,
       )}
     >
-      <textarea
+      <Textarea
         ref={textareaRef}
         value={value}
         onChange={(event) => setValue(event.target.value)}
@@ -148,17 +149,17 @@ export function ChatComposer({
         // either clipping early or growing past its own limit.
         style={{ maxHeight: MAX_HEIGHT }}
         // `field-sizing-content` is deliberately absent — see the note above.
-        className="w-full resize-none bg-transparent px-2 py-1.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground/70 disabled:opacity-60"
+        className="w-full border-none focus-visible:ring-0 resize-none bg-transparent px-2 py-1.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground/70 disabled:opacity-60"
       />
 
       <div className="flex items-center gap-1">
+
+        <div className="ml-auto flex items-center gap-2">
         <ProviderPicker
           value={provider}
           onChange={onProviderChange}
           disabled={disabled}
         />
-
-        <div className="ml-auto">
           {isStreaming && onStop ? (
             <Button
               type="button"
@@ -166,7 +167,7 @@ export function ChatComposer({
               variant="secondary"
               onClick={onStop}
               aria-label="Stop generating"
-              className="size-8 rounded-full"
+              className="size-8"
             >
               <Square className="size-3 fill-current" />
             </Button>
@@ -183,7 +184,7 @@ export function ChatComposer({
                 size="icon"
                 disabled={!canSend}
                 aria-label="Send"
-                className="size-8 rounded-full transition-opacity disabled:opacity-40"
+                className="size-8 transition-opacity disabled:opacity-40"
               >
                 <ArrowUp className="size-4" />
               </Button>

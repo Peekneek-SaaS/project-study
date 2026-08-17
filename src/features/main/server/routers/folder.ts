@@ -2,6 +2,7 @@ import {
   DRIVE_TYPE_VALUES,
   typeExtensions,
 } from "@/features/main/lib/drive-filters";
+import { deriveDocumentStatus } from "@/features/main/lib/document-status";
 import { MODIFIED_VALUES, modifiedRange } from "@/lib/list-filters";
 import { prisma } from "@/lib/prisma";
 import { deleteUploadedFiles } from "@/lib/uploadthing-server";
@@ -339,6 +340,10 @@ export const FolderRouter = createTRPCRouter({
           isLocked: true,
           createdAt: true,
           updatedAt: true,
+          // Only the status. The reading itself is large and none of the
+          // listing's business — this is here so the badge can combine the two
+          // jobs into one answer.
+          content: { select: { status: true } },
         },
       });
 
@@ -356,7 +361,21 @@ export const FolderRouter = createTRPCRouter({
             orderBy: { name: "asc" },
           });
 
-      return { folders, documents: await documentsQuery };
+      /**
+       * The badge's answer, worked out here rather than in the row.
+       *
+       * `status` stays exactly as it was — the workspace build — because that
+       * is what decides whether a document can be opened, previewed and
+       * dragged, and none of those should wait on a book being read for chat.
+       * `overallStatus` is the combined one, and the only thing the badge and
+       * the poll look at.
+       */
+      const documents = (await documentsQuery).map(({ content, ...doc }) => ({
+        ...doc,
+        overallStatus: deriveDocumentStatus(doc.status, content?.status ?? null),
+      }));
+
+      return { folders, documents };
     }),
 
   getBreadcrumb: protectedProcedure
@@ -402,10 +421,20 @@ export const FolderRouter = createTRPCRouter({
           isLocked: true,
           createdAt: true,
           updatedAt: true,
+          content: { select: { status: true } },
         },
       }),
     ]);
-    return { folders, documents };
+
+    // The palette hands these straight to the drive's own row components, so
+    // they have to come back the same shape the listing produces.
+    return {
+      folders,
+      documents: documents.map(({ content, ...doc }) => ({
+        ...doc,
+        overallStatus: deriveDocumentStatus(doc.status, content?.status ?? null),
+      })),
+    };
   }),
 
   // For the "Move to..." folder picker — full tree, lightweight fields only

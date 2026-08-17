@@ -1,17 +1,16 @@
 "use client";
 
-import { Suspense, useCallback, useMemo } from "react";
+import { Suspense, useCallback, useEffect, useMemo } from "react";
 import {
   ArrowLeft,
-  Columns2,
   FileText,
   MessageSquare,
-  PanelRight,
   Shapes,
   StickyNote,
   X,
 } from "lucide-react";
 import Link from "next/link";
+import { parseAsInteger, useQueryState } from "nuqs";
 
 import { QueryErrorBoundary } from "@/components/query-error-boundary";
 import { Button } from "@/components/ui/button";
@@ -75,6 +74,37 @@ export function WorkWorkspace({
     useDocumentWorkspace(documentId);
 
   const layout = useWorkLayout();
+
+  /**
+   * The page a chat citation asked for, if this page was opened from one.
+   *
+   * In the query string rather than in a store, because a citation is a *link* —
+   * it has to survive being opened in a new tab, shared, or reloaded, and none
+   * of that works if the target page lives in memory. `nuqs` reads it
+   * reactively, so following a second citation to the same document scrolls the
+   * viewer rather than doing nothing on an unchanged route.
+   */
+  const [citedPage] = useQueryState("page", parseAsInteger);
+
+  /**
+   * A citation has to be able to *show* the page it lands on.
+   *
+   * The layout is remembered across visits, so someone who reads with the
+   * document minimised — or closed altogether, working from the board — would
+   * follow a citation into a page where the document is not on screen at all.
+   * The link would appear to do nothing.
+   *
+   * So arriving with a page restores the document, once, and only when a page
+   * was actually asked for. A visit without one leaves the arrangement exactly
+   * as the user left it.
+   */
+  useEffect(() => {
+    if (citedPage === null) return;
+    layout.showDocument();
+    // Only on a change of the *cited page*: depending on the layout would rerun
+    // this every time the user then minimised the document, undoing them.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [citedPage]);
 
   /**
    * Side by side on a desktop, stacked on a phone.
@@ -148,92 +178,21 @@ export function WorkWorkspace({
     [documentId],
   );
 
+  /**
+   * The sections themselves, with no toolbar of their own.
+   *
+   * The tabs that used to sit above these now live in the page header — see the
+   * return below. What is left here is only the panes, so this is a plain stack
+   * rather than a `Tabs` root: the root moved up to wrap the header *and* the
+   * panels, because a `TabsList` and its `TabsContent` have to share one.
+   */
   const sections = (
-    <Tabs
-      value={layout.tab}
-      onValueChange={(value) => {
-        if (isWorkTab(value)) layout.setTab(value);
-      }}
-      className="flex h-full min-h-0 flex-col gap-0"
-    >
+    <div className="flex h-full min-h-0 flex-col">
       {/*
-        `@container` so the labels below answer to this panel's width rather
-        than the window's. `md:` could not see a panel dragged narrow — the
-        window has not changed size — so the labels stayed put and the toolbar
-        crushed. The same fix the notes grid needed.
-      */}
-      <div className="@container flex h-10 shrink-0 items-center gap-2 px-2">
-        <TabsList variant="custom">
-          {/*
-            `aria-label` on the trigger rather than relying on the text: below
-            the threshold the label is `hidden`, which takes it out of the
-            accessibility tree as well as off the screen, leaving a tab with an
-            icon and no name. The attribute is carried at every width so the two
-            cannot disagree.
-          */}
-
-          {/* Restores the document without having to find the floating window,
-              which may be parked behind whatever the user is working on. */}
-          {layout.minimized && (
-            <Button
-              variant="ghost"
-              aria-label="Show the document"
-              onClick={layout.restore}
-              className="hover:bg-transparent"
-            >
-              <FileText className="fill-orange-400 stroke-orange-200" />
-              <span className="hidden @sm:inline">Document</span>
-            </Button>
-          )}
-          {!layout.documentOpen && (
-            <Button
-              variant="ghost"
-              aria-label="Show the document"
-              onClick={() => layout.setDocumentOpen(true)}
-              className="hover:bg-transparent"
-            >
-              <FileText className="fill-orange-400 stroke-orange-200" />
-              <span className="hidden @sm:inline">Document</span>
-            </Button>
-          )}
-
-          <TabsTrigger value="board" aria-label="Board">
-            <Shapes className="stroke-purple-500 fill-purple-500" />
-            <span className="hidden @sm:inline">Board</span>
-          </TabsTrigger>
-          <TabsTrigger value="notes" aria-label="Sticky notes">
-            <StickyNote className=" fill-yellow-400 stroke-yellow-200" />
-            <span className="hidden @sm:inline">Sticky notes</span>
-          </TabsTrigger>
-          <TabsTrigger value="chat" aria-label="Chat">
-            <MessageSquare className="fill-emerald-500 stroke-emerald-500" />
-            <span className="hidden @sm:inline">Chat</span>
-          </TabsTrigger>
-        </TabsList>
-
-        <div className="ml-auto flex items-center gap-1">
-          {/* Restores the document without having to find the floating window,
-              which may be parked behind whatever the user is working on. */}
-
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            aria-label="Close the sections panel"
-            title="Close this panel"
-            // Refused when it would empty the page — the hook guards this too,
-            // but a button that cannot work should look like it.
-            disabled={!layout.documentOpen || layout.minimized}
-            onClick={() => layout.setSectionsOpen(false)}
-          >
-            <X />
-          </Button>
-        </div>
-      </div>
-
-      {/*
-        Both tabs stay mounted. The board is an Excalidraw canvas that reads its
-        scene once on mount, so unmounting it to look at a note and coming back
-        would reload the whole scene and lose the viewport the user had set up.
+        Board and notes stay mounted. The board is an Excalidraw canvas that
+        reads its scene once on mount, so unmounting it to look at a note and
+        coming back would reload the whole scene and lose the viewport the user
+        had set up.
       */}
       <TabsContent
         value="board"
@@ -308,21 +267,133 @@ export function WorkWorkspace({
           </Suspense>
         </QueryErrorBoundary>
       </TabsContent>
-    </Tabs>
+    </div>
+  );
+
+  /**
+   * Pressing a tab both selects it and makes sure it is on screen.
+   *
+   * `showSections` rather than `setTab`, because with the tabs now in the page
+   * header they are reachable while the sections panel is closed — and a tab
+   * that highlights without bringing its content back is a control that appears
+   * broken. Opening a panel that is already open is a no-op, so this is right in
+   * both cases.
+   */
+  const openTab = useCallback(
+    (value: string) => {
+      if (isWorkTab(value)) layout.showSections(value);
+    },
+    [layout],
   );
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-11 shrink-0 items-center gap-2 border-b px-3">
-        <Button size="sm" variant="ghost" asChild>
-          <Link href={DRIVE_PATH}>
-            <ArrowLeft />
-            Back
-          </Link>
-        </Button>
-        <span className="truncate text-sm font-medium" title={workspace.name}>
-          {workspace.name}
-        </span>
+    /*
+      The `Tabs` root wraps the whole workspace rather than just the sections
+      panel, which is what lets the triggers live in the header while their
+      panes stay down in the panel — they share one Radix context and nothing
+      else has to be wired between them.
+    */
+    <Tabs
+      value={layout.tab}
+      onValueChange={openTab}
+      className="min-h-0 flex-1 gap-0"
+    >
+      {/*
+        One toolbar for the page instead of two stacked strips.
+
+        The tabs used to sit inside the sections panel, directly under this bar,
+        which cost a row of height to say something this bar had room for and
+        left the two disagreeing about width as the split was dragged. Up here
+        they are always in the same place whatever the panels are doing — and
+        they still work when the sections panel is shut, which is the part that
+        makes closing it worth doing.
+
+        `@container` so the labels answer to the *page* width. They used to
+        answer to the panel's, which is why they were hidden far more often than
+        they needed to be.
+      */}
+      <div className="@container flex h-11 shrink-0 justify-between items-center gap-2 border-b px-3">
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="ghost" asChild>
+            <Link href={DRIVE_PATH}>
+              <ArrowLeft />
+            </Link>
+          </Button>
+
+          <span
+            className="hidden min-w-0 truncate text-sm font-medium @md:block"
+            title={workspace.name}
+          >
+            {workspace.name}
+          </span>
+        </div>
+
+        {/*
+          Centred rather than trailing the name: the tabs are the thing this bar
+          is *for* now, and a long file name would otherwise push them around as
+          it truncated.
+        */}
+        <div>
+          <TabsList variant="custom" className="mx-auto">
+            {/*
+            Brings the document back, however it left — minimised into the
+            floating window, or closed outright. One button for both because
+            `showDocument` settles both flags, and because from the user's side
+            it is one intent: put the document back.
+            
+            Sat with the tabs since it is the same kind of control — which pane
+            am I looking at — and shown only when the document is not already
+            on screen.
+            */}
+            {(layout.minimized || !layout.documentOpen) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label="Show the document"
+                onClick={layout.showDocument}
+                className="hover:bg-transparent"
+              >
+                <FileText className="fill-orange-400 stroke-orange-200" />
+                <span className="hidden @lg:inline">Document</span>
+              </Button>
+            )}
+
+            {/*
+            `aria-label` on every trigger rather than relying on the text: below
+            the threshold the label is `hidden`, which takes it out of the
+            accessibility tree as well as off the screen, leaving a tab with an
+            icon and no name.
+            
+            `onClick` alongside the root's `onValueChange` because that callback
+            says nothing when the tab pressed is already the current one — which
+            is exactly the press that still has to reopen a closed panel.
+            */}
+            <TabsTrigger
+              value="board"
+              aria-label="Board"
+              onClick={() => openTab("board")}
+            >
+              <Shapes className="stroke-purple-500 fill-purple-500" />
+              <span className="hidden @lg:inline">Board</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="notes"
+              aria-label="Sticky notes"
+              onClick={() => openTab("notes")}
+            >
+              <StickyNote className="fill-yellow-400 stroke-yellow-200" />
+              <span className="hidden @lg:inline">Notes</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="chat"
+              aria-label="Chat"
+              onClick={() => openTab("chat")}
+            >
+              <MessageSquare className="fill-emerald-500 stroke-emerald-500" />
+              <span className="hidden @lg:inline">Chat</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
       </div>
 
       {/* `relative` is what the floating window is positioned against — it
@@ -354,21 +425,19 @@ export function WorkWorkspace({
                   // rather than down, so a page fits its height instead of
                   // being cropped to a sliver of one.
                   pdfLayout={isMobile ? "horizontal" : "vertical"}
+                  page={citedPage}
                   // Minimising and closing both need somewhere for the page to
                   // carry on being: with the sections closed this panel is all
-                  // there is, so neither is offered and the way back to them
-                  // takes their place.
+                  // there is, so neither is offered.
+                  //
+                  // No tabs passed any more — the panel used to carry a copy of
+                  // them for when the sections were closed, and the header's
+                  // are always there now.
                   onMinimize={layout.sectionsOpen ? layout.minimize : undefined}
                   onClose={
                     layout.sectionsOpen
                       ? () => layout.setDocumentOpen(false)
                       : undefined
-                  }
-                  // Which tab the tabs in that bar mark as the current one, and
-                  // what pressing either of them reopens the panel on.
-                  tab={layout.tab}
-                  onShowSections={
-                    layout.sectionsOpen ? undefined : layout.showSections
                   }
                 />
               </ResizablePanel>
@@ -393,6 +462,7 @@ export function WorkWorkspace({
           <DocumentPip
             documentId={documentId}
             name={workspace.name}
+            page={citedPage}
             corner={layout.corner}
             size={layout.pipSize}
             onCornerChange={layout.setCorner}
@@ -404,6 +474,6 @@ export function WorkWorkspace({
           />
         )}
       </div>
-    </div>
+    </Tabs>
   );
 }

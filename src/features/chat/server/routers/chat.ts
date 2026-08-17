@@ -260,4 +260,25 @@ export const ChatRouter = createTRPCRouter({
 
       return { id: input.id };
     }),
+
+  /**
+   * Deletes everything ticked in the recents list.
+   *
+   * Ownership is a `where` clause rather than a check per id: `deleteMany`
+   * filters and deletes in one statement, so a list containing someone else's
+   * chat quietly deletes only the caller's rather than failing the whole batch
+   * — and never reveals which of the ids was not theirs.
+   *
+   * Returns the count actually removed, which is what the toast reports. It can
+   * be lower than the number asked for, and that is the honest answer.
+   */
+  bulkRemove: protectedProcedure
+    .input(z.object({ ids: z.array(z.string()).min(1).max(100) }))
+    .mutation(async ({ ctx, input }) => {
+      const { count } = await prisma.chat.deleteMany({
+        where: { id: { in: input.ids }, userId: ctx.userId },
+      });
+
+      return { count };
+    }),
 });

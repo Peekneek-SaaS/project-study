@@ -14,7 +14,11 @@
 import { generateObject } from "ai";
 import z from "zod";
 
-import { extractPages, type ExtractedPage } from "@/lib/ai/extraction";
+import {
+  extractPages,
+  stripUnstorable,
+  type ExtractedPage,
+} from "@/lib/ai/extraction";
 import { createFallbackModel } from "@/lib/ai/providers";
 import type { AiProvider } from "@/lib/ai/types";
 import { isPdf, stripExtension } from "@/lib/document-file-types";
@@ -230,12 +234,19 @@ async function describeDocument(
     const used = fallback.resolved();
 
     return {
+      // Every string is run through `stripUnstorable` on the way out. A model
+      // asked to transcribe a document with a broken encoding will happily echo
+      // the NUL bytes back, and one of those anywhere in a summary is enough for
+      // Postgres to reject the whole write.
+      //
       // Empty strings are the schema's way of saying "not stated" — turned into
       // nulls here so the database holds one kind of absence, not two.
-      title: object.title.trim() || stripExtension(fileName),
-      subject: object.subject.trim() || null,
-      summary: object.summary.trim(),
-      topics: object.topics.map((topic) => topic.trim()).filter(Boolean),
+      title: stripUnstorable(object.title).trim() || stripExtension(fileName),
+      subject: stripUnstorable(object.subject).trim() || null,
+      summary: stripUnstorable(object.summary).trim(),
+      topics: object.topics
+        .map((topic) => stripUnstorable(topic).trim())
+        .filter(Boolean),
       outline: sanitiseOutline(object.outline, pages.length),
       provider: used?.provider ?? null,
       model: used?.model ?? null,
@@ -261,7 +272,7 @@ function sanitiseOutline(
 ): OutlineEntry[] {
   return entries
     .map((entry) => ({
-      title: entry.title.trim(),
+      title: stripUnstorable(entry.title).trim(),
       pageStart: Math.max(1, Math.min(pageCount, Math.round(entry.pageStart))),
       pageEnd: Math.max(1, Math.min(pageCount, Math.round(entry.pageEnd))),
     }))
@@ -451,7 +462,12 @@ async function transcribeScanned(
 
     const pages = object.pages
       .filter((page) => Number.isFinite(page.page) && page.page >= 1)
-      .map((page) => ({ page: Math.round(page.page), text: page.text.trim() }))
+      .map((page) => ({
+        page: Math.round(page.page),
+        // These never pass through `tidy`, so this is the only place a
+        // transcription's control characters get removed.
+        text: stripUnstorable(page.text).trim(),
+      }))
       .sort((a, b) => a.page - b.page);
 
     return pages.length > 0 ? pages : null;

@@ -40,6 +40,7 @@ export function DocumentPip({
   onSizeChange,
   onRestore,
   onClose,
+  page,
 }: {
   documentId: string;
   name: string;
@@ -51,6 +52,15 @@ export function DocumentPip({
   onSizeChange: (size: PipSize) => void;
   onRestore: () => void;
   onClose: () => void;
+  /**
+   * A page to open at, when a chat citation asked for one.
+   *
+   * Forwarded even though the workspace restores the document on arrival: the
+   * two run in the same render, so for one frame the floating window is still
+   * the thing holding the viewer, and a citation followed twice in a row must
+   * land either way.
+   */
+  page?: number | null;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -287,7 +297,8 @@ export function DocumentPip({
       </div>
 
       <div className="min-h-0 flex-1">
-        <WorkDocumentPanel documentId={documentId} name={name} compact />
+        <WorkDocumentPanel
+          page={page} documentId={documentId} name={name} compact />
       </div>
 
       {/*

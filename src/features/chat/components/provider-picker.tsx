@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown } from "lucide-react";
+import { Check } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -41,14 +41,13 @@ export function ProviderPicker({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          type="button"
           variant="ghost"
-          size="sm"
+          size="icon"
           disabled={disabled}
           // A quiet control: it sits inside the composer, and a filled button
           // there would compete with the send button next to it.
           className={cn(
-            "h-8 gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground",
+            "h-8 gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground",
             className,
           )}
           aria-label={`Model: ${PROVIDER_INFO[value].label}`}
@@ -57,9 +56,8 @@ export function ProviderPicker({
               this size it is the fastest way to read which one is armed, and
               it is the only label left once the text is hidden on narrow
               surfaces like the document panel. */}
-          <ProviderLogo provider={value} labelled={false} />
-          <span className="hidden sm:inline">{PROVIDER_INFO[value].label}</span>
-          <ChevronDown className="size-3 opacity-60" />
+          <ProviderLogo provider={value} labelled={false} className="size-5"/>
+          {/* <span className="hidden sm:inline">{PROVIDER_INFO[value].label}</span> */}
         </Button>
       </DropdownMenuTrigger>
 

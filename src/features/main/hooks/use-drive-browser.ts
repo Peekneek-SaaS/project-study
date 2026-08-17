@@ -68,7 +68,7 @@ export function useDriveBrowser() {
      * is focused again.
      */
     refetchInterval: ({ state }) =>
-      state.data?.documents.some((doc) => isTransientStatus(doc.status))
+      state.data?.documents.some((doc) => isTransientStatus(doc.overallStatus))
         ? WORKSPACE_POLL_MS
         : false,
   });

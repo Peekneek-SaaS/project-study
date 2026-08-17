@@ -26,17 +26,24 @@ export function DocumentView({
   name,
   url,
   pdfLayout,
+  page,
   fallback = null,
 }: {
   name: string;
   url: string;
   /** Only reaches the PDF viewer; the other two have no such arrangement. */
   pdfLayout?: PdfLayout;
+  /**
+   * A page to open at, for a chat citation. PDF only, like the layout above —
+   * a .docx has no fixed pages to land on, and a .pptx viewer of its own to
+   * teach about slides, so both ignore it rather than pretending.
+   */
+  page?: number | null;
   fallback?: ReactNode;
 }) {
   switch (documentViewerKind(name)) {
     case "pdf":
-      return <LazyPdfViewer url={url} layout={pdfLayout} />;
+      return <LazyPdfViewer url={url} layout={pdfLayout} page={page} />;
     case "docx":
       return <LazyDocxViewer url={url} />;
     case "pptx":

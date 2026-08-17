@@ -3,6 +3,7 @@
 import type { ChatStatus, UIMessage } from "ai";
 import { AlertTriangle } from "lucide-react";
 import { motion } from "motion/react";
+import { useEffect, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +13,7 @@ import {
   MessageScrollerItem,
   MessageScrollerProvider,
   MessageScrollerViewport,
+  useMessageScroller,
 } from "@/components/ui/message-scroller";
 import { ChatMessage } from "@/features/chat/components/chat-message";
 import { CHAT_COLUMN } from "@/features/chat/types";
@@ -31,6 +33,49 @@ import { cn } from "@/lib/utils";
  * keeps a long conversation cheap: messages scrolled out of view are not laid
  * out at all, so the hundredth message costs what the first one did.
  */
+
+/**
+ * Carries a newly sent question to the top of the viewport.
+ *
+ * Not a jump to the bottom, which is what an autoscroller does on its own and
+ * which lands the question at the very edge with the answer immediately shoved
+ * off-screen underneath it. Bringing the question to the *top* instead opens the
+ * whole viewport below it for the reply to fill, so the answer arrives into
+ * space that is already looking at it — the movement every good chat makes on
+ * send, and the reason it feels considered rather than jerky.
+ *
+ * Its own component because `useMessageScroller` only works inside the
+ * provider, and the provider is rendered below by `ChatThread` itself.
+ *
+ * Keyed on the last user message's id rather than on the message count: a
+ * streaming answer changes the count on almost every frame, and scrolling on
+ * each one would fight the reader for the whole reply.
+ */
+function ScrollOnSend({ lastUserMessageId }: { lastUserMessageId?: string }) {
+  const { scrollToMessage } = useMessageScroller();
+  const previous = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!lastUserMessageId || lastUserMessageId === previous.current) return;
+
+    const isFirstRender = previous.current === undefined;
+    previous.current = lastUserMessageId;
+
+    // A conversation opened from the recents list should already be at the
+    // bottom, not animate there from wherever the anchor happened to be.
+    if (isFirstRender) return;
+
+    scrollToMessage(lastUserMessageId, {
+      align: "start",
+      behavior: "smooth",
+      // A sliver of the previous turn stays visible, so the movement reads as
+      // the page travelling rather than the content being replaced.
+      scrollMargin: 12,
+    });
+  }, [lastUserMessageId, scrollToMessage]);
+
+  return null;
+}
 
 /** The three-dot wait between sending a question and the first token. */
 function ThinkingIndicator() {
@@ -87,24 +132,39 @@ export function ChatThread({
 }) {
   const last = messages[messages.length - 1];
 
+  // Searched from the end, so this is the question just asked rather than the
+  // first one in the conversation.
+  const lastUserMessageId = messages.findLast(
+    (message) => message.role === "user",
+  )?.id;
+
   /**
    * Whether to show the dots.
    *
-   * Only in the gap between the question landing and the answer starting — once
-   * the assistant message exists and has content, the answer itself is the
-   * indicator. `submitted` covers the request being in flight; `streaming` with
-   * a still-empty assistant message covers the model having connected but not
-   * yet said anything, which is where the tool calls happen and is the longest
-   * part of the wait.
+   * The test is "has the answer started *saying* anything", not "does the
+   * message have parts yet". Those come apart badly with tools: the first thing
+   * an assistant message gains is a tool call, so a parts-length test stopped
+   * the indicator the instant the model began searching — leaving a long,
+   * silent gap before any prose, which reads as the answer having failed. The
+   * searches are shown, but they are the model working, not the model replying.
+   *
+   * So the dots stay up until a text part actually has characters in it, which
+   * is the exact moment the reply begins and the exact moment they stop being
+   * needed.
    */
+  const hasStartedAnswering =
+    last?.role === "assistant" &&
+    last.parts.some(
+      (part) => part.type === "text" && part.text.trim().length > 0,
+    );
+
   const isThinking =
     status === "submitted" ||
-    (status === "streaming" &&
-      last?.role === "assistant" &&
-      last.parts.length === 0);
+    (status === "streaming" && !hasStartedAnswering);
 
   return (
     <MessageScrollerProvider>
+      <ScrollOnSend lastUserMessageId={lastUserMessageId} />
       <MessageScroller className={cn("min-h-0 flex-1", className)}>
         <MessageScrollerViewport>
           <MessageScrollerContent
@@ -115,6 +175,9 @@ export function ChatThread({
             {messages.map((message, index) => (
               <MessageScrollerItem
                 key={message.id}
+                // Named so `ScrollOnSend` can bring this exact message to the
+                // top of the viewport.
+                messageId={message.id}
                 // The anchor the scroller keeps pinned to the bottom. Only the
                 // last message is one, so growing earlier messages — which
                 // happens when a tool result lands — does not drag the view.

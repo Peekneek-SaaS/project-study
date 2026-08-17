@@ -91,7 +91,7 @@ export function DriveDocumentRow({
         </div>
       </TableCell>
       <TableCell>
-        <DriveStatusBadge status={doc.status} />
+        <DriveStatusBadge status={doc.overallStatus} />
       </TableCell>
       <TableCell className="text-muted-foreground">
         {formatDriveDate(doc.updatedAt)}

@@ -32,6 +32,34 @@ export async function queueContentProcessing(
   documentId: string,
   provider?: AiProvider | null,
 ) {
+  /**
+   * The row exists before the job does.
+   *
+   * Written here rather than left to the task, so the drive can say "Building"
+   * from the moment of upload. Created by the task instead, there is a window —
+   * short for a small file, long when the queue is busy — where the workspace
+   * has finished and the reading has not started, and the document has no
+   * content row at all. The badge would call that "Complete" and then walk it
+   * back to "Building" a moment later, which reads as the app changing its mind.
+   */
+  const document = await prisma.document.findUnique({
+    where: { id: documentId },
+    select: { userId: true },
+  });
+
+  // Deleted between the upload finishing and this running. Nothing to read, and
+  // nothing to attribute a row to.
+  if (!document) return;
+
+  await prisma.documentContent.upsert({
+    where: { documentId },
+    create: { documentId, userId: document.userId, status: "PENDING" },
+    // An existing row is a re-run — a retry, or a document being read again.
+    // Clearing the error is what stops the last failure showing over a job that
+    // has only just been queued.
+    update: { status: "PENDING", error: null },
+  });
+
   const idempotencyKey = await idempotencyKeys.create(
     `process-content-${documentId}`,
     { scope: "global" },
@@ -50,27 +78,14 @@ export async function queueContentProcessing(
     // down: the document's chat tab shows it, and offers to try again.
     console.error("[content] could not queue processing", { documentId, error });
 
-    // Looked up rather than taken as an argument. This path is rare, and a
-    // signature carrying a `userId` only for it would have every caller supply
-    // one for the case that almost never happens.
-    const document = await prisma.document.findUnique({
-      where: { id: documentId },
-      select: { userId: true },
-    });
-
-    // Deleted while the trigger was failing. There is no row to mark and no
-    // owner to attribute one to.
-    if (!document) return;
-
-    const failure = {
-      status: "FAILED" as const,
-      error: "This document could not be queued for reading. Try again.",
-    };
-
-    await prisma.documentContent.upsert({
+    // The row is already there — it was written above, before the trigger was
+    // attempted — so this only has to change what it says.
+    await prisma.documentContent.updateMany({
       where: { documentId },
-      create: { documentId, userId: document.userId, ...failure },
-      update: failure,
+      data: {
+        status: "FAILED",
+        error: "This document could not be queued for reading. Try again.",
+      },
     });
   }
 }

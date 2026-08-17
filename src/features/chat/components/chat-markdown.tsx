@@ -3,11 +3,16 @@
 import "katex/dist/katex.min.css";
 
 import { memo } from "react";
-import ReactMarkdown, { type Components } from "react-markdown";
+import ReactMarkdown, {
+  defaultUrlTransform,
+  type Components,
+} from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 
+import { CitationLink } from "@/features/chat/components/citation-link";
+import { isCitationHref, parseCitation } from "@/features/chat/lib/citations";
 import { cn } from "@/lib/utils";
 
 /**
@@ -37,16 +42,44 @@ import { cn } from "@/lib/utils";
  * whole tree reconcile on each token.
  */
 const components: Components = {
-  // Links only ever come from the model quoting a document, so they open away
-  // from the app rather than navigating the conversation out from under itself.
-  a: ({ className, ...props }) => (
-    <a
-      {...props}
-      target="_blank"
-      rel="noreferrer noopener"
-      className={cn("font-medium underline underline-offset-4", className)}
-    />
-  ),
+  /**
+   * Two kinds of link, told apart by their scheme.
+   *
+   * A `doc:` href is a citation the model wrote — see `citations.ts` — and
+   * becomes a chip that opens that document at that page. Anything else is a
+   * real URL, which opens in a new tab rather than navigating the conversation
+   * out from under itself.
+   *
+   * A malformed citation falls through to the ordinary branch rather than
+   * throwing: this is generated text, and a link that renders plainly is a much
+   * better failure than an answer that will not render at all.
+   */
+  a: ({ className, href, children, ...props }) => {
+    const citation = parseCitation(href);
+
+    if (citation) {
+      return (
+        <CitationLink
+          documentId={citation.documentId}
+          page={citation.page}
+        >
+          {children}
+        </CitationLink>
+      );
+    }
+
+    return (
+      <a
+        {...props}
+        href={href}
+        target="_blank"
+        rel="noreferrer noopener"
+        className={cn("font-medium underline underline-offset-4", className)}
+      >
+        {children}
+      </a>
+    );
+  },
 
   // Tables are the one block that can be genuinely wider than the column —
   // comparisons across documents produce them — so this is the one that gets
@@ -115,6 +148,24 @@ const components: Components = {
 const remarkPlugins = [remarkGfm, remarkMath];
 const rehypePlugins = [rehypeKatex];
 
+/**
+ * Lets citations through the URL sanitiser, and nothing else.
+ *
+ * react-markdown drops any scheme it does not recognise — which is exactly the
+ * behaviour you want against `javascript:` in generated text, and which would
+ * also silently blank every `doc:` citation, turning each one into a chip that
+ * goes nowhere.
+ *
+ * So the allowance is narrow and explicit: a href is admitted only if it parses
+ * as a real citation, which means an id and an optional page and nothing else.
+ * Everything else — including any other invented scheme — is handed back to the
+ * default sanitiser untouched.
+ */
+function urlTransform(url: string): string {
+  if (isCitationHref(url)) return url;
+  return defaultUrlTransform(url);
+}
+
 export const ChatMarkdown = memo(function ChatMarkdown({
   children,
   className,
@@ -145,6 +196,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
         remarkPlugins={remarkPlugins}
         rehypePlugins={rehypePlugins}
         components={components}
+        urlTransform={urlTransform}
       >
         {children}
       </ReactMarkdown>
