@@ -132,6 +132,49 @@ async function systemPromptFor(scope: ChatScope): Promise<string> {
   return universalSystemPrompt(await listReadableDocuments(scope.userId));
 }
 
+/**
+ * Removes an answer that a retry threw away.
+ *
+ * `regenerate` drops the last answer on the client and the agent pops it from
+ * its own history, but neither of them touches the database — so without this
+ * the discarded answer stays in `ChatMessage`, and reopening the chat shows the
+ * old reply *and* its replacement stacked one after the other. The new message
+ * carries a new id, so the upsert in `saveMessage` cannot overwrite it either.
+ *
+ * Scoped deliberately tightly. It deletes only assistant rows, and only those
+ * at or after the newest surviving question — which is exactly the tail a
+ * regenerate can discard, because the agent trims trailing assistants and
+ * stops at the first user message. A blunter "delete anything not in the
+ * accumulated history" would do the same job today and quietly delete the front
+ * of the transcript the day history compaction is turned on.
+ */
+async function reconcileRetriedAnswers(
+  chatId: string,
+  uiMessages: { id: string; role: string }[],
+) {
+  const keptIds = uiMessages.map((message) => message.id);
+  if (keptIds.length === 0) return;
+
+  // The boundary: nothing before the last question can be affected by a retry.
+  const lastQuestion = await prisma.chatMessage.findFirst({
+    where: { chatId, role: "user", id: { in: keptIds } },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true },
+  });
+  if (!lastQuestion) return;
+
+  const { count } = await prisma.chatMessage.deleteMany({
+    where: {
+      chatId,
+      role: "assistant",
+      createdAt: { gte: lastQuestion.createdAt },
+      id: { notIn: keptIds },
+    },
+  });
+
+  if (count > 0) logger.log("Discarded retried answers", { chatId, count });
+}
+
 export const studyChat = chat
   .withClientData({ schema: clientDataSchema })
   .agent({
@@ -196,6 +239,7 @@ export const studyChat = chat
      */
     onTurnComplete: async ({
       chatId,
+      uiMessages,
       newUIMessages,
       runId,
       chatAccessToken,
@@ -221,6 +265,8 @@ export const studyChat = chat
           provider: message.role === "assistant" ? provider : null,
         });
       }
+
+      await reconcileRetriedAnswers(chatId, uiMessages);
 
       // Written unconditionally, and as its own statement. These three are what
       // a later tab reconnects with, so they must land on every turn — folding

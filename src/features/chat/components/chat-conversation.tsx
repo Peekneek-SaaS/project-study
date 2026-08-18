@@ -191,6 +191,9 @@ export function ChatConversation({ chatId }: { chatId: string }) {
           error={error}
           onRetry={() => regenerate(requestOptions)}
           providers={providers}
+          onRetryMessage={(messageId) =>
+            regenerate({ messageId, ...requestOptions })
+          }
         />
       )}
 

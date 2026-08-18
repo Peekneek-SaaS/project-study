@@ -285,6 +285,9 @@ export function DocumentChatPanel({ documentId }: { documentId: string }) {
           error={error}
           onRetry={() => regenerate(requestOptions)}
           providers={providers}
+          onRetryMessage={(messageId) =>
+            regenerate({ messageId, ...requestOptions })
+          }
           contentClassName="px-3 py-4"
         />
       )}

@@ -51,9 +51,44 @@ import { cn } from "@/lib/utils";
  * streaming answer changes the count on almost every frame, and scrolling on
  * each one would fight the reader for the whole reply.
  */
-function ScrollOnSend({ lastUserMessageId }: { lastUserMessageId?: string }) {
-  const { scrollToMessage } = useMessageScroller();
+function ScrollOnSend({
+  lastUserMessageId,
+  hasMessages,
+}: {
+  lastUserMessageId?: string;
+  hasMessages: boolean;
+}) {
+  const { scrollToEnd, scrollToMessage } = useMessageScroller();
   const previous = useRef<string | undefined>(undefined);
+  const landed = useRef(false);
+
+  /**
+   * Opening a conversation lands at the newest message, not the oldest.
+   *
+   * A chat is read from the bottom: what you came back for is the last thing
+   * said, and starting at the first message means scrolling past the whole
+   * history to reach it.
+   *
+   * Done explicitly rather than left to `defaultScrollPosition`, which is
+   * already "end" and still lands short. The scroller measures `scrollHeight`
+   * on the frame the messages first mount — before the markdown has laid out,
+   * before KaTeX has replaced its formulae, and before the items with
+   * `content-visibility: auto` have reported a real height. It jumps to the
+   * bottom of a document that is a fraction of its eventual size, and the
+   * content then grows underneath, leaving the view near the top.
+   *
+   * So it is asked twice: once now, and once on the next frame when those
+   * heights are known. `autoScroll` on the provider covers everything after
+   * that, re-pinning as late-loading content settles.
+   */
+  useEffect(() => {
+    if (landed.current || !hasMessages) return;
+    landed.current = true;
+
+    scrollToEnd({ behavior: "auto" });
+    const frame = requestAnimationFrame(() => scrollToEnd({ behavior: "auto" }));
+    return () => cancelAnimationFrame(frame);
+  }, [hasMessages, scrollToEnd]);
 
   useEffect(() => {
     if (!lastUserMessageId || lastUserMessageId === previous.current) return;
@@ -61,8 +96,8 @@ function ScrollOnSend({ lastUserMessageId }: { lastUserMessageId?: string }) {
     const isFirstRender = previous.current === undefined;
     previous.current = lastUserMessageId;
 
-    // A conversation opened from the recents list should already be at the
-    // bottom, not animate there from wherever the anchor happened to be.
+    // The landing above already put an opened conversation at the bottom;
+    // animating there as well would travel twice.
     if (isFirstRender) return;
 
     scrollToMessage(lastUserMessageId, {
@@ -111,6 +146,7 @@ export function ChatThread({
   error,
   onRetry,
   providers,
+  onRetryMessage,
   className,
   contentClassName,
 }: {
@@ -127,10 +163,30 @@ export function ChatThread({
    * this map simply renders without a mark.
    */
   providers?: Record<string, string | null>;
+  /**
+   * Discards an answer and re-runs the turn that produced it.
+   *
+   * Offered on the last answer only. The durable agent trims its own history by
+   * popping trailing assistant messages until it reaches a user message, so it
+   * can regenerate the tail and nothing else — a button on an older answer
+   * would leave the browser's transcript and the agent's disagreeing.
+   */
+  onRetryMessage?: (messageId: string) => void;
   className?: string;
   contentClassName?: string;
 }) {
   const last = messages[messages.length - 1];
+
+  /**
+   * Whether an answer can be thrown away and asked again right now.
+   *
+   * Withheld mid-turn: a regenerate while something is already streaming would
+   * be two turns racing to write the same tail.
+   */
+  const canRetry =
+    onRetryMessage !== undefined &&
+    status !== "streaming" &&
+    status !== "submitted";
 
   // Searched from the end, so this is the question just asked rather than the
   // first one in the conversation.
@@ -163,10 +219,41 @@ export function ChatThread({
     (status === "streaming" && !hasStartedAnswering);
 
   return (
-    <MessageScrollerProvider>
-      <ScrollOnSend lastUserMessageId={lastUserMessageId} />
+    /*
+      `autoScroll` keeps the view pinned to the newest message while one is
+      being written, and re-pins it whenever content grows underneath — a
+      markdown table finishing its layout, a formula being typeset, an image
+      arriving. Without it the scroller starts in "free-scrolling" mode and
+      never corrects itself, which is what left an opened chat sitting near the
+      top. It yields the moment the reader scrolls away, so it cannot fight
+      someone re-reading an earlier answer mid-stream.
+    */
+    <MessageScrollerProvider autoScroll defaultScrollPosition="end">
+      <ScrollOnSend
+        lastUserMessageId={lastUserMessageId}
+        hasMessages={messages.length > 0}
+      />
       <MessageScroller className={cn("min-h-0 flex-1", className)}>
-        <MessageScrollerViewport>
+        {/*
+          No visible bar, but every bit of the scrolling.
+          `no-scrollbar` sets `scrollbar-width: none` and hides the WebKit
+          pseudo-element; it touches nothing about `overflow`, so wheel,
+          trackpad, touch, keyboard and `scrollIntoView` all behave exactly as
+          before — as does the autoscroll that pins this to the newest message.
+
+          Applied here rather than relied upon from the global rule in
+          `globals.css`: that one lives in `@layer base`, which any utility
+          class outranks, and this viewport arrives from the shared component
+          carrying `scrollbar-thin` and friends. Those happen to be no-ops today
+          — Tailwind v4 ships no scrollbar utilities and no plugin defines them
+          — but they are written as an opt-in to a visible bar, and the moment
+          such a plugin is added they would become one. Saying it explicitly
+          here means this thread's answer does not depend on that.
+
+          The `scroll-fade-b` already on the viewport is what puts the "there is
+          more below" hint back, which is the affordance a hidden bar costs.
+        */}
+        <MessageScrollerViewport className="no-scrollbar">
           <MessageScrollerContent
             // The same measure the composer uses, from the same constant, so
             // the two can never disagree about how wide a chat is.
@@ -189,6 +276,15 @@ export function ChatThread({
                     status === "streaming" && index === messages.length - 1
                   }
                   provider={providers?.[message.id]}
+                  // The last message, and only when it is an answer: there is
+                  // nothing to regenerate about a question.
+                  onRetry={
+                    canRetry &&
+                    index === messages.length - 1 &&
+                    message.role === "assistant"
+                      ? () => onRetryMessage(message.id)
+                      : undefined
+                  }
                 />
               </MessageScrollerItem>
             ))}

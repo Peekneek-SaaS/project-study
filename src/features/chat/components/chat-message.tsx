@@ -1,7 +1,7 @@
 "use client";
 
 import { isToolUIPart, type ToolUIPart, type UIMessage } from "ai";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, RotateCcw } from "lucide-react";
 import { motion } from "motion/react";
 import { memo, useCallback, useState } from "react";
 
@@ -63,10 +63,23 @@ export const ChatMessage = memo(function ChatMessage({
   message,
   isStreaming = false,
   provider,
+  onRetry,
 }: {
   message: UIMessage;
   /** True only for the last assistant message while tokens are arriving. */
   isStreaming?: boolean;
+  /**
+   * Throws this answer away and asks the same question again.
+   *
+   * Passed only to the *last* answer in the conversation, and only while
+   * nothing is streaming — see `ChatThread`, which decides both. An answer with
+   * turns after it cannot be retried, because the durable agent trims its own
+   * history by popping trailing assistant messages until it reaches a user
+   * message: it has no way to reach back into the middle. Offering a button
+   * there would leave the browser and the agent disagreeing about what was
+   * said, which is a far worse outcome than not offering it.
+   */
+  onRetry?: () => void;
   /**
    * Which model wrote this, where it is known.
    *
@@ -152,6 +165,31 @@ export const ChatMessage = memo(function ChatMessage({
       {!isStreaming && text.length > 0 && (
         <div className={cn("-ms-1 flex items-center gap-1 pt-0.5")}>
           <CopyButton text={text} />
+
+          {/*
+            Discards this answer and asks the same question again.
+
+            The question is not re-sent from the composer, and that is the point:
+            `regenerate` slices the answer out of the conversation and re-runs
+            the turn from the user message above it, so the transcript ends up
+            with one answer rather than the same question asked twice.
+          */}
+          {onRetry && (
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="ghost"
+              onClick={onRetry}
+              aria-label="Try this answer again"
+              title="Try again"
+              // Revealed the same way the copy button is: on hover for a
+              // pointer, always present for touch and keyboard, where there is
+              // no hover to reveal it with.
+              className="size-7 text-muted-foreground opacity-0 transition-opacity focus-visible:opacity-100 group-hover/message:opacity-100 max-md:opacity-100"
+            >
+              <RotateCcw className="size-3.5" />
+            </Button>
+          )}
 
           {/*
             Which model wrote this. Worth showing per message rather than once
