@@ -165,3 +165,13 @@ export function noteAppearanceStyle(
     "--note-line-height": `${appearance.fontSize * NOTE_LINE_HEIGHT_RATIO}px`,
   } as React.CSSProperties;
 }
+
+/**
+ * The most a note can hold.
+ *
+ * Here rather than in the router so the client can respect it before asking.
+ * Pasting a long passage into a note is the one path that can genuinely reach
+ * this, and finding out through a validation error after the modal has closed
+ * is a much worse way to learn it than being told while choosing.
+ */
+export const MAX_NOTE_CONTENT = 10_000;

@@ -7,6 +7,7 @@ import { DocumentPreviewModal } from "@/features/main/modal/document-preview-mod
 import { RenameItemModal } from "@/features/main/modal/rename-item-modal";
 import { SearchModal } from "@/features/main/modal/search-modal";
 import { UploadModal } from "@/features/main/modal/upload-modal";
+import { PasteIntoModal } from "@/features/main/modal/paste-into-modal";
 
 /**
  * Mounts every modal once, at the root, so anything on the page can open one
@@ -26,6 +27,7 @@ export function ModalProvider() {
       <DocumentPreviewModal />
       {/* Reads `useSearchStore` rather than `useModalStore` — see that store. */}
       <SearchModal />
+      <PasteIntoModal />
     </>
   );
 }

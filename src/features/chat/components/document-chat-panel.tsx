@@ -19,7 +19,11 @@ import { ChatGreeting } from "@/features/chat/components/chat-greeting";
 import ChatSuggestions from "@/features/chat/components/chat-suggestions";
 import { ChatThread } from "@/features/chat/components/chat-thread";
 import { useChatProvider } from "@/features/chat/hooks/use-chat-provider";
-import { providersById, toUIMessages } from "@/features/chat/lib/messages";
+import {
+  providersById,
+  timestampsById,
+  toUIMessages,
+} from "@/features/chat/lib/messages";
 import {
   clearChatSession,
   mintChatAccessToken,
@@ -149,6 +153,13 @@ export function DocumentChatPanel({ documentId }: { documentId: string }) {
     [data.chat],
   );
 
+
+  /** When each stored message was written — see `timestampsById`. */
+  const timestamps = useMemo(
+    () => timestampsById(data.chat?.messages ?? []),
+    [data.chat],
+  );
+
   /** Where the durable run had got to — see the universal conversation. */
   const sessions = useMemo(
     () =>
@@ -164,8 +175,25 @@ export function DocumentChatPanel({ documentId }: { documentId: string }) {
     [data.chat, chatId],
   );
 
+  /**
+   * The picker's choice, as the agent's client data.
+   *
+   * On the transport rather than passed per message, because that is the only
+   * place this transport reads it: its wire payload always carries
+   * `this.clientData`, and the `metadata` argument to `sendMessage` — which the
+   * plain HTTP transport does honour — is silently dropped here. Sent that way,
+   * every turn reached the agent with no provider at all, so the chain started
+   * at its default and OpenAI answered whatever the picker said.
+   *
+   * The transport is still never rebuilt: `useTriggerChatTransport` keeps this
+   * up to date through `setClientData`, so changing model mid-conversation
+   * cannot orphan a stream in flight.
+   */
+  const clientData = useMemo(() => ({ provider }), [provider]);
+
   const transport = useTriggerChatTransport<typeof studyChat>({
     task: "study-chat",
+    clientData,
     accessToken: ({ chatId: id }) => mintChatAccessToken(id),
     // `documentId` is passed to the action rather than sent with each turn: it
     // is written onto the chat row once, and the agent reads the row. A client
@@ -178,10 +206,6 @@ export function DocumentChatPanel({ documentId }: { documentId: string }) {
       if (!session) void clearChatSession(id);
     },
   });
-
-  /** The picker's choice, sent as the agent's per-turn client data. */
-  const requestOptions = useMemo(() => ({ metadata: { provider } }), [provider]);
-
   const { messages, sendMessage, status, stop, error, regenerate } = useChat({
     id: chatId,
     messages: initialMessages,
@@ -273,7 +297,7 @@ export function DocumentChatPanel({ documentId }: { documentId: string }) {
           <ChatSuggestions
             suggestions={SUGGESTIONS}
             onSuggestion={(question) =>
-              sendMessage({ text: question }, requestOptions)
+              sendMessage({ text: question })
             }
             className="mt-6"
           />
@@ -283,10 +307,11 @@ export function DocumentChatPanel({ documentId }: { documentId: string }) {
           messages={messages}
           status={status}
           error={error}
-          onRetry={() => regenerate(requestOptions)}
+          onRetry={() => regenerate()}
           providers={providers}
+        timestamps={timestamps}
           onRetryMessage={(messageId) =>
-            regenerate({ messageId, ...requestOptions })
+            regenerate({ messageId })
           }
           contentClassName="px-3 py-4"
         />
@@ -294,7 +319,7 @@ export function DocumentChatPanel({ documentId }: { documentId: string }) {
 
       <div className="shrink-0 p-3">
         <ChatComposer
-          onSubmit={(question) => sendMessage({ text: question }, requestOptions)}
+          onSubmit={(question) => sendMessage({ text: question })}
           onStop={stop}
           isStreaming={isStreaming}
           provider={provider}

@@ -1,6 +1,8 @@
 // lib/stores/modal-store.ts
 import { create } from "zustand";
 
+import type { PasteIntoTarget } from "@/features/main/lib/paste-targets";
+
 /** A single drive row a modal is acting on. */
 export interface DriveItemTarget {
   kind: "document" | "folder";
@@ -35,6 +37,14 @@ export interface PreviewTarget {
  * Add one here, render it in `ModalProvider`.
  */
 interface ModalPayloads {
+  /**
+   * The picker that puts a piece of selected text somewhere.
+   *
+   * Carries the text rather than reaching for it when it opens, because by
+   * then there is nothing to reach for: clicking the button that opens this
+   * collapses the selection it was made from.
+   */
+  "paste-into": PasteIntoTarget;
   "upload-file": undefined;
   "create-folder": undefined;
   "delete-item": DeleteTarget;
@@ -96,3 +106,10 @@ export const selectDeleteSelection = (state: ModalStore) =>
 /** The document to preview, or `null` when the overlay is not the modal on screen. */
 export const selectPreviewTarget = (state: ModalStore) =>
   state.type === "preview-document" ? (state.payload as PreviewTarget) : null;
+
+/**
+ * The text the picker should paste and where, or `null` when it is not the
+ * modal on screen. Guarded by `type` like every selector above it.
+ */
+export const selectPasteTarget = (state: ModalStore) =>
+  state.type === "paste-into" ? (state.payload as PasteIntoTarget) : null;

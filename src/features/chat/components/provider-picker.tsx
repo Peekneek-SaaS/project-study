@@ -47,7 +47,7 @@ export function ProviderPicker({
           // A quiet control: it sits inside the composer, and a filled button
           // there would compete with the send button next to it.
           className={cn(
-            "h-8 gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground",
+            "h-8 gap-1.5 text-xs transition-colors hover:text-foreground",
             className,
           )}
           aria-label={`Model: ${PROVIDER_INFO[value].label}`}

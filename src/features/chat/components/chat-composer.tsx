@@ -15,6 +15,7 @@ import { ProviderPicker } from "@/features/chat/components/provider-picker";
 import { CHAT_COLUMN } from "@/features/chat/types";
 import { fastTransition } from "@/lib/motion";
 import type { AiProvider } from "@/lib/ai/types";
+import { useComposerInsertStore } from "@/lib/stores/composer-insert-store";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -85,6 +86,39 @@ export function ChatComposer({
     if (autoFocus) textareaRef.current?.focus();
   }, [autoFocus]);
 
+  /**
+   * Collects text left for the composer by something else on the page —
+   * "Reply" on a selected passage, today.
+   *
+   * Appended rather than assigned: a half-written question is not something to
+   * throw away because a quotation arrived, and the likely next action is
+   * typing *around* what was just pasted.
+   *
+   * Subscribed to `pending` and read through `take`, which clears as it reads,
+   * so React's development double-invoke cannot paste the same passage twice.
+   */
+  useEffect(
+    () =>
+      // Subscribed to, rather than selected and reacted to with a second
+      // effect. Reading `pending` as state and setting `value` from it would be
+      // a synchronous setState inside an effect — a cascading render, and one
+      // the React Compiler rightly refuses. A subscription is what an effect is
+      // actually for: the update happens in the callback, when the store
+      // changes, not while the effect body runs.
+      useComposerInsertStore.subscribe((state, previous) => {
+        if (state.pending === null || state.pending === previous.pending) return;
+
+        const text = useComposerInsertStore.getState().take();
+        if (!text) return;
+
+        setValue((current) =>
+          current.trim() ? `${current.trimEnd()}\n\n${text}` : text,
+        );
+        textareaRef.current?.focus();
+      }),
+    [],
+  );
+
   const submit = useCallback(() => {
     const question = value.trim();
     if (!question || disabled) return;
@@ -125,7 +159,7 @@ export function ChatComposer({
         // The whole thing is one surface that reacts to focus, rather than a
         // bordered textarea with controls parked underneath it.
         "group/composer relative flex flex-col gap-1 border bg-card p-2 shadow-sm transition-[box-shadow,border-color] duration-200",
-        "focus-within:border-ring/60 focus-within:shadow-md",
+        "focus-within:border-ring/60 focus-within:shadow-md dark:bg-muted",
         // The measure lives here rather than on each caller. Left to the
         // callers it was forgotten in the document panel, so the box ran the
         // full width of the panel while the answers above it sat in a column —
@@ -149,7 +183,7 @@ export function ChatComposer({
         // either clipping early or growing past its own limit.
         style={{ maxHeight: MAX_HEIGHT }}
         // `field-sizing-content` is deliberately absent — see the note above.
-        className="w-full border-none focus-visible:ring-0 resize-none bg-transparent px-2 py-1.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground/70 disabled:opacity-60"
+        className="w-full border-none focus-visible:ring-0 resize-none bg-transparent px-2 py-1.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground/70 disabled:opacity-60 dark:bg-muted"
       />
 
       <div className="flex items-center gap-1">

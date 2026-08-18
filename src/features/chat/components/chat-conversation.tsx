@@ -10,7 +10,11 @@ import { ChatGreeting } from "@/features/chat/components/chat-greeting";
 import ChatSuggestions from "@/features/chat/components/chat-suggestions";
 import { ChatThread } from "@/features/chat/components/chat-thread";
 import { useChatProvider } from "@/features/chat/hooks/use-chat-provider";
-import { providersById, toUIMessages } from "@/features/chat/lib/messages";
+import {
+  providersById,
+  timestampsById,
+  toUIMessages,
+} from "@/features/chat/lib/messages";
 import { UNIVERSAL_SUGGESTIONS } from "@/features/chat/lib/suggestions";
 import {
   clearChatSession,
@@ -63,6 +67,13 @@ export function ChatConversation({ chatId }: { chatId: string }) {
     [chat],
   );
 
+
+  /** When each stored message was written — see `timestampsById`. */
+  const timestamps = useMemo(
+    () => timestampsById(chat?.messages ?? []),
+    [chat],
+  );
+
   /**
    * Where the run had got to when this page was last closed.
    *
@@ -88,8 +99,25 @@ export function ChatConversation({ chatId }: { chatId: string }) {
     [chat, chatId],
   );
 
+  /**
+   * The picker's choice, as the agent's client data.
+   *
+   * On the transport rather than passed per message, because that is the only
+   * place this transport reads it: its wire payload always carries
+   * `this.clientData`, and the `metadata` argument to `sendMessage` — which the
+   * plain HTTP transport does honour — is silently dropped here. Sent that way,
+   * every turn reached the agent with no provider at all, so the chain started
+   * at its default and OpenAI answered whatever the picker said.
+   *
+   * The transport is still never rebuilt: `useTriggerChatTransport` keeps this
+   * up to date through `setClientData`, so changing model mid-conversation
+   * cannot orphan a stream in flight.
+   */
+  const clientData = useMemo(() => ({ provider }), [provider]);
+
   const transport = useTriggerChatTransport<typeof studyChat>({
     task: "study-chat",
+    clientData,
     // Called only when a token is refused as expired. The action re-checks
     // ownership before minting, because this is the one call the browser can
     // make unprompted.
@@ -130,17 +158,6 @@ export function ChatConversation({ chatId }: { chatId: string }) {
       );
     },
   });
-
-  /**
-   * The picker's choice, sent with each turn.
-   *
-   * `metadata` rather than a request body: this is the agent's `clientData`,
-   * and per-call values override the transport's defaults — which is what lets
-   * the model change mid-conversation without rebuilding the transport around
-   * a stream already in flight.
-   */
-  const requestOptions = useMemo(() => ({ metadata: { provider } }), [provider]);
-
   /**
    * Sends the question that was asked on the previous page.
    *
@@ -152,8 +169,8 @@ export function ChatConversation({ chatId }: { chatId: string }) {
 
   useEffect(() => {
     const question = takeDraft(chatId);
-    if (question) void sendMessage({ text: question }, requestOptions);
-  }, [chatId, requestOptions, sendMessage, takeDraft]);
+    if (question) void sendMessage({ text: question });
+  }, [chatId, sendMessage, takeDraft]);
 
   const isStreaming = status === "streaming" || status === "submitted";
 
@@ -179,7 +196,7 @@ export function ChatConversation({ chatId }: { chatId: string }) {
           <ChatSuggestions
             suggestions={UNIVERSAL_SUGGESTIONS}
             onSuggestion={(question) =>
-              sendMessage({ text: question }, requestOptions)
+              sendMessage({ text: question })
             }
             className="mt-6"
           />
@@ -189,17 +206,18 @@ export function ChatConversation({ chatId }: { chatId: string }) {
           messages={messages}
           status={status}
           error={error}
-          onRetry={() => regenerate(requestOptions)}
+          onRetry={() => regenerate()}
           providers={providers}
+        timestamps={timestamps}
           onRetryMessage={(messageId) =>
-            regenerate({ messageId, ...requestOptions })
+            regenerate({ messageId })
           }
         />
       )}
 
       <div className="shrink-0 px-4 pb-4">
         <ChatComposer
-          onSubmit={(question) => sendMessage({ text: question }, requestOptions)}
+          onSubmit={(question) => sendMessage({ text: question })}
           onStop={stop}
           isStreaming={isStreaming}
           provider={provider}

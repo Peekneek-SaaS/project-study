@@ -3,6 +3,7 @@ import z from "zod";
 
 import {
   DEFAULT_NOTE_APPEARANCE,
+  MAX_NOTE_CONTENT,
   MAX_NOTE_FONT_SIZE,
   MIN_NOTE_FONT_SIZE,
   NOTE_COLORS,
@@ -13,8 +14,13 @@ import { MODIFIED_VALUES, modifiedRange } from "@/lib/list-filters";
 import { prisma } from "@/lib/prisma";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
-/** A note's body. Capped generously — it is a note, not a document. */
-const MAX_CONTENT = 10_000;
+/**
+ * A note's body. Capped generously — it is a note, not a document.
+ *
+ * Defined in `note-appearance` so the client shares the number: the paste modal
+ * has to know it to trim rather than be rejected.
+ */
+const MAX_CONTENT = MAX_NOTE_CONTENT;
 
 /**
  * Appearance, validated against the same names the client paints with.

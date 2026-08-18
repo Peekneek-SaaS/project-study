@@ -95,3 +95,19 @@ export function providersById(
     messages.map((message) => [message.id, message.provider ?? null]),
   );
 }
+
+/**
+ * When each stored message was written, by message id.
+ *
+ * Carried beside the messages for the same reason the providers are: a
+ * `UIMessage` has nowhere to put it, and it is only known once the turn has
+ * been recorded. Takes the narrowest shape it can so TypeScript never has to
+ * walk the recursive JSON behind `parts` — see `providersById`.
+ */
+export function timestampsById(
+  messages: readonly { id: string; createdAt: string | Date }[],
+): Record<string, string | Date> {
+  return Object.fromEntries(
+    messages.map((message) => [message.id, message.createdAt]),
+  );
+}

@@ -8,7 +8,9 @@ import { memo, useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { ChatToolActivity } from "@/features/chat/components/chat-tool-activity";
+import { ANSWER_ATTRIBUTE } from "@/features/chat/components/answer-selection";
 import { ProviderLogo } from "@/features/chat/components/provider-logo";
+import { formatMessageTime } from "@/features/chat/lib/format-message-time";
 import { messageText } from "@/features/chat/lib/messages";
 import { PROVIDER_INFO, isAiProvider } from "@/lib/ai/types";
 import { fadeUp, mountAnimation } from "@/lib/motion";
@@ -63,6 +65,7 @@ export const ChatMessage = memo(function ChatMessage({
   message,
   isStreaming = false,
   provider,
+  createdAt,
   onRetry,
 }: {
   message: UIMessage;
@@ -88,9 +91,45 @@ export const ChatMessage = memo(function ChatMessage({
    * tracked. Both render without the mark rather than guessing at one.
    */
   provider?: string | null;
+  /**
+   * When this message was written, where it is known.
+   *
+   * Absent for a turn that has not been recorded yet — the durable agent writes
+   * both halves of a turn in `onTurnComplete`, so a question and its answer are
+   * unstored until the answer finishes. Those fall back to when the bubble
+   * appeared, which for a message being sent right now is the same moment.
+   */
+  createdAt?: string | Date;
 }) {
   const isUser = message.role === "user";
   const text = messageText(message);
+
+  /**
+   * When to say this was sent.
+   *
+   * `useState` with an initialiser rather than a ref or an effect: it is
+   * evaluated once, on the render this bubble first mounts, which for a message
+   * just sent is the moment it was sent. A stored timestamp wins whenever there
+   * is one, so a reopened conversation shows what the database says rather than
+   * when the page happened to load.
+   */
+  const [mountedAt] = useState(() => new Date());
+  const sentAt = formatMessageTime(createdAt ?? mountedAt);
+
+  /**
+   * Whether the model has started actually replying.
+   *
+   * Once it has, the searches above are taken down. They exist to say "this is
+   * working" during the wait — which is the longest and least explained part of
+   * a cited answer — and the moment prose arrives that job is done and they are
+   * just clutter between the question and its answer.
+   *
+   * The same test the thinking dots use, so the two hand over cleanly: the dots
+   * stop exactly when the searches disappear and the text begins.
+   */
+  const hasAnswer = message.parts.some(
+    (part) => part.type === "text" && part.text.trim().length > 0,
+  );
 
   if (isUser) {
     return (
@@ -99,8 +138,22 @@ export const ChatMessage = memo(function ChatMessage({
         variants={fadeUp}
         className="flex justify-end"
       >
-        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-muted px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap wrap-break-word">
-          {text}
+        {/* `bg-input` in light mode, where `bg-muted` sat too close to the page
+            and the bubble barely read as one. Dark mode keeps `bg-muted`, which
+            already separates cleanly there. */}
+        <div className="flex max-w-[85%] flex-col items-end gap-1">
+          <div className="rounded-2xl rounded-br-md bg-input/30 px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap wrap-break-word dark:bg-muted">
+            {text}
+          </div>
+          {/*
+            Always shown rather than revealed on hover, unlike the answer's
+            controls beneath it: this is information *about* the message, not an
+            action on it, and a timestamp you have to go looking for is one
+            nobody reads.
+          */}
+          <time className="px-1 text-[0.6875rem] text-muted-foreground">
+            {sentAt}
+          </time>
         </div>
       </motion.div>
     );
@@ -114,6 +167,9 @@ export const ChatMessage = memo(function ChatMessage({
     >
       {message.parts.map((part, index) => {
         if (isToolUIPart(part)) {
+          // Gone as soon as there is an answer to read — see `hasAnswer`.
+          if (hasAnswer) return null;
+
           return (
             <ChatToolActivity
               // Index-keyed deliberately: parts are append-only within a
@@ -140,7 +196,15 @@ export const ChatMessage = memo(function ChatMessage({
         }
 
         if (part.type === "text") {
-          return <ChatMarkdown key={`text-${index}`}>{part.text}</ChatMarkdown>;
+          return (
+            // Marked so selecting inside it offers to write it somewhere.
+            // Only the prose carries this: the tool activity and the reasoning
+            // are the model working, not the answer, and neither is worth
+            // quoting into a note.
+            <div key={`text-${index}`} {...{ [ANSWER_ATTRIBUTE]: "" }}>
+              <ChatMarkdown>{part.text}</ChatMarkdown>
+            </div>
+          );
         }
 
         return null;
@@ -164,6 +228,14 @@ export const ChatMessage = memo(function ChatMessage({
           message still being written. */}
       {!isStreaming && text.length > 0 && (
         <div className={cn("-ms-1 flex items-center gap-1 pt-0.5")}>
+          {/* Leading the row and never hidden, matching the question's. The
+              controls beside it stay hover-revealed — they are things to do,
+              and three permanently visible buttons under every answer would
+              compete with the answer. */}
+          <time className="px-1 text-[0.6875rem] text-muted-foreground">
+            {sentAt}
+          </time>
+
           <CopyButton text={text} />
 
           {/*
@@ -202,9 +274,18 @@ export const ChatMessage = memo(function ChatMessage({
             competing with the answer itself.
           */}
           {isAiProvider(provider) && (
-            <span className="flex items-center gap-1 text-[0.6875rem] text-muted-foreground opacity-0 transition-opacity group-hover/message:opacity-100 max-md:opacity-100">
-              <ProviderLogo provider={provider} labelled={false} />
-              {PROVIDER_INFO[provider].label}
+            <span
+              // The mark alone. Beside a copy and a retry button the name was
+              // the only text in the row, which made provenance look like the
+              // loudest thing under an answer — and the logo already says which
+              // model this was to anyone who cares to look.
+              //
+              // `title` for the pointer, and `ProviderLogo`'s own `aria-label`
+              // for everyone else, so dropping the text costs nothing but ink.
+              title={PROVIDER_INFO[provider].label}
+              className="flex items-center px-1 text-muted-foreground opacity-0 transition-opacity group-hover/message:opacity-100 max-md:opacity-100"
+            >
+              <ProviderLogo provider={provider} />
             </span>
           )}
         </div>
