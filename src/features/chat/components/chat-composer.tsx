@@ -41,6 +41,7 @@ export function ChatComposer({
   isStreaming = false,
   provider,
   onProviderChange,
+  attachment,
   placeholder = "Ask anything about your documents…",
   autoFocus = false,
   disabled = false,
@@ -53,6 +54,19 @@ export function ChatComposer({
   isStreaming?: boolean;
   provider: AiProvider;
   onProviderChange: (provider: AiProvider) => void;
+  /**
+   * What this composer is asking *about*, shown across the top of the box.
+   *
+   * A slot inside the composer rather than something the caller stacks above
+   * it, because "attached" has to survive every width: rendered as a sibling it
+   * would be a second box to keep aligned with this one, and the two would
+   * drift the first time the measure or the padding changed. Inside, it shares
+   * the border, the background and the focus ring by construction.
+   *
+   * Absent for the universal chat, which is asking about everything and has
+   * nothing to name.
+   */
+  attachment?: React.ReactNode;
   placeholder?: string;
   autoFocus?: boolean;
   disabled?: boolean;
@@ -106,7 +120,8 @@ export function ChatComposer({
       // actually for: the update happens in the callback, when the store
       // changes, not while the effect body runs.
       useComposerInsertStore.subscribe((state, previous) => {
-        if (state.pending === null || state.pending === previous.pending) return;
+        if (state.pending === null || state.pending === previous.pending)
+          return;
 
         const text = useComposerInsertStore.getState().take();
         if (!text) return;
@@ -169,6 +184,14 @@ export function ChatComposer({
         className,
       )}
     >
+      {/* Above the text and inside the border, so it reads as a label on the
+          box rather than a separate control floating over it. */}
+      {attachment && (
+        <div className="flex min-w-0 items-center gap-1.5 px-2 pb-1.5 text-xs text-muted-foreground">
+          {attachment}
+        </div>
+      )}
+
       <Textarea
         ref={textareaRef}
         value={value}
@@ -187,13 +210,12 @@ export function ChatComposer({
       />
 
       <div className="flex items-center gap-1">
-
         <div className="ml-auto flex items-center gap-2">
-        <ProviderPicker
-          value={provider}
-          onChange={onProviderChange}
-          disabled={disabled}
-        />
+          <ProviderPicker
+            value={provider}
+            onChange={onProviderChange}
+            disabled={disabled}
+          />
           {isStreaming && onStop ? (
             <Button
               type="button"

@@ -3,7 +3,7 @@
 import type { ChatStatus, UIMessage } from "ai";
 import { AlertTriangle } from "lucide-react";
 import { motion } from "motion/react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import { Button } from "@/components/ui/button";
 import { ArrowDown } from "lucide-react";
@@ -126,19 +126,9 @@ export function ChatThread({
     contentRef,
     spacerRef,
     anchorRef,
-    isFollowingRef,
+    isAway,
     scrollToBottom,
   } = useChatScroll({ turnKey: lastUserId, revision });
-
-  /**
-   * Whether to offer a way back down.
-   *
-   * Mirrored into state because the button has to re-render when it changes,
-   * while the follow logic itself must not — hence the ref being the source of
-   * truth and this being a copy of it, updated only when the answer is one the
-   * button would change its mind about.
-   */
-  const [isAway, setIsAway] = useState(false);
 
   /**
    * Whether the model has started replying.
@@ -179,13 +169,6 @@ export function ChatThread({
           // above behave exactly as they did. `scroll-fade-b` is what puts the
           // "there is more below" hint back in its place.
           className="no-scrollbar scroll-fade-b min-h-0 flex-1 overflow-y-auto overscroll-contain"
-          onScroll={() => {
-            // Read from the ref the scroll listener already maintains, so the
-            // button and the follow logic can never disagree about where the
-            // reader is.
-            const away = !isFollowingRef.current;
-            setIsAway((current) => (current === away ? current : away));
-          }}
         >
           <div
             ref={contentRef}

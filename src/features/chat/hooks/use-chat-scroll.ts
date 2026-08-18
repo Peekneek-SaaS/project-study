@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 /**
  * How a conversation scrolls while it is being answered.
@@ -55,6 +61,15 @@ export interface ChatScrollHandles {
   anchorRef: React.RefObject<HTMLDivElement | null>;
   /** True while the view is following the newest content. */
   isFollowingRef: React.RefObject<boolean>;
+  /**
+   * Whether the reader has left the bottom — the cue to offer a way back.
+   *
+   * State as well as the ref above, because a button has to re-render to
+   * appear and the follow logic must not re-render at all. Written only when
+   * the answer flips, so a scroll is still one render rather than one per
+   * frame.
+   */
+  isAway: boolean;
   /** Jumps to the newest content and resumes following. */
   scrollToBottom: (behavior?: ScrollBehavior) => void;
 }
@@ -77,6 +92,7 @@ export function useChatScroll({
   // away and back on by returning to the bottom — never by anything else, so a
   // long answer cannot drag the reader back down.
   const isFollowingRef = useRef(true);
+  const [isAway, setIsAway] = useState(false);
 
   /**
    * Whether a question has been asked *on this page*.
@@ -217,8 +233,19 @@ export function useChatScroll({
     const handleScroll = () => {
       const distance =
         viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
-      isFollowingRef.current = distance <= BOTTOM_THRESHOLD;
+      const following = distance <= BOTTOM_THRESHOLD;
+
+      isFollowingRef.current = following;
+      // Only on a change of answer. Scroll fires continuously, and setting the
+      // same value on every frame would re-render the whole transcript for the
+      // length of a scroll.
+      setIsAway((current) => (current === !following ? current : !following));
     };
+
+    // Run once on mount so the button's state is right before the first
+    // scroll — a conversation that opens shorter than its viewport never
+    // scrolls at all, and would otherwise keep whatever it started with.
+    handleScroll();
 
     viewport.addEventListener("scroll", handleScroll, { passive: true });
     return () => viewport.removeEventListener("scroll", handleScroll);
@@ -230,6 +257,7 @@ export function useChatScroll({
     spacerRef,
     anchorRef,
     isFollowingRef,
+    isAway,
     scrollToBottom,
   };
 }

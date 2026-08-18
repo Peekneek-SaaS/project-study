@@ -7,7 +7,7 @@ import {
   useSuspenseQuery,
 } from "@tanstack/react-query";
 import { useTriggerChatTransport } from "@trigger.dev/sdk/chat/react";
-import { AlertTriangle, FileSearch, RefreshCw } from "lucide-react";
+import { AlertTriangle, FileSearch, FileText, RefreshCw } from "lucide-react";
 import { motion } from "motion/react";
 import { useMemo } from "react";
 import { toast } from "sonner";
@@ -141,6 +141,10 @@ export function DocumentChatPanel({ documentId }: { documentId: string }) {
    * first message.
    */
   const chatId = data.chat?.id ?? documentChatId(documentId);
+
+  /** What to call this document — see the composer's `attachment` below. */
+  const documentName =
+    data.content?.title ?? stripExtension(data.documentName);
 
   const initialMessages = useMemo(
     () => (data.chat ? toUIMessages(data.chat.messages) : []),
@@ -287,9 +291,10 @@ export function DocumentChatPanel({ documentId }: { documentId: string }) {
           className="flex min-h-0 flex-1 flex-col items-center justify-center px-4"
         >
           <ChatGreeting
-            title={
-              data.content.title ?? stripExtension(data.documentName)
-            }
+            // The same name the composer's attachment shows, from the same
+            // place — the greeting and the label must not call one document two
+            // different things.
+            title={documentName}
             subtitle="Ask anything about this document. I only answer from this one — for questions across everything you have uploaded, use the main chat."
             className="max-w-md"
           />
@@ -326,6 +331,28 @@ export function DocumentChatPanel({ documentId }: { documentId: string }) {
           onProviderChange={setProvider}
           disabled={isStreaming}
           placeholder="Ask about this document…"
+          /*
+            Names the one document this chat can answer from.
+
+            Worth the room because the two chats look identical and behave very
+            differently: this one refuses anything outside its document, and
+            without a label that refusal reads as the assistant being unable to
+            answer rather than as it being scoped on purpose. Sitting on the
+            composer rather than at the top of the panel keeps it in view at the
+            moment the question is written, which is when it matters.
+
+            The printed title where the reading found one, the file name
+            otherwise — the same order the greeting uses, so the panel calls the
+            document one thing throughout.
+          */
+          attachment={
+            <>
+              <FileText className="size-3.5 shrink-0 fill-orange-400 stroke-orange-200" />
+              <span className="truncate" title={documentName}>
+                {documentName}
+              </span>
+            </>
+          }
         />
       </div>
     </div>
