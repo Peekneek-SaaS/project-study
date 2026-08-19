@@ -65,7 +65,7 @@ export async function TodoView({
     // because this is a flex item in two directions' worth of flex containers,
     // and a flex item is as big as its content until it is told otherwise.
     <div className="flex h-[calc(100svh-var(--drive-header-h))] min-h-0 min-w-0 flex-col overflow-hidden [--drive-header-h:4rem] md:group-has-data-[collapsible=icon]/sidebar-wrapper:[--drive-header-h:3rem]">
-      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-y-auto p-4 [--drive-sticky-top:0rem] [--drive-title-h:3rem] [--drive-toolbar-h:3rem]">
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-y-auto px-4 [--drive-sticky-top:0rem] [--drive-title-h:3rem] [--drive-toolbar-h:3rem]">
         {/* `motion/react-client` so a server component can animate — see
             `main-view.tsx` for the whole of why. */}
         <motion.div

@@ -65,7 +65,7 @@ export async function MainView({
       would outrank the `md:` override and the offset would stop following the
       collapsed header.
     */
-    <div className="relative flex flex-1 flex-col gap-2 p-4 [--drive-sticky-top:4rem] [--drive-title-h:3rem] [--drive-toolbar-h:3rem] md:group-has-data-[collapsible=icon]/sidebar-wrapper:[--drive-sticky-top:3rem]">
+    <div className="relative flex flex-1 flex-col gap-2 px-4 [--drive-sticky-top:4rem] [--drive-title-h:3rem] [--drive-toolbar-h:3rem] md:group-has-data-[collapsible=icon]/sidebar-wrapper:[--drive-sticky-top:3rem]">
       {/*
         Stays put while the listing scrolls under it, so "My Files" and the
         layout switch are always within reach in a long folder. Opaque, because

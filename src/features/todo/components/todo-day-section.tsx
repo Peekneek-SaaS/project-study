@@ -105,7 +105,8 @@ export function TodoDaySection({
         // than the board growing to the busiest day.
         isGrid && "h-full min-h-0 w-72 shrink-0 snap-start",
         // Ringed briefly after the header's calendar sent the reader here.
-        isFlashing && "rounded-lg ring-2 ring-primary/50 ring-offset-4 ring-offset-background",
+        isFlashing &&
+          "rounded-lg ring-2 ring-primary/50 ring-offset-4 ring-offset-background",
         "transition-shadow duration-300",
       )}
     >
@@ -122,7 +123,9 @@ export function TodoDaySection({
           size="icon"
           onClick={() => setIsCollapsed((collapsed) => !collapsed)}
           aria-expanded={!isCollapsed}
-          aria-label={isCollapsed ? `Expand ${group.label}` : `Collapse ${group.label}`}
+          aria-label={
+            isCollapsed ? `Expand ${group.label}` : `Collapse ${group.label}`
+          }
           className={cn(
             "size-6 shrink-0 text-muted-foreground",
             // The chevron is the state: down is open, right is shut.
@@ -141,7 +144,7 @@ export function TodoDaySection({
             // everything else is measured from — so it is the one heading that
             // is allowed to be loud.
             group.isToday && "text-primary",
-            isOverdue && "text-destructive",
+            isOverdue && "line-through decoration-red-500",
           )}
         >
           {group.label}
@@ -180,9 +183,7 @@ export function TodoDaySection({
             )}
 
             {completedCount > 0 && (
-              <DropdownMenuItem
-                onSelect={() => void clearDay(group.key, true)}
-              >
+              <DropdownMenuItem onSelect={() => void clearDay(group.key, true)}>
                 <Trash2 />
                 Delete completed ({completedCount})
               </DropdownMenuItem>
@@ -236,8 +237,13 @@ export function TodoDaySection({
               start out as one — so it gets a quiet line rather than an
               illustration and a call to action. */}
           {group.todos.length === 0 && !isComposing && (
-            <p className={cn("px-2 text-sm text-muted-foreground", isGrid ? "py-1" : "py-2")}>
-              No tasks
+            <p
+              className={cn(
+                "px-2 text-sm text-muted-foreground",
+                isGrid ? "py-1" : "py-2",
+              )}
+            >
+              No todos
             </p>
           )}
 
@@ -256,8 +262,8 @@ export function TodoDaySection({
               // as a row of its own — a task-shaped thing with no task in it.
               className="w-fit justify-start gap-2 px-2 font-normal text-muted-foreground hover:text-foreground"
             >
-              <Plus className="text-primary" />
-              Add task
+              <Plus />
+              Add todo
             </Button>
           )}
         </div>

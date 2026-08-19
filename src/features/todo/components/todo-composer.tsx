@@ -16,6 +16,7 @@ import {
   type TodoPriority,
 } from "@/features/todo/lib/todo-priority";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 
 /**
  * The box that takes a new task.
@@ -108,21 +109,36 @@ export function TodoComposer({
         }
       }}
       className={cn(
-        "flex flex-col gap-2 rounded-xl border bg-card p-2.5 shadow-xs",
+        "flex flex-col gap-2 border bg-card p-2.5 shadow-xs",
         "focus-within:border-primary/40 transition-colors",
         className,
       )}
     >
-      <input
+      <Input
         ref={inputRef}
         value={title}
         onChange={(event) => setTitle(event.target.value)}
         placeholder="What needs doing?"
         maxLength={500}
         aria-label="Task name"
-        // A bare input rather than the `Input` component: inside a card that is
-        // already a bordered box, a second border draws a box in a box.
-        className="w-full bg-transparent px-1 text-sm outline-none placeholder:text-muted-foreground"
+        /*
+          Stripped back to the text and nothing else, in every state.
+
+          The card around it is already a bordered box that lights up on focus —
+          see the form — so an input with its own border, background and focus
+          ring draws a box inside a box and the two rings fire together. Width
+          rather than style is what is taken off (`border-0`, not
+          `border-none`), because the component sets a border *width* and only a
+          width can override it; the same for the rings, which are cleared on
+          `focus-visible` and on `aria-invalid` rather than only at rest, or the
+          box would come back the moment the field was typed in.
+        */
+        className={cn(
+          "w-full border-0 bg-transparent px-1 text-sm shadow-none outline-none",
+          "placeholder:text-muted-foreground dark:bg-transparent",
+          "focus-visible:border-0 focus-visible:ring-0",
+          "aria-invalid:border-0 aria-invalid:ring-0",
+        )}
       />
 
       <div className="flex flex-wrap items-center gap-1.5">

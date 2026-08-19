@@ -49,7 +49,7 @@ import { cn } from "@/lib/utils";
  * as a sentence about the task.
  */
 const chipClassName =
-  "h-8 gap-1.5 rounded-full border border-input px-3 text-xs font-normal shadow-none hover:bg-accent";
+  "h-8 gap-1.5  border border-input px-3 text-xs font-normal shadow-none hover:bg-accent";
 
 /** Marks a chip that is carrying a value, so "set" is visible from a glance. */
 const activeChipClassName = "border-primary/40 bg-primary/5 text-foreground";
@@ -91,7 +91,7 @@ export function TodoDateChip({
           out which number tomorrow is, which is a question the page already
           knows the answer to.
         */}
-        <div className="flex flex-col p-1">
+        {/* <div className="flex flex-col p-1">
           {[
             { label: "Today", offset: 0 },
             { label: "Tomorrow", offset: 1 },
@@ -116,7 +116,7 @@ export function TodoDateChip({
           })}
         </div>
 
-        <Separator />
+        <Separator /> */}
 
         <Calendar
           mode="single"
@@ -206,11 +206,7 @@ export function TodoPriorityChip({
           variant="ghost"
           size="sm"
           title="Priority"
-          className={cn(
-            chipClassName,
-            isSet && activeChipClassName,
-            className,
-          )}
+          className={cn(chipClassName, isSet && activeChipClassName, className)}
         >
           <Flag className={cn("size-3.5", isSet && meta.className)} />
           {isSet ? meta.label : "Priority"}

@@ -43,7 +43,7 @@ export async function BoardsView({
   await prefetchAwaited(trpc.board.list.queryOptions(filters));
 
   return (
-    <div className="relative flex flex-1 flex-col gap-2 p-4 [--drive-sticky-top:4rem] [--drive-title-h:3rem] [--drive-toolbar-h:3rem] md:group-has-data-[collapsible=icon]/sidebar-wrapper:[--drive-sticky-top:3rem]">
+    <div className="relative flex flex-1 flex-col gap-2 px-4 [--drive-sticky-top:4rem] [--drive-title-h:3rem] [--drive-toolbar-h:3rem] md:group-has-data-[collapsible=icon]/sidebar-wrapper:[--drive-sticky-top:3rem]">
       {/* `motion/react-client` so a server component can animate — see
           `main-view.tsx` for the whole of why. */}
       <motion.div
