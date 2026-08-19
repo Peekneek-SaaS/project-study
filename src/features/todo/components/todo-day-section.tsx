@@ -225,6 +225,9 @@ export function TodoDaySection({
                 now={now}
                 variant={isGrid ? "card" : "row"}
                 documentId={documentId}
+                // The day already knows; the rows should not each ask the clock
+                // again and risk disagreeing with the heading over them.
+                isPast={isPast}
               />
             ))}
           </motion.div>

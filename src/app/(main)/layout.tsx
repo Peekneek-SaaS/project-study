@@ -31,9 +31,17 @@ const MainLayout: React.FC<MainLayoutProps> = async ({ children }) => {
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
       <MainSidebar />
-      <SidebarInset>
+      {/*
+        `min-w-0` on both, and load-bearing rather than tidy: this inset is a
+        flex item beside the sidebar, so its automatic minimum size is whatever
+        is inside it. A page with something wider than the screen — the todo
+        board's fortnight of columns — would otherwise widen the inset itself,
+        push the header and the sidebar around, and leave the page scrolling
+        sideways instead of the scroller inside it.
+      */}
+      <SidebarInset className="min-w-0">
         <MainHeader />
-        <main className="flex flex-1 flex-col">
+        <main className="flex min-w-0 flex-1 flex-col">
           {/*
             No `HydrateClient` here. The layout warms nothing, so it would have
             nothing of its own to hand over — and being an ancestor of the page,

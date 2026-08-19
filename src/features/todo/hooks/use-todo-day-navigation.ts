@@ -10,6 +10,23 @@ import { TODO_DATE_PARAM, TODO_PATH } from "@/features/todo/types";
 /** Long enough to find the day, short enough not to nag. */
 const FLASH_MS = 3000;
 
+/**
+ * How long the landing keeps correcting itself, in ms.
+ *
+ * Long enough to outlast everything that moves the page just after it appears —
+ * see the layout effect below — and short enough that a reader could not have
+ * meant to scroll within it. Any real interaction stops it early regardless.
+ */
+const ANCHOR_SETTLE_MS = 400;
+
+/** What counts as the reader taking over. */
+const TAKEOVER_EVENTS = [
+  "wheel",
+  "touchstart",
+  "pointerdown",
+  "keydown",
+] as const;
+
 /** The attribute a day section marks itself with, for both scroll and flash. */
 export const DAY_ATTRIBUTE = "data-todo-day";
 
@@ -70,26 +87,64 @@ export function useTodoDayNavigation(view: TodoViewType) {
     // Switching between the list and the grid rebuilds the days along the other
     // axis, where the old scroll position means nothing — so a view change
     // re-anchors, exactly as arriving does.
-    if (!scrollToDay(todayKey(), "instant", view)) return;
-    anchoredView.current = view;
+    // Not conditional on the first attempt landing: a navigation can commit
+    // this effect a frame before the day sections are actually in the document,
+    // and giving up there is what would leave the page at the top for good. The
+    // loop below keeps trying for as long as it keeps trying anything.
+    const anchor = () => {
+      if (!scrollToDay(todayKey(), "instant", view)) return;
+      anchoredView.current = view;
+    };
+
+    anchor();
 
     /*
-      And again on the next frame, which is the part that makes arriving here
-      actually land on today.
+      And then held there for a few frames, which is the part that makes
+      arriving here actually land on today.
 
-      This effect runs while the page is still committing, and two other things
-      set the scroll position *after* it: the router puts a client navigation
-      back at the top of the document, and the browser restores the old offset
-      on a reload. Either one lands after this and undoes it, which is why the
-      page kept opening a fortnight away despite the anchor being right.
+      One scroll during the commit is not enough, because three other things
+      move the page just after it: the router puts a client navigation back at
+      the top of the document, the browser restores the old offset on a reload,
+      and the rows fade and stagger in, which changes the height of everything
+      above today while it settles. Whichever lands last wins, and it was never
+      this — hence a page that opened a fortnight away however right the anchor
+      was.
 
-      Instant again, and the same target, so there is nothing to see — the
-      second call is a no-op whenever the first one survived.
+      So the anchor is simply re-asserted until the page stops moving under it.
+      Instant, and always the same target, so there is nothing to watch: every
+      call after the first is a no-op unless something has displaced it.
+
+      Any sign of the reader taking over ends it immediately. Four hundred
+      milliseconds is far too short a window to scroll in on purpose, but a
+      landing that fought the reader even once would be worse than one that
+      missed.
     */
-    const frame = window.requestAnimationFrame(() =>
-      scrollToDay(todayKey(), "instant", view),
-    );
-    return () => window.cancelAnimationFrame(frame);
+    let frame = 0;
+    let stopped = false;
+    const deadline = performance.now() + ANCHOR_SETTLE_MS;
+
+    const stop = () => {
+      stopped = true;
+    };
+
+    for (const type of TAKEOVER_EVENTS) {
+      window.addEventListener(type, stop, { passive: true });
+    }
+
+    const settle = () => {
+      if (stopped || performance.now() > deadline) return;
+      anchor();
+      frame = window.requestAnimationFrame(settle);
+    };
+
+    frame = window.requestAnimationFrame(settle);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      for (const type of TAKEOVER_EVENTS) {
+        window.removeEventListener(type, stop);
+      }
+    };
   }, [targetDay, view]);
 
   useEffect(() => {

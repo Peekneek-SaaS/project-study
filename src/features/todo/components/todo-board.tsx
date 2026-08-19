@@ -45,10 +45,21 @@ export function TodoBoard({ serverView }: { serverView: TodoViewType }) {
         <TodoFilterView />
       </div>
 
-      {/* `min-h-0` so the grid below can be given a height and have it mean
-          something: a flex item that refuses to shrink past its content cannot
-          be the thing that scrolls. */}
-      <div className="flex min-h-0 flex-1 flex-col pt-2">
+      {/*
+        `min-h-0` so the grid below can be given a height and have it mean
+        something, and `min-w-0` for the same reason on the other axis — which
+        is the one that was breaking.
+
+        A flex item's automatic minimum size is its *content's* size, so every
+        wrapper between the page and a sideways scroller has to be told it may
+        be narrower than what is inside it. Without that the fortnight of
+        columns sets the width of this column, then of the page, then of the
+        whole inset — the scroller never has less room than its content, so it
+        never scrolls, and the page grows sideways under the sidebar and header
+        instead. The chain has to be unbroken: one wrapper without it is enough
+        to push the width back out.
+      */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col pt-2">
         {showEmptyState ? (
           <TodoEmptyState />
         ) : (
@@ -59,7 +70,14 @@ export function TodoBoard({ serverView }: { serverView: TodoViewType }) {
                     // A fortnight of columns is wider than any screen, so the
                     // grid scrolls sideways and snaps to a column edge rather
                     // than squeezing every day into an unreadable sliver.
-                    "-mx-4 flex snap-x snap-mandatory gap-6 overflow-x-auto px-4 pb-4 [&>section]:scroll-ml-4",
+                    //
+                    // `min-w-0` on the scroller itself as well as on its
+                    // wrappers, and `overscroll-x-contain` so running out of
+                    // days does not hand the swipe to the page behind it and
+                    // trigger a back-navigation. The same set the attachment
+                    // strip uses, which is the one horizontal snap scroller in
+                    // here that was already behaving.
+                    "-mx-4 flex min-w-0 snap-x snap-mandatory gap-6 overflow-x-auto overscroll-x-contain px-4 pb-4 [&>section]:scroll-ml-4",
                     /*
                       And it is given the height that is left over rather than
                       being allowed to size itself.

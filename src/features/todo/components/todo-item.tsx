@@ -52,10 +52,19 @@ export function TodoItem({
   now,
   variant = "row",
   documentId,
+  isPast = false,
 }: {
   todo: Todo;
   now: number | null;
   variant?: "row" | "card";
+  /**
+   * Whether the day this task is filed under has already gone by.
+   *
+   * Passed down rather than worked out here, so every row on the page agrees
+   * with the heading above it about which day is today — the same `today` the
+   * sections and the window were built from. See `useTodayKey`.
+   */
+  isPast?: boolean;
   /**
    * The document whose tab this row is being drawn in, if it is in one.
    *
@@ -105,6 +114,10 @@ export function TodoItem({
   const isRunning = timer.state === "running";
   const isCard = variant === "card";
 
+  // A day that has gone by with this still unticked: not done, and no longer
+  // doable on the day it was meant for.
+  const isMissed = isPast && !todo.completed;
+
   return (
     <motion.div
       variants={listItem}
@@ -114,10 +127,6 @@ export function TodoItem({
         isCard
           ? "rounded-xl border bg-card px-3 py-2.5 shadow-xs transition-shadow hover:shadow-sm"
           : "border-b px-1 py-2.5 last:border-b-0",
-        // A finished task steps back rather than disappearing: it is still the
-        // record of the day, and the count beside the heading has already
-        // stopped counting it.
-        todo.completed && "opacity-55",
       )}
     >
       <TodoCheckbox
@@ -137,7 +146,21 @@ export function TodoItem({
           title="Edit task"
           className={cn(
             "min-w-0 flex-1 truncate text-left text-sm transition-colors hover:text-primary",
-            todo.completed && "line-through decoration-muted-foreground",
+            /*
+              Both kinds of "not on the list any more" are struck through
+              rather than faded.
+
+              Fading the whole row took the title, the flag, the timer and the
+              menu down with it — a row you could still click but could barely
+              read, and on a day full of finished tasks the page went grey. A
+              line through the words says the one thing that is actually true
+              about the task, leaves everything around it at full contrast, and
+              keeps the two states apart by colour: done is quiet, missed is
+              the day heading's own red.
+            */
+            todo.completed &&
+              "text-muted-foreground line-through decoration-muted-foreground",
+            isMissed && "line-through decoration-destructive/70",
           )}
         >
           {todo.title}
