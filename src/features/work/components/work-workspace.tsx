@@ -3,7 +3,9 @@
 import { Suspense, useCallback, useEffect, useMemo } from "react";
 import {
   ArrowLeft,
+  CircleDashed,
   FileText,
+  ListTodo,
   MessageSquare,
   Shapes,
   StickyNote,
@@ -28,6 +30,7 @@ import { DocumentPip } from "@/features/work/components/document-pip";
 import { WorkBuildingState } from "@/features/work/components/work-building-state";
 import { WorkDocumentPanel } from "@/features/work/components/work-document-panel";
 import { WorkNotesPanel } from "@/features/work/components/work-notes-panel";
+import { WorkTodoPanel } from "@/features/work/components/work-todo-panel";
 import { useDocumentWorkspace } from "@/features/work/hooks/use-document-workspace";
 import { useWorkLayout } from "@/features/work/hooks/use-work-layout";
 import {
@@ -241,6 +244,37 @@ export function WorkWorkspace({
       </TabsContent>
 
       {/*
+        Not force-mounted, and for a different reason from the chat below.
+
+        There is nothing here to lose by unmounting — no canvas viewport, no
+        half-written note — but there *is* something to gain by remounting: this
+        list settles expired timers on every read, so coming back to the tab is
+        what makes a task whose twenty-five minutes ran out while the board was
+        up already be ticked off when it is looked at.
+      */}
+      <TabsContent value="todo" className="min-h-0 flex-1">
+        {isBuilding || hasFailed ? (
+          <WorkBuildingState
+            status={workspace.status}
+            onRetry={retry}
+            isRetrying={isRetrying}
+          />
+        ) : (
+          <QueryErrorBoundary message="Something went wrong loading these tasks.">
+            <Suspense
+              fallback={
+                <div className="flex h-full items-center justify-center">
+                  <Spinner />
+                </div>
+              }
+            >
+              <WorkTodoPanel documentId={documentId} />
+            </Suspense>
+          </QueryErrorBoundary>
+        )}
+      </TabsContent>
+
+      {/*
         The one tab that is *not* force-mounted.
 
         The other two are kept alive because unmounting them loses something the
@@ -383,6 +417,14 @@ export function WorkWorkspace({
             >
               <StickyNote className="fill-yellow-400 stroke-yellow-200" />
               <span className="hidden @lg:inline">Note</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="todo"
+              aria-label="Tasks"
+              onClick={() => openTab("todo")}
+            >
+              <CircleDashed className="stroke-red-500" strokeWidth={2.5} />
+              <span className="hidden @lg:inline">Todo</span>
             </TabsTrigger>
             <TabsTrigger
               value="chat"

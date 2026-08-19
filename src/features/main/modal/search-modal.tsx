@@ -9,6 +9,7 @@ import {
   MessageSquare,
   NotebookPen,
   Shapes,
+  SquareCheck,
   SquareMousePointer,
   StickyNote,
 } from "lucide-react";
@@ -35,9 +36,11 @@ import {
   searchChatsOptions,
   searchItemsOptions,
   searchNotesOptions,
+  searchTodosOptions,
 } from "@/features/main/hooks/use-search-items";
 import { noteDisplayTitle } from "@/features/sticky-notes/lib/note-content";
 import { stickyNotePath } from "@/features/sticky-notes/types";
+import { todoDatePath } from "@/features/todo/types";
 import { useDriveStore } from "@/lib/stores/drive-store";
 import { useSearchStore } from "@/lib/stores/search-store";
 import { useTRPC } from "@/trpc/client";
@@ -136,14 +139,23 @@ export function SearchModal() {
     ...searchChatsOptions(trpc),
     enabled: isOpen,
   });
+  const { data: todoData, isLoading: isLoadingTodos } = useQuery({
+    ...searchTodosOptions(trpc),
+    enabled: isOpen,
+  });
 
   const isLoading =
-    isLoadingItems || isLoadingBoards || isLoadingNotes || isLoadingChats;
+    isLoadingItems ||
+    isLoadingBoards ||
+    isLoadingNotes ||
+    isLoadingChats ||
+    isLoadingTodos;
   const folders = data?.folders ?? [];
   const documents = data?.documents ?? [];
   const boards = boardData ?? [];
   const notes = noteData ?? [];
   const chats = chatData ?? [];
+  const todos = todoData ?? [];
 
   /**
    * Search can land on a folder several levels down, so the breadcrumb trail is
@@ -191,6 +203,21 @@ export function SearchModal() {
     router.push(chatPath(chatId));
   };
 
+  /**
+   * A task has no page of its own — it lives in a day on the todo page — so the
+   * day is what this navigates to, and the page scrolls to it and flashes the
+   * heading. The same journey the header's calendar makes, through the same
+   * parameter: see `useTodoDayNavigation`.
+   *
+   * The task's own document, when it has one, is deliberately not where this
+   * goes. Somebody searching a task wants the task; the document is one click
+   * further on from the row this lands on.
+   */
+  const handleSelectTodo = (todo: (typeof todos)[number]) => {
+    closeSearch();
+    router.push(todoDatePath(todo.dueDate));
+  };
+
   return (
     <CommandDialog
       open={isOpen}
@@ -198,7 +225,7 @@ export function SearchModal() {
         if (!open) closeSearch();
       }}
       title="Search"
-      description="Search your files, boards, notes and chats"
+      description="Search your files, boards, notes, chats and tasks"
       // Capped against the viewport rather than a pixel height, so a long
       // drive never pushes the palette off-screen. `flex` replaces the
       // dialog's own grid to let the list absorb the leftover space, and
@@ -212,7 +239,7 @@ export function SearchModal() {
       */}
       <Command className="min-h-0 flex-1">
         <CommandInput
-          placeholder="Search files, boards, notes and chats…"
+          placeholder="Search files, boards, notes, chats and tasks…"
           value={query}
           onValueChange={setQuery}
         />
@@ -328,6 +355,45 @@ export function SearchModal() {
                 >
                   <MessageSquare className="fill-emerald-500 stroke-emerald-500" />
                   <span className="truncate">{chat.title}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+
+          {todos.length > 0 && (
+            <CommandGroup heading="Tasks">
+              {todos.map((todo) => (
+                <CommandItem
+                  key={todo.id}
+                  /*
+                    The title and the document it was written against, so a task
+                    is findable by either — "read chapter 4" or the file it is
+                    about. The day is deliberately not in here: every task has
+                    one, so typing a date would match half the list, and the day
+                    is where selecting this *takes* you rather than what
+                    identifies it.
+                  */
+                  value={`${todo.title} ${todo.document?.name ?? ""} ${todo.id}`}
+                  onSelect={() => handleSelectTodo(todo)}
+                >
+                  <SquareCheck className="fill-sky-500 stroke-background" />
+                  <span
+                    className={cn(
+                      "truncate",
+                      // Still findable once it is done — a finished task is
+                      // often exactly the one being looked for — but shown as
+                      // finished rather than as something still to do.
+                      todo.completed &&
+                        "text-muted-foreground line-through decoration-muted-foreground",
+                    )}
+                  >
+                    {todo.title}
+                  </span>
+                  {todo.document && (
+                    <span className="ml-auto truncate pl-2 text-[0.625rem] text-muted-foreground">
+                      {todo.document.name}
+                    </span>
+                  )}
                 </CommandItem>
               ))}
             </CommandGroup>

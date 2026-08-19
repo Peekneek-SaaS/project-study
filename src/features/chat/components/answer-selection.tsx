@@ -1,6 +1,6 @@
 "use client";
 
-import { NotebookPen, Reply } from "lucide-react";
+import { CircleDashed, NotebookPen, Reply, StickyNote } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   useCallback,
@@ -306,11 +306,21 @@ export function AnswerSelectionProvider({
                     variant="ghost"
                     className="h-8 gap-1.5 text-xs"
                     onClick={() =>
-                      consume((text) => openModal("paste-into", { kind: "notes", text }))
+                      consume((text) =>
+                        openModal("paste-into", { kind: "notes", text }),
+                      )
                     }
                   >
-                    <NotebookPen className="size-3.5" />
-                    Write in note
+                    <StickyNote className="size-3.5 fill-yellow-400 stroke-yellow-200" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 gap-1.5 text-xs"
+                    onClick={() => {}}
+                  >
+                    <CircleDashed className="size-3.5  stroke-red-500" />
                   </Button>
                   <Button
                     type="button"

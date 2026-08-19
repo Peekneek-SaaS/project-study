@@ -5,6 +5,7 @@ import MainBreadCrumbs from "./main-breadcrumbs";
 import { ModeToggle } from "@/components/mode-toggle";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import MainCalendarButton from "@/features/main/components/main-calendar-button";
 import { Search, UserRound } from "lucide-react";
 import { useSearchStore } from "@/lib/stores/search-store";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -70,6 +71,7 @@ const MainHeader = () => {
           outranks the one drawing the circle. `rounded-md` rather than
           `rounded-none` so it follows `--radius` if the theme ever softens.
         */}
+        <MainCalendarButton />
         <div className="flex size-8 shrink-0 items-center justify-center [&_.cl-avatarBox]:size-8 [&_.cl-avatarBox]:rounded-md [&_.cl-avatarImage]:rounded-md [&_.cl-userButtonBox]:size-8 [&_.cl-userButtonTrigger]:size-8 [&_.cl-userButtonTrigger]:rounded-md [&_.cl-userButtonTrigger]:p-0">
           <UserButton
             fallback={

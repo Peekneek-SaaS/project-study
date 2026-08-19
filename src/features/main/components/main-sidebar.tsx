@@ -2,6 +2,8 @@
 
 import {
   AudioLines,
+  CircleDashed,
+  Focus,
   Headphones,
   Home,
   LayoutGrid,
@@ -80,11 +82,24 @@ const MainSidebar = () => {
       icon: StickyNote,
       iconClassName: "fill-yellow-400 stroke-yellow-200",
     },
+
+    {
+      label: "Todo",
+      href: "/todo",
+      icon: CircleDashed,
+      iconClassName: "stroke-red-500 [stroke-width:2.5]",
+    },
     {
       label: "Chat",
       href: "/chat",
       icon: MessageSquare,
       iconClassName: "fill-emerald-500 stroke-emerald-500",
+    },
+    {
+      label: "Focus",
+      href: "/focus",
+      icon: Focus,
+      iconClassName: "stroke-cyan-500 fill-cyan-500",
     },
   ];
 

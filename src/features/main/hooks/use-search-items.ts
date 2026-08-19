@@ -68,6 +68,22 @@ export function searchChatsOptions(trpc: ReturnType<typeof useTRPC>) {
 }
 
 /**
+ * Tasks, on the same terms as the three above.
+ *
+ * The bare list, with no filters passed — which is the same cache entry the
+ * todo page's default view reads, so opening the palette on that page costs
+ * nothing at all. A filtered todo page keeps its own entry and this one stays
+ * whole, which is what search wants: the point of looking a task up is to find
+ * the one the current filter is hiding.
+ */
+export function searchTodosOptions(trpc: ReturnType<typeof useTRPC>) {
+  return {
+    ...trpc.todo.list.queryOptions(),
+    staleTime: SEARCH_STALE_TIME,
+  };
+}
+
+/**
  * Fills the palette's cache ahead of time. Safe to call as often as the pointer
  * moves — a fetch already in flight is joined, and fresh data is left alone.
  */
@@ -80,6 +96,7 @@ export function usePrefetchSearchItems() {
     void queryClient.prefetchQuery(searchBoardsOptions(trpc));
     void queryClient.prefetchQuery(searchNotesOptions(trpc));
     void queryClient.prefetchQuery(searchChatsOptions(trpc));
+    void queryClient.prefetchQuery(searchTodosOptions(trpc));
   }, [queryClient, trpc]);
 }
 
