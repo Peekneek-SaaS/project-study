@@ -331,6 +331,10 @@ export function DocumentChatPanel({ documentId }: { documentId: string }) {
           onProviderChange={setProvider}
           disabled={isStreaming}
           placeholder="Ask about this document…"
+          // No `@` picker here: this conversation can only search the document
+          // it belongs to, so a menu of the others would offer references it is
+          // bound to refuse. The universal chat is where a file is chosen.
+          mentions={false}
           /*
             Names the one document this chat can answer from.
 

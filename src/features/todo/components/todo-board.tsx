@@ -82,23 +82,23 @@ export function TodoBoard({ serverView }: { serverView: TodoViewType }) {
                       And it is given the height that is left over rather than
                       being allowed to size itself.
 
-                      This is what was breaking the grid. Left to its content, a
-                      sideways scroller grows to the tallest column, every other
-                      column stretches to match, and the whole page ends up as
-                      tall as the busiest day with its horizontal scrollbar
-                      pushed somewhere off the bottom of the window — so moving
-                      between days meant scrolling down to find the bar and back
-                      up to read a column.
+                      Left to its content, a sideways scroller grows to the
+                      tallest column, every other column stretches to match, and
+                      the board ends up as tall as the busiest day with its
+                      horizontal scrollbar pushed off the bottom of the window —
+                      so moving between days meant scrolling down to find the
+                      bar and back up to read a column.
 
-                      Bounded to the viewport minus everything sticky above it —
-                      the header, the title bar, the toolbar — plus the page's
-                      own padding, each of which is already declared as a
-                      variable by the view. Now the columns fill the screen
-                      exactly, each scrolls its own tasks, and the page itself
-                      does not scroll at all: a board, which is what a grid of
-                      days was meant to be.
+                      `h-full` rather than a calculation, now that the page has a
+                      real height to take a share of: the wrapper around this is
+                      what remains of it once the title bar and the toolbar have
+                      had theirs, so this is exactly the space available and
+                      there is no measurement to keep in step. The columns fill
+                      the screen, each scrolls its own tasks, and the board never
+                      scrolls vertically — which is what a grid of days was meant
+                      to be.
                     */
-                    "h-[calc(100svh-var(--drive-sticky-top)-var(--drive-title-h)-var(--drive-toolbar-h)-2.5rem)]",
+                    "h-full",
                   )
                 : "flex flex-col gap-8",
             )}
