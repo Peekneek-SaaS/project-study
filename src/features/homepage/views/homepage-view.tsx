@@ -1,5 +1,11 @@
 import { AnnouncementBar } from "@/features/homepage/components/announcement-bar";
 import { AnswersSection } from "@/features/homepage/components/answers-section";
+import {
+  FinalCtaAuthCta,
+  HeroAuthCta,
+  NavAuthCta,
+  NavMenuAuthLink,
+} from "@/features/homepage/components/auth-cta";
 import { ComprehensionSection } from "@/features/homepage/components/comprehension-section";
 import { EverythingSection } from "@/features/homepage/components/everything-section";
 import { FinalCtaSection } from "@/features/homepage/components/final-cta-section";
@@ -25,6 +31,12 @@ import { WorkspaceSection } from "@/features/homepage/components/workspace-secti
  * and the page ships less JavaScript for the arrangement being made where no
  * JavaScript is needed to make it.
  *
+ * Being a server component is also what lets the auth-dependent buttons be
+ * server-rendered. `NavAuthCta` and the rest `await auth()` and are handed
+ * down as children, so the nav and the hero can stay client components without
+ * either of them having to learn who is signed in — and without the buttons
+ * flickering from "Start for free" to "Dashboard" after hydration.
+ *
  * The alternating light/dark rhythm is deliberate and not decorative: the two
  * ink bands fall on `comprehension` and the closing call to action, which are
  * the two moments the page changes what it is talking about. A reader
@@ -34,10 +46,10 @@ export function HomepageView() {
   return (
     <div className="flex min-h-full flex-col bg-background">
       <AnnouncementBar />
-      <HomepageNav />
+      <HomepageNav authCta={<NavAuthCta />} menuAuthLink={<NavMenuAuthLink />} />
 
       <main className="flex-1">
-        <HeroSection />
+        <HeroSection primaryCta={<HeroAuthCta />} />
         <FormatsStrip />
         <WorkspaceSection />
         <PipelineSection />
@@ -45,7 +57,7 @@ export function HomepageView() {
         <AnswersSection />
         <ModelsSection />
         <EverythingSection />
-        <FinalCtaSection />
+        <FinalCtaSection cta={<FinalCtaAuthCta />} />
       </main>
 
       <HomepageFooter />

@@ -2,12 +2,10 @@
 
 import { AnimatePresence, motion, useMotionValueEvent, useScroll } from "motion/react";
 import Link from "next/link";
-import { useState } from "react";
-import { ArrowRight, Menu, X } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { Menu, X } from "lucide-react";
 
 import Logo from "@/components/logo";
-import { CtaButton } from "@/features/homepage/components/cta-button";
-import { SIGN_IN_PATH, SIGN_UP_PATH } from "@/features/homepage/lib/design";
 import { DURATION, EASE_OUT } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
@@ -32,8 +30,20 @@ const LINKS = [
  * The threshold is deliberately short. It fires while the hero is still mostly
  * on screen, which is what makes the bar feel attached to the scroll rather
  * than to a section boundary somewhere below the fold.
+ *
+ * The two auth-dependent slots arrive as props rather than being rendered
+ * here. They are server components — see `auth-cta` — and this file is a
+ * client one, so it cannot import them; taking them as `ReactNode` lets the
+ * server decide what a signed-in visitor sees while the scroll behaviour and
+ * the drawer stay in the browser where they belong.
  */
-export function HomepageNav() {
+export function HomepageNav({
+  authCta,
+  menuAuthLink,
+}: {
+  authCta: ReactNode;
+  menuAuthLink: ReactNode;
+}) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const { scrollY } = useScroll();
@@ -68,24 +78,7 @@ export function HomepageNav() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/*
-            Deliberately not branched on whether anyone is signed in.
-
-            Clerk v7 replaced `SignedIn`/`SignedOut` with `<Show when=...>`,
-            which renders `null` while auth is still loading — so a nav that
-            swapped its buttons on session state would arrive empty and fill in
-            a beat later, on every single visit, at the most-looked-at corner
-            of the page. Two static links cost a signed-in visitor one
-            redirect, which Clerk does for them anyway, and cost everyone else
-            nothing.
-          */}
-          <CtaButton href={SIGN_IN_PATH} tone="outline" className="hidden sm:inline-flex">
-            Sign in
-          </CtaButton>
-          <CtaButton href={SIGN_UP_PATH} tone="solid">
-            Start for free
-            <ArrowRight />
-          </CtaButton>
+          {authCta}
 
           <button
             type="button"
@@ -120,13 +113,7 @@ export function HomepageNav() {
                   {link.label}
                 </Link>
               ))}
-              <Link
-                href={SIGN_IN_PATH}
-                onClick={() => setMenuOpen(false)}
-                className="border-t border-border py-3 text-sm font-medium text-foreground/70 sm:hidden"
-              >
-                Sign in
-              </Link>
+              {menuAuthLink}
             </div>
           </motion.div>
         ) : null}

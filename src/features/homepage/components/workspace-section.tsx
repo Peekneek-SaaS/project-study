@@ -3,11 +3,11 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import {
-  ListTodo,
+  CircleDashed,
+  FileText,
   MessageSquare,
   Shapes,
   StickyNote,
-  Text,
 } from "lucide-react";
 
 import {
@@ -41,7 +41,8 @@ const SURFACES = [
   {
     id: "read",
     tab: "Read it",
-    icon: Text,
+    icon: FileText,
+    iconClassName: "fill-orange-400 stroke-orange-200",
     lead: "The page, where you left it.",
     rest: "Open the file and it stays open — the same page, the same scroll, next time you come back. Float it over the canvas when you need the room.",
     points: [
@@ -55,6 +56,7 @@ const SURFACES = [
     id: "draw",
     tab: "Draw on it",
     icon: Shapes,
+    iconClassName: "fill-purple-500 stroke-purple-500",
     lead: "A canvas that opens beside the page.",
     rest: "Not in another app, not on another tab. Redraw the figure while the figure is still on screen — that is the whole trick to remembering it.",
     points: [
@@ -68,6 +70,7 @@ const SURFACES = [
     id: "note",
     tab: "Note it",
     icon: StickyNote,
+    iconClassName: "fill-yellow-400 stroke-yellow-200",
     lead: "Notes that stay with their source.",
     rest: "Written against the document, filed under the day you wrote them, and still there when you open it three weeks later looking for the one thing you knew you had written down.",
     points: [
@@ -78,22 +81,10 @@ const SURFACES = [
     render: () => <NotesMockup className="h-[400px]" />,
   },
   {
-    id: "ask",
-    tab: "Ask it",
-    icon: MessageSquare,
-    lead: "Answers with the page number attached.",
-    rest: "It searches the passages and reads the pages before it says anything, then shows you which ones. Click the page and the document jumps there.",
-    points: [
-      "Ask one document, or everything you have ever uploaded",
-      "Every claim carries the page it came from",
-      "Three models behind it — pick one, or let it pick",
-    ],
-    render: () => <ChatMockup className="h-[400px]" />,
-  },
-  {
     id: "plan",
     tab: "Plan it",
-    icon: ListTodo,
+    icon: CircleDashed,
+    iconClassName: "stroke-red-500 stroke-2.5",
     lead: "A reading list, turned into a week.",
     rest: "Tasks written against a document still show up on the day they are due, badged with where they came from — because a planner that hid them would be lying about the day.",
     points: [
@@ -102,6 +93,20 @@ const SURFACES = [
       "One planner for document work and everything else",
     ],
     render: () => <TodoMockup className="h-[400px]" />,
+  },
+  {
+    id: "ask",
+    tab: "Ask it",
+    icon: MessageSquare,
+    iconClassName: "fill-emerald-500 stroke-emerald-500",
+    lead: "Answers with the page number attached.",
+    rest: "It searches the passages and reads the pages before it says anything, then shows you which ones. Click the page and the document jumps there.",
+    points: [
+      "Ask one document, or everything you have ever uploaded",
+      "Every claim carries the page it came from",
+      "Three models behind it — pick one, or let it pick",
+    ],
+    render: () => <ChatMockup className="h-[400px]" />,
   },
 ] as const;
 
@@ -165,7 +170,7 @@ export function WorkspaceSection() {
                     <item.icon
                       className={cn(
                         "size-4 shrink-0 transition-colors",
-                        isActive ? "text-primary" : "text-foreground/25",
+                        isActive ? item.iconClassName : "text-foreground/25",
                       )}
                     />
                     {item.tab}

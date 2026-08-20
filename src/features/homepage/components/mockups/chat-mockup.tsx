@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { ArrowUp, Search, Sparkles } from "lucide-react";
+import { ArrowUp, MessageSquare, Search } from "lucide-react";
 
 import { DURATION, EASE_OUT } from "@/lib/motion";
 import { cn } from "@/lib/utils";
@@ -30,9 +30,9 @@ export function ChatMockup({
       )}
     >
       <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-border bg-muted/60 px-2.5">
-        <Sparkles className="size-3 text-primary" />
+        <MessageSquare className="size-3 fill-emerald-500 stroke-emerald-500" />
         <span className="text-[10px] font-medium text-foreground/60">
-          Ask this document
+          bio-ch4-final-v2.pdf
         </span>
       </div>
 
@@ -58,12 +58,12 @@ export function ChatMockup({
           transition={{ duration: DURATION.base, ease: EASE_OUT, delay: 0.25 }}
           className="space-y-1"
         >
-          <div className="inline-flex items-center gap-1 rounded-none border border-border bg-background px-1.5 py-0.5 text-[9.5px] text-foreground/50">
+          <div className="inline-flex items-center gap-1 rounded-none px-1.5 py-0.5 text-[9.5px] text-foreground/50">
             <Search className="size-2.5" />
             Searched this document
             <span className="font-mono text-foreground/35">8 passages</span>
           </div>
-          <div className="inline-flex items-center gap-1 rounded-none border border-border bg-background px-1.5 py-0.5 text-[9.5px] text-foreground/50">
+          <div className="inline-flex items-center gap-1 rounded-none px-1.5 py-0.5 text-[9.5px] text-foreground/50">
             Read pages
             <span className="font-mono text-foreground/35">11–13</span>
           </div>
@@ -107,7 +107,9 @@ export function ChatMockup({
           <span className="flex-1 text-[10px] text-foreground/30">
             Ask anything about this document…
           </span>
-          <span className="font-mono text-[9px] text-foreground/35">Claude</span>
+          {/* <span className="font-mono text-[9px] text-foreground/35">
+            Claude
+          </span> */}
           <span className="grid size-4 place-items-center rounded-none bg-primary text-primary-foreground">
             <ArrowUp className="size-2.5" />
           </span>

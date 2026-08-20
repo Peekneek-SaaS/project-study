@@ -2,12 +2,13 @@
 
 import { motion } from "motion/react";
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight } from "lucide-react";
+import type { ReactNode } from "react";
+import { ArrowUpRight } from "lucide-react";
 
 import { CtaButton } from "@/features/homepage/components/cta-button";
 import { ChatMockup } from "@/features/homepage/components/mockups/chat-mockup";
 import { WorkspaceMockup } from "@/features/homepage/components/mockups/workspace-mockup";
-import { FRAME, SIGN_UP_PATH } from "@/features/homepage/lib/design";
+import { FRAME } from "@/features/homepage/lib/design";
 import { DURATION, EASE_OUT } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +21,11 @@ import { cn } from "@/lib/utils";
  * reads as a jump. The delays are written out rather than driven by a
  * container's `staggerChildren` because the intervals here are uneven on
  * purpose: the headline holds a beat longer than the eyebrow above it.
+ *
+ * `primaryCta` is a prop for the same reason the nav's is — it is decided on
+ * the server so a signed-in visitor is offered their dashboard rather than a
+ * sign-up, and a client component cannot import the server component that
+ * makes that call. See `auth-cta`.
  */
 const rise = (delay: number) => ({
   initial: { opacity: 0, y: 14 },
@@ -27,7 +33,7 @@ const rise = (delay: number) => ({
   transition: { duration: DURATION.slow, ease: EASE_OUT, delay },
 });
 
-export function HeroSection() {
+export function HeroSection({ primaryCta }: { primaryCta: ReactNode }) {
   return (
     <section className="relative overflow-hidden">
       {/*
@@ -77,10 +83,7 @@ export function HeroSection() {
             {...rise(0.27)}
             className="mt-9 flex flex-wrap items-center justify-center gap-2.5"
           >
-            <CtaButton href={SIGN_UP_PATH} tone="solid" size="lg">
-              Start for free
-              <ArrowRight />
-            </CtaButton>
+            {primaryCta}
             <CtaButton href="#workspace" tone="outline" size="lg">
               See it work
             </CtaButton>

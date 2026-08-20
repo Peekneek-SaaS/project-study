@@ -2,8 +2,8 @@
 
 import { motion } from "motion/react";
 import {
+  CircleDashed,
   FileText,
-  ListTodo,
   MessageSquare,
   Minus,
   Shapes,
@@ -28,10 +28,30 @@ import { cn } from "@/lib/utils";
  * product on first login is worse than no image at all.
  */
 const TABS = [
-  { icon: Shapes, label: "Board", active: true },
-  { icon: StickyNote, label: "Notes", active: false },
-  { icon: ListTodo, label: "Tasks", active: false },
-  { icon: MessageSquare, label: "Chat", active: false },
+  {
+    icon: Shapes,
+    iconClassName: "fill-purple-500 stroke-purple-500",
+    label: "Board",
+    active: true,
+  },
+  {
+    icon: StickyNote,
+    iconClassName: "fill-yellow-400 stroke-yellow-200",
+    label: "Notes",
+    active: false,
+  },
+  {
+    icon: CircleDashed,
+    iconClassName: "stroke-red-500 [stroke-width:2.5]",
+    label: "Todos",
+    active: false,
+  },
+  {
+    icon: MessageSquare,
+    iconClassName: "fill-emerald-500 stroke-emerald-500",
+    label: "Chat",
+    active: false,
+  },
 ] as const;
 
 export function WorkspaceMockup({ className }: { className?: string }) {
@@ -51,10 +71,12 @@ export function WorkspaceMockup({ className }: { className?: string }) {
         <div className="hidden w-[38%] shrink-0 flex-col border-r border-border sm:flex">
           <div className="flex h-7 shrink-0 items-center justify-between border-b border-border px-2">
             <span className="flex items-center gap-1 text-[10px] font-medium text-foreground/60">
-              <FileText className="size-3" />
+              <FileText className="size-3 fill-orange-400 stroke-orange-200" />
               bio-ch4-final-v2.pdf
             </span>
-            <span className="font-mono text-[9.5px] text-foreground/35">12 / 34</span>
+            <span className="font-mono text-[9.5px] text-foreground/35">
+              12 / 34
+            </span>
           </div>
           <div className="min-h-0 flex-1 overflow-hidden bg-muted/40 p-3">
             <div className="h-full rounded-none border border-border bg-card p-3 shadow-sm">
@@ -63,8 +85,15 @@ export function WorkspaceMockup({ className }: { className?: string }) {
               {/* The highlighted passage — what a citation points back at. */}
               <motion.div
                 initial={{ backgroundColor: "rgba(0,0,0,0)" }}
-                animate={{ backgroundColor: "color-mix(in oklch, var(--primary), transparent 88%)" }}
-                transition={{ duration: DURATION.slow, ease: EASE_OUT, delay: 1.1 }}
+                animate={{
+                  backgroundColor:
+                    "color-mix(in oklch, var(--primary), transparent 88%)",
+                }}
+                transition={{
+                  duration: DURATION.slow,
+                  ease: EASE_OUT,
+                  delay: 1.1,
+                }}
                 className="-mx-1 mb-3 rounded-none px-1 py-1"
               >
                 <TextLines count={3} widths={[97, 93, 64]} />
@@ -87,7 +116,7 @@ export function WorkspaceMockup({ className }: { className?: string }) {
                     : "text-foreground/45",
                 )}
               >
-                <tab.icon className="size-3" />
+                <tab.icon className={cn("size-3", tab.iconClassName)} />
                 {tab.label}
               </span>
             ))}
@@ -132,29 +161,47 @@ function BoardScene() {
     >
       {/* Nucleus */}
       <motion.circle
-        cx="160" cy="105" r="34"
-        stroke="var(--foreground)" strokeWidth="1.4" strokeOpacity="0.75"
+        cx="160"
+        cy="105"
+        r="34"
+        stroke="var(--foreground)"
+        strokeWidth="1.4"
+        strokeOpacity="0.75"
         {...draw(0.35)}
       />
       <motion.circle
-        cx="160" cy="105" r="13"
-        stroke="var(--primary)" strokeWidth="1.4"
+        cx="160"
+        cy="105"
+        r="13"
+        stroke="var(--primary)"
+        strokeWidth="1.4"
         {...draw(0.75)}
       />
       {/* Membrane */}
       <motion.ellipse
-        cx="160" cy="108" rx="120" ry="76"
-        stroke="var(--foreground)" strokeWidth="1.4" strokeOpacity="0.35"
+        cx="160"
+        cy="108"
+        rx="120"
+        ry="76"
+        stroke="var(--foreground)"
+        strokeWidth="1.4"
+        strokeOpacity="0.35"
         strokeDasharray="4 4"
         {...draw(0.1)}
       />
       {/* Leader lines out to labels */}
       <motion.path
-        d="M126 88 L74 58" stroke="var(--foreground)" strokeOpacity="0.4" strokeWidth="1.2"
+        d="M126 88 L74 58"
+        stroke="var(--foreground)"
+        strokeOpacity="0.4"
+        strokeWidth="1.2"
         {...draw(1.15)}
       />
       <motion.path
-        d="M194 122 L250 156" stroke="var(--foreground)" strokeOpacity="0.4" strokeWidth="1.2"
+        d="M194 122 L250 156"
+        stroke="var(--foreground)"
+        strokeOpacity="0.4"
+        strokeWidth="1.2"
         {...draw(1.35)}
       />
       {/* Hand-written labels */}
@@ -163,8 +210,22 @@ function BoardScene() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: DURATION.base, ease: EASE_OUT, delay: 1.5 }}
       >
-        <rect x="28" y="46" width="52" height="15" fill="var(--card)" stroke="var(--border)" />
-        <text x="34" y="57" fontSize="9" fill="var(--foreground)" fillOpacity="0.75" fontFamily="var(--font-sans)">
+        <rect
+          x="28"
+          y="46"
+          width="52"
+          height="15"
+          fill="var(--card)"
+          stroke="var(--border)"
+        />
+        <text
+          x="34"
+          y="57"
+          fontSize="9"
+          fill="var(--foreground)"
+          fillOpacity="0.75"
+          fontFamily="var(--font-sans)"
+        >
           nucleus
         </text>
       </motion.g>
@@ -173,8 +234,22 @@ function BoardScene() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: DURATION.base, ease: EASE_OUT, delay: 1.7 }}
       >
-        <rect x="248" y="148" width="62" height="15" fill="var(--card)" stroke="var(--primary)" strokeOpacity="0.4" />
-        <text x="254" y="159" fontSize="9" fill="var(--primary)" fontFamily="var(--font-sans)">
+        <rect
+          x="248"
+          y="148"
+          width="62"
+          height="15"
+          fill="var(--card)"
+          stroke="var(--primary)"
+          strokeOpacity="0.4"
+        />
+        <text
+          x="254"
+          y="159"
+          fontSize="9"
+          fill="var(--primary)"
+          fontFamily="var(--font-sans)"
+        >
           p. 12 ↗
         </text>
       </motion.g>

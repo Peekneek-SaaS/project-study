@@ -1,28 +1,26 @@
 "use client";
 
 import { motion } from "motion/react";
-import { ArrowRight } from "lucide-react";
+import type { ReactNode } from "react";
 
-import { CtaButton } from "@/features/homepage/components/cta-button";
 import { Reveal } from "@/features/homepage/components/homepage-primitives";
-import {
-  INK,
-  INK_BORDER,
-  INK_MUTED,
-  SIGN_IN_PATH,
-  SIGN_UP_PATH,
-} from "@/features/homepage/lib/design";
+import { INK, INK_BORDER, INK_MUTED } from "@/features/homepage/lib/design";
 import { cn } from "@/lib/utils";
 
 /**
  * The last thing before the footer.
  *
  * Nothing new is argued here — anyone still reading has been convinced or has
- * not. So it is one line, two buttons, and a great deal of quiet around them.
+ * not. So it is one line, the buttons, and a great deal of quiet around them.
  * The vertical hairlines behind it are the page's own grid, brought forward one
  * last time so the closing band belongs to the same drawing as the rest.
+ *
+ * `cta` arrives as a prop for the same reason the nav's and the hero's do:
+ * which buttons belong here depends on whether anyone is signed in, that is
+ * decided on the server so it cannot flicker, and this band is a client
+ * component because of the movement above. See `auth-cta`.
  */
-export function FinalCtaSection() {
+export function FinalCtaSection({ cta }: { cta: ReactNode }) {
   return (
     <section className={cn("relative overflow-hidden border-t", INK, INK_BORDER)}>
       {/* The comb of vertical rules — the reference closes on the same figure. */}
@@ -57,13 +55,7 @@ export function FinalCtaSection() {
 
           <Reveal delay={0.2}>
             <div className="mt-10 flex flex-wrap items-center justify-center gap-2.5">
-              <CtaButton href={SIGN_UP_PATH} tone="inkSolid" size="lg">
-                Start for free
-                <ArrowRight />
-              </CtaButton>
-              <CtaButton href={SIGN_IN_PATH} tone="inkOutline" size="lg">
-                Sign in
-              </CtaButton>
+              {cta}
             </div>
           </Reveal>
 
