@@ -1,7 +1,7 @@
 "use client";
 
 import { createElement, useEffect, useRef, useState } from "react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import {
   FileText,
@@ -37,7 +37,7 @@ import {
 } from "@/lib/stores/create-selection-store";
 import { useTodoSelectionStore } from "@/lib/stores/todo-selection-store";
 import { workPath } from "@/features/work/types";
-import { listItem } from "@/lib/motion";
+import { listItemMotion, presenceAnimation, revealPanel } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 /**
@@ -164,16 +164,6 @@ export function TodoItem({
     autoCompleting.current = true;
     void setCompleted(todo.id, true);
   }, [setCompleted, timer.state, todo.completed, todo.id]);
-
-  if (isEditing) {
-    return (
-      <TodoEditor
-        todo={todo}
-        onClose={() => setIsEditing(false)}
-        documentId={documentId}
-      />
-    );
-  }
 
   const isRunning = timer.state === "running";
   const isCard = variant === "card";
@@ -347,23 +337,52 @@ export function TodoItem({
   const hasMeta = Boolean(documentChip || priorityFlag || timerButton);
 
   return (
-    <motion.div
-      variants={listItem}
-      layout="position"
-      {...(isSelectable ? rowProps : {})}
-      // `data-selected` rather than `aria-selected`, for the reason the note
-      // card gives: a plain `div` has no role that takes it, and saying it
-      // properly would mean making every day a listbox.
-      data-selected={isSelected || undefined}
-      className={cn(
-        "group/todo flex",
-        // A card stacks its two lines; a row is the one line.
-        isCard
-          ? "flex-col gap-1.5 rounded-xl border bg-card px-3 py-2.5 shadow-xs transition-shadow hover:shadow-sm"
-          : "items-center gap-3 border-b px-1 py-2.5 last:border-b-0",
-        isSelectable &&
-          "cursor-default rounded-lg select-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
-        /*
+    /*
+      The row and its editor are the same task in two states, so they swap
+      inside a presence rather than replacing each other outright — which is
+      what this used to do, and what made opening an editor feel like the row
+      had been deleted and something else pasted in its place.
+
+      `wait`, and nothing that projects a box from one place to another: the row
+      fades out where it stands and the editor fades in over the same spot. The
+      arrangement this replaces popped the row out of the flow and let the
+      editor animate its `layout`, which in the grid — where a card sits in a
+      narrow scrolling column rather than across the page — meant the projection
+      measured two different boxes and slid the swap in from the side. Nothing
+      here has moved, so nothing should travel.
+
+      `propagate`, and this is the part with teeth: a nested presence ignores
+      its parent's exit unless told otherwise, and the day's list around this is
+      one. Without it a deleted task would vanish on the spot while every list
+      that holds a plainer row faded out properly.
+    */
+    <AnimatePresence mode="wait" propagate>
+      {isEditing ? (
+        <motion.div key="editor" variants={revealPanel} {...presenceAnimation}>
+          <TodoEditor
+            todo={todo}
+            onClose={() => setIsEditing(false)}
+            documentId={documentId}
+          />
+        </motion.div>
+      ) : (
+        <motion.div
+          key="row"
+          {...listItemMotion}
+          {...(isSelectable ? rowProps : {})}
+          // `data-selected` rather than `aria-selected`, for the reason the note
+          // card gives: a plain `div` has no role that takes it, and saying it
+          // properly would mean making every day a listbox.
+          data-selected={isSelected || undefined}
+          className={cn(
+            "group/todo flex",
+            // A card stacks its two lines; a row is the one line.
+            isCard
+              ? "flex-col gap-1.5 rounded-xl border bg-card px-3 py-2.5 shadow-xs transition-shadow hover:shadow-sm"
+              : "items-center gap-3 border-b px-1 py-2.5 last:border-b-0",
+            isSelectable &&
+              "cursor-default rounded-lg select-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
+            /*
           A tick box already lives on the left of this row, so a *picked* task
           cannot be marked with another one — the row itself lights up instead.
 
@@ -377,46 +396,50 @@ export function TodoItem({
           Full strength rather than `/40` for the same reason: at one pixel
           against a tinted background, a 40% line is a suggestion.
         */
-        isSelected && "bg-primary/10 ring-1 ring-primary ring-inset",
-      )}
-    >
-      {isCard ? (
-        <>
-          {/* The task itself, and the one control that acts on the whole of
+            isSelected && "bg-primary/10 ring-1 ring-primary ring-inset",
+          )}
+        >
+          {isCard ? (
+            <>
+              {/* The task itself, and the one control that acts on the whole of
               it. Nothing else is allowed on this line. */}
-          <div className="flex items-center gap-3">
-            {checkbox}
-            <div className="flex min-w-0 flex-1 items-center">{titleNode}</div>
-            {actionsMenu}
-          </div>
+              <div className="flex items-center gap-3">
+                {checkbox}
+                <div className="flex min-w-0 flex-1 items-center">
+                  {titleNode}
+                </div>
+                {actionsMenu}
+              </div>
 
-          {/* What is true *about* the task, on a line of its own, indented
+              {/* What is true *about* the task, on a line of its own, indented
               under the title rather than under the tick box. Wrapping, because
               three of these in an 18rem column is one too many for one line —
               and a second line of annotations costs less than a countdown
               nobody can read. */}
-          {hasMeta && (
-            <div className="flex flex-wrap items-center gap-2 pl-8">
-              {documentChip}
-              {/* {priorityFlag} */}
+              {hasMeta && (
+                <div className="flex flex-wrap items-center gap-2 pl-8">
+                  {documentChip}
+                  {/* {priorityFlag} */}
+                  {timerButton}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              {checkbox}
+
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                {titleNode}
+                {documentChip}
+                {/* {priorityFlag} */}
+              </div>
+
               {timerButton}
-            </div>
+              {actionsMenu}
+            </>
           )}
-        </>
-      ) : (
-        <>
-          {checkbox}
-
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            {titleNode}
-            {documentChip}
-            {/* {priorityFlag} */}
-          </div>
-
-          {timerButton}
-          {actionsMenu}
-        </>
+        </motion.div>
       )}
-    </motion.div>
+    </AnimatePresence>
   );
 }

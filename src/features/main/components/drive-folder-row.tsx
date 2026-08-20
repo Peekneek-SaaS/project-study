@@ -5,7 +5,7 @@ import { Folder as FolderIcon, FolderLock } from "lucide-react";
 
 import { MotionTableRow } from "@/components/motion/motion-table";
 import { TableCell } from "@/components/ui/table";
-import { listItem } from "@/lib/motion";
+import { listItemMotion } from "@/lib/motion";
 import { DriveItemActions } from "@/features/main/components/drive-item-actions";
 import { DriveRowActions } from "@/features/main/components/drive-row-actions";
 import {
@@ -70,7 +70,7 @@ export function DriveFolderRow({
 
   return (
     <MotionTableRow
-      variants={listItem}
+      {...listItemMotion}
       ref={(node) => {
         dragRef(node);
         dropRef(node);

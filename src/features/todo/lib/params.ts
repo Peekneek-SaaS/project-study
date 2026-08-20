@@ -28,8 +28,9 @@ export const todoFilterParsers = {
   /**
    * The documents whose tasks to show, as ids.
    *
-   * A list, because "these two papers" is a real question and "this one paper"
-   * is only the common case of it. Ids rather than names: a rename must not
+   * A list, though the toolbar's select picks one at a time: the shape is what
+   * the router and every bookmarked URL already speak, so narrowing the control
+   * did not have to narrow the param. Ids rather than names: a rename must not
    * quietly empty a filtered page somebody had bookmarked.
    */
   documents: parseAsArrayOf(parseAsString),

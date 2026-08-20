@@ -25,7 +25,7 @@ import {
   useDriveSelectionStore,
 } from "@/lib/stores/drive-selection-store";
 import { useDriveStore } from "@/lib/stores/drive-store";
-import { listItem } from "@/lib/motion";
+import { listItemMotion } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 /**
@@ -72,7 +72,7 @@ export function DriveFolderCard({
 
   return (
     <motion.div
-      variants={listItem}
+      {...listItemMotion}
       ref={(node) => {
         dragRef(node);
         dropRef(node);
@@ -83,12 +83,25 @@ export function DriveFolderCard({
       className={cn(
         // The border is transparent until it is needed, so selecting a card
         // outlines it without nudging the grid a pixel.
-        "flex select-none items-center gap-3 rounded-xl border dark:border-muted border-transparent bg-input/20 dark:hover:bg-muted px-3 py-3 transition-colors",
+        "flex select-none items-center gap-3  border dark:border-muted border-transparent bg-input/20 dark:hover:bg-muted px-3 py-3 transition-colors",
         "hover:bg-input/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        isSelected && "border-primary bg-muted",
+        /*
+          Every state that colours this border states it twice, once for each
+          mode, and that is not belt and braces.
+
+          The resting border is `dark:border-muted`, which `cn` cannot merge
+          away when a plain `border-primary` arrives — different variant, so
+          tailwind-merge keeps both — and which then wins on specificity,
+          because the `dark` variant compiles to `:is(.dark *)` and that is one
+          class more than the bare utility. Naming the dark case explicitly is
+          what puts the two back in the same group, where the later one wins.
+        */
+        isSelected && "border-primary dark:border-primary bg-muted",
         isDragging && "cursor-grabbing",
         (isDragging || (isSelected && isDraggingSelection)) && "opacity-40",
-        isDropTarget && !isDragging && "border-primary bg-accent",
+        isDropTarget &&
+          !isDragging &&
+          "border-primary dark:border-primary bg-accent",
       )}
     >
       {/* {folder.isLocked ? (

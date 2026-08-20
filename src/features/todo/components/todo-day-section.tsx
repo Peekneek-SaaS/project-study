@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { ChevronDown, MoreHorizontal, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,12 @@ import { useTodoMutations } from "@/features/todo/hooks/use-todo-mutations";
 import type { TodoDayGroup } from "@/features/todo/lib/group-todos-by-day";
 import { isPastDay, longDayLabel } from "@/features/todo/lib/todo-dates";
 import type { RowSelectModifiers } from "@/hooks/use-row-interaction";
-import { listContainer, mountAnimation } from "@/lib/motion";
+import {
+  listContainer,
+  mountAnimation,
+  presenceAnimation,
+  revealPanel,
+} from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 /**
@@ -229,19 +234,32 @@ export function TodoDaySection({
             variants={listContainer}
             className={cn("flex flex-col", isGrid ? "gap-2" : "gap-0")}
           >
-            {group.todos.map((todo) => (
-              <TodoItem
-                key={todo.id}
-                todo={todo}
-                now={now}
-                variant={isGrid ? "card" : "row"}
-                onSelect={onSelect}
-                documentId={documentId}
-                // The day already knows; the rows should not each ask the clock
-                // again and risk disagreeing with the heading over them.
-                isPast={isPast}
-              />
-            ))}
+            {/*
+              What lets a deleted task leave rather than blink out. The rows
+              stay mounted for as long as their exit runs, and the ones below
+              close the gap on the `layout` spring they each carry — see
+              `listItemMotion`.
+
+              Plain mode rather than `popLayout`, because these children are
+              components and not motion elements: `popLayout` has to measure the
+              child it is popping, so it needs one that takes a ref. The row
+              inside each does the popping instead.
+            */}
+            <AnimatePresence>
+              {group.todos.map((todo) => (
+                <TodoItem
+                  key={todo.id}
+                  todo={todo}
+                  now={now}
+                  variant={isGrid ? "card" : "row"}
+                  onSelect={onSelect}
+                  documentId={documentId}
+                  // The day already knows; the rows should not each ask the
+                  // clock again and risk disagreeing with the heading over them.
+                  isPast={isPast}
+                />
+              ))}
+            </AnimatePresence>
           </motion.div>
 
           {/* Said plainly, as asked. An empty day is a normal state — most days
@@ -258,25 +276,51 @@ export function TodoDaySection({
             </p>
           )}
 
-          {isComposing ? (
-            <TodoComposer
-              day={group.key}
-              documentId={documentId}
-              onClose={() => setIsComposing(false)}
-              className={isGrid ? "" : "my-2"}
-            />
-          ) : (
-            <Button
-              variant="ghost"
-              onClick={() => setIsComposing(true)}
-              // Only as wide as what it says. Stretched across the day it read
-              // as a row of its own — a task-shaped thing with no task in it.
-              className="w-fit justify-start gap-2 px-2 font-normal text-muted-foreground hover:text-foreground"
-            >
-              <Plus />
-              Add todo
-            </Button>
-          )}
+          {/*
+            The composer and the button that opens it are one control in two
+            states, so they fade one into the other in place — `wait`, and no
+            `layout`, for the reason the row's own swap gives: a projected box
+            in the grid's narrow column slides in from the side, and neither of
+            these has gone anywhere.
+
+            `initial={false}` because the button is not arriving on the first
+            paint — it came with the day — and only the swaps after that are
+            worth animating.
+          */}
+          <AnimatePresence mode="wait" initial={false}>
+            {isComposing ? (
+              <motion.div
+                key="composer"
+                variants={revealPanel}
+                {...presenceAnimation}
+              >
+                <TodoComposer
+                  day={group.key}
+                  documentId={documentId}
+                  onClose={() => setIsComposing(false)}
+                  className={isGrid ? "" : "my-2"}
+                />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="add"
+                variants={revealPanel}
+                {...presenceAnimation}
+              >
+                <Button
+                  variant="ghost"
+                  onClick={() => setIsComposing(true)}
+                  // Only as wide as what it says. Stretched across the day it
+                  // read as a row of its own — a task-shaped thing with no task
+                  // in it.
+                  className="w-fit justify-start gap-2 px-2 font-normal text-muted-foreground hover:text-foreground"
+                >
+                  <Plus />
+                  Add todo
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       )}
     </section>

@@ -52,8 +52,18 @@ const supportRequestSchema = z.object({
  */
 const formatSubmittedAt = (date: Date) =>
   new Intl.DateTimeFormat("en-GB", {
-    dateStyle: "medium",
-    timeStyle: "short",
+    // Spelled out field by field rather than as `dateStyle`/`timeStyle`,
+    // because ECMA-402 forbids combining either of those with a component
+    // option — and `timeZoneName` is a component option. The combination is not
+    // ignored, it throws: `TypeError: Invalid option : option`, from inside the
+    // send, on every submission. These fields are what `medium` and `short`
+    // came to for en-GB, so the output is unchanged: "20 Aug 2026, 16:30 UTC".
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
     timeZone: SUPPORT_TIMEZONE,
     timeZoneName: "short",
   }).format(date);

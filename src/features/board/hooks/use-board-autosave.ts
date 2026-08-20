@@ -123,5 +123,15 @@ export function useBoardAutosave(boardId: string) {
     };
   }, [flush]);
 
-  return { handleChange, state };
+  /**
+   * Save whatever is waiting, now, without seeing the debounce out.
+   *
+   * The same `flush` the unmount uses, handed out for the button in the corner
+   * — which is there because a board that saves on its own still has to answer
+   * "is it safe to close this tab yet", and the honest answer to that is a
+   * control that lets you *make* it safe rather than a label asking you to
+   * wait. Nothing pending is not an error: `flush` returns having done nothing,
+   * and the state stays `saved`.
+   */
+  return { handleChange, state, saveNow: flush };
 }

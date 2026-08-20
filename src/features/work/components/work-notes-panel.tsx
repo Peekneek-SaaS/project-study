@@ -141,7 +141,7 @@ export function WorkNotesPanel({ documentId }: { documentId: string }) {
           // thing this is standing in for, so showing a ghost of it through
           // the bar reads as a bug rather than as depth.
           "bg-background",
-          "transition-[opacity,visibility] duration-150 ease-out",
+          "transition-[opacity,visibility] duration-250 ease-out",
           !isSelecting && "invisible opacity-0",
         )}
       >

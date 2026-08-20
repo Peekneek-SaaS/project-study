@@ -53,10 +53,15 @@ export function TodoComposer({
    * Absent on the page, and deliberately: a composer there clears its field and
    * waits for the next task, because tasks arrive in handfuls. Somewhere the
    * composer was opened to write down *one* particular thing — the paste
-   * picker, which opens it on an excerpt — there is nothing to wait for, and
-   * the caller says so by passing this.
+   * picker, which opens it on an excerpt; the drive's New Todo — there is
+   * nothing to wait for, and the caller says so by passing this.
+   *
+   * Handed the day the task was filed under rather than the day the composer
+   * opened on, because the date chip may have moved it: a caller that reports
+   * where the task went, or travels there, has to be told where it actually
+   * went.
    */
-  onCreated?: () => void;
+  onCreated?: (dueDate: DayKey) => void;
   /**
    * The title to start from, for a composer opened on something already
    * written. Only the first render's value is read: after that the field is the
@@ -114,7 +119,7 @@ export function TodoComposer({
     // Whoever opened this for one task takes it from here — usually by
     // unmounting the composer, which is why nothing below runs for them.
     if (onCreated) {
-      onCreated();
+      onCreated(pending.dueDate);
       return;
     }
 

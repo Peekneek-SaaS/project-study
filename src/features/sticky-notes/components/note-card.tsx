@@ -23,7 +23,7 @@ import {
   selectIsRowSelected,
 } from "@/lib/stores/create-selection-store";
 import { useNoteSelectionStore } from "@/lib/stores/note-selection-store";
-import { listItem } from "@/lib/motion";
+import { layoutTransition, listItem, presenceAnimation } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 /**
@@ -115,6 +115,10 @@ export function NoteCard({
       <motion.article
         ref={articleRef}
         variants={listItem}
+        {...presenceAnimation}
+        // Position only, so the wall closing over a deleted note slides the
+        // cards across rather than stretching what is written on them.
+        layout="position"
         // A note lifts a little under the pointer and presses in when clicked,
         // which is most of what makes a card feel like an object. Spring rather
         // than a duration: the weight is what reads as physical, and a hand
@@ -122,7 +126,16 @@ export function NoteCard({
         // exactly what a spring handles and a tween does not.
         whileHover={isEditing ? undefined : { y: -3, scale: 1.01 }}
         whileTap={isEditing ? undefined : { scale: 0.995 }}
-        transition={{ type: "spring", stiffness: 400, damping: 30, mass: 0.6 }}
+        // The `layout` key is the wall's own, slower spring — the hover spring
+        // above is meant for a card chasing the pointer, and a note sliding half
+        // the grid to close a gap on it would arrive before the eye did.
+        transition={{
+          type: "spring",
+          stiffness: 400,
+          damping: 30,
+          mass: 0.6,
+          layout: layoutTransition,
+        }}
         {...gestures}
         data-note-id={note.id}
         // `data-selected` rather than `aria-selected`: an `article` has no role

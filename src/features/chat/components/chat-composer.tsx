@@ -55,6 +55,28 @@ import { Textarea } from "@/components/ui/textarea";
  */
 export type ComposerSize = "default" | "compact";
 
+/**
+ * Whether the composer offers a choice of model.
+ *
+ * Off, as a deliberate product call rather than because the picker broke: a
+ * control for choosing between three models sits next to the send button on
+ * every surface, and a question is not the moment to ask somebody which company
+ * should answer it. The default chain answers well, and the fallback behind it
+ * means a provider being down is not a choice anyone has to make — see
+ * `createFallbackModel`.
+ *
+ * A flag and not a comment block, so nothing rots behind it. The picker's props
+ * are still typed, still passed, and still checked by the compiler; flipping
+ * this to `true` is the whole of turning it back on. Typed as `boolean` on
+ * purpose — as a bare `false` the compiler would narrow it and stop caring
+ * whether what it guards still compiles.
+ *
+ * The choice itself is untouched either way. `useChatProvider` still holds it,
+ * the callers still send it, and the server still puts it at the front of the
+ * chain — this hides the control, it does not remove the setting.
+ */
+const SHOW_PROVIDER_PICKER: boolean = false;
+
 /** How tall the box may grow before it starts scrolling instead, in px. */
 const MAX_HEIGHT: Record<ComposerSize, number> = {
   default: 220,
@@ -627,15 +649,17 @@ export function ChatComposer({
             isCompact && "shrink-0",
           )}
         >
-          <ProviderPicker
-            value={provider}
-            onChange={onProviderChange}
-            disabled={disabled}
-            // Important, deliberately: the picker sets its own `h-8`, and two
-            // height utilities of the same family on one element are settled by
-            // stylesheet order rather than by which was written last.
-            className={cn(isCompact && "h-7!")}
-          />
+          {SHOW_PROVIDER_PICKER && (
+            <ProviderPicker
+              value={provider}
+              onChange={onProviderChange}
+              disabled={disabled}
+              // Important, deliberately: the picker sets its own `h-8`, and two
+              // height utilities of the same family on one element are settled
+              // by stylesheet order rather than by which was written last.
+              className={cn(isCompact && "h-7!")}
+            />
+          )}
           {isStreaming && onStop ? (
             <Button
               type="button"

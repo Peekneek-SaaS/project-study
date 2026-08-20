@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 
 import { DriveDocumentCard } from "@/features/main/components/drive-document-card";
 import { DriveFolderCard } from "@/features/main/components/drive-folder-card";
@@ -48,13 +48,15 @@ export function DriveGrid({
             aria-label="Folders"
             className="grid gap-3 grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4"
           >
-            {folders.map((folder) => (
-              <DriveFolderCard
-                key={folder.id}
-                folder={folder}
-                onSelect={onSelect}
-              />
-            ))}
+            <AnimatePresence>
+              {folders.map((folder) => (
+                <DriveFolderCard
+                  key={folder.id}
+                  folder={folder}
+                  onSelect={onSelect}
+                />
+              ))}
+            </AnimatePresence>
           </motion.div>
         </section>
       )}
@@ -72,9 +74,11 @@ export function DriveGrid({
             aria-label="Files"
             className="grid gap-4 grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4"
           >
-            {documents.map((doc) => (
-              <DriveDocumentCard key={doc.id} doc={doc} onSelect={onSelect} />
-            ))}
+            <AnimatePresence>
+              {documents.map((doc) => (
+                <DriveDocumentCard key={doc.id} doc={doc} onSelect={onSelect} />
+              ))}
+            </AnimatePresence>
           </motion.div>
         </section>
       )}

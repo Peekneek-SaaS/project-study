@@ -32,7 +32,7 @@ import {
   selectIsDocumentSelected,
   useDriveSelectionStore,
 } from "@/lib/stores/drive-selection-store";
-import { listItem } from "@/lib/motion";
+import { listItemMotion } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 /**
@@ -79,7 +79,7 @@ export function DriveDocumentCard({
 
   return (
     <motion.div
-      variants={listItem}
+      {...listItemMotion}
       ref={ref}
       {...cardProps}
       role="option"

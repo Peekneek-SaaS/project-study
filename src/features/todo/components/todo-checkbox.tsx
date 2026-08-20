@@ -52,7 +52,7 @@ export function TodoCheckbox({
       aria-label={completed ? "Mark as not done" : "Mark as done"}
       className={cn(
         "group/check relative grid size-5 shrink-0 place-items-center rounded-full",
-        "transition-transform duration-150 ease-out hover:scale-110 active:scale-95",
+        "transition-transform duration-250 ease-out hover:scale-110 active:scale-95",
         "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
         meta.className,
         completed && "text-primary",

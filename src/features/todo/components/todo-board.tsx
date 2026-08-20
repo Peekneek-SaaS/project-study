@@ -9,10 +9,10 @@ import { TodoEmptyState } from "@/features/todo/components/todo-empty-state";
 import TodoFilterView from "@/features/todo/components/todo-filter-view";
 import { useTodoClock } from "@/features/todo/hooks/use-todo-clock";
 import { useTodoDayNavigation } from "@/features/todo/hooks/use-todo-day-navigation";
-import { useTodoMutations } from "@/features/todo/hooks/use-todo-mutations";
 import { useTodosBrowser } from "@/features/todo/hooks/use-todos-browser";
 import { ROW_ATTRIBUTE } from "@/hooks/use-row-interaction";
 import { useRowSelection } from "@/hooks/use-row-selection";
+import { useModalStore } from "@/lib/stores/modal-store";
 import { useTodoSelectionStore } from "@/lib/stores/todo-selection-store";
 import type { TodoViewType } from "@/lib/stores/todo-view-store";
 import { cn } from "@/lib/utils";
@@ -38,7 +38,7 @@ export function TodoBoard({ serverView }: { serverView: TodoViewType }) {
   const now = useTodoClock(hasRunningTimer);
   const flashingDay = useTodoDayNavigation(view);
 
-  const { removeTodos } = useTodoMutations();
+  const openModal = useModalStore((state) => state.open);
 
   const selectedIds = useTodoSelectionStore((state) => state.ids);
   const clearSelection = useTodoSelectionStore((state) => state.clear);
@@ -119,7 +119,7 @@ export function TodoBoard({ serverView }: { serverView: TodoViewType }) {
         <div
           inert={isSelecting}
           className={cn(
-            "transition-[opacity,visibility] duration-150 ease-out",
+            "transition-[opacity,visibility] duration-250 ease-out",
             isSelecting && "invisible opacity-0",
           )}
         >
@@ -130,7 +130,7 @@ export function TodoBoard({ serverView }: { serverView: TodoViewType }) {
           inert={!isSelecting}
           className={cn(
             "flex w-full items-center justify-between gap-3 py-2",
-            "transition-[opacity,visibility] duration-150 ease-out",
+            "transition-[opacity,visibility] duration-250 ease-out",
             !isSelecting && "invisible opacity-0",
           )}
         >
@@ -163,23 +163,22 @@ export function TodoBoard({ serverView }: { serverView: TodoViewType }) {
           </div>
 
           {/*
-            Straight to the delete, with no dialog in the way.
+            The one delete on this page that asks first.
 
-            Deliberately matching the rest of this page rather than the drive:
-            a task's own menu deletes on the spot, and so does a day's "Delete
-            all", because a task is a line somebody wrote in a second and can
-            write again. A confirmation here and nowhere else would be the odd
-            one out.
+            A task's own menu still deletes on the spot, and so does a day's
+            "Delete all", because each of those is aimed at something the reader
+            is looking at as they click it. This one is not: it is pointed at a
+            selection that can span the whole fortnight, gathered by ticks made
+            minutes and a scroll apart, and the tasks it takes are mostly off
+            screen. The ids are handed over rather than read from the store by
+            the dialog, because what is ticked and what is *here* are two
+            different lists — see `selected` above.
           */}
           <Button
             variant="destructive"
             size="sm"
             aria-label="Delete the selected tasks"
-            onClick={() => {
-              const ids = selected;
-              clearSelection();
-              void removeTodos(ids);
-            }}
+            onClick={() => openModal("delete-todos", { ids: selected })}
           >
             <Trash2 />
             Delete
@@ -202,7 +201,12 @@ export function TodoBoard({ serverView }: { serverView: TodoViewType }) {
         to push the width back out.
       */}
       <div
-        className="flex min-h-0 min-w-0 flex-1 flex-col pt-2"
+        className={cn(
+          "flex min-h-0 min-w-0 flex-1 flex-col",
+          // In the grid this gap belongs to the scroller instead — see the
+          // `pt-2` on it — so the flash ring has room inside the clip.
+          !isGrid && "pt-2",
+        )}
         // Clicking past the tasks drops the selection, the way clicking empty
         // space in a file manager does. Rows carry a row key and answer their
         // own clicks; buttons, links and menu entries speak for themselves.
@@ -237,7 +241,14 @@ export function TodoBoard({ serverView }: { serverView: TodoViewType }) {
                     // trigger a back-navigation. The same set the attachment
                     // strip uses, which is the one horizontal snap scroller in
                     // here that was already behaving.
-                    "-mx-4 flex min-w-0 snap-x snap-mandatory gap-6 overflow-x-auto overscroll-x-contain px-4 pb-4 [&>section]:scroll-ml-4",
+                    //
+                    // `pt-2` as well as `pb-4`, because this clips on both axes:
+                    // declaring `overflow-x` leaves `overflow-y` computed as
+                    // `auto`, not `visible`. A column is `h-full`, so with no
+                    // room above it the flash ring the calendar leaves on the
+                    // day it sent you to was cut off flush along this edge, and
+                    // the day arrived missing its top line.
+                    "-mx-4 flex min-w-0 snap-x snap-mandatory gap-6 overflow-x-auto overscroll-x-contain px-4 pt-2 pb-4 [&>section]:scroll-ml-4",
                     /*
                       And it is given the height that is left over rather than
                       being allowed to size itself.

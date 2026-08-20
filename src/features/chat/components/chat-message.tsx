@@ -273,7 +273,7 @@ export const ChatMessage = memo(function ChatMessage({
             provenance rather than content: available when looked for, never
             competing with the answer itself.
           */}
-          {isAiProvider(provider) && (
+          {/* {isAiProvider(provider) && (
             <span
               // The mark alone. Beside a copy and a retry button the name was
               // the only text in the row, which made provenance look like the
@@ -287,7 +287,7 @@ export const ChatMessage = memo(function ChatMessage({
             >
               <ProviderLogo provider={provider} />
             </span>
-          )}
+          )} */}
         </div>
       )}
     </motion.div>

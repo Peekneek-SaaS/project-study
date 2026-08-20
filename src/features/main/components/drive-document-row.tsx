@@ -6,7 +6,7 @@ import { ExternalLink, FileLock, FileText, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MotionTableRow } from "@/components/motion/motion-table";
 import { TableCell } from "@/components/ui/table";
-import { listItem } from "@/lib/motion";
+import { listItemMotion } from "@/lib/motion";
 import { DriveItemActions } from "@/features/main/components/drive-item-actions";
 import { DriveRowActions } from "@/features/main/components/drive-row-actions";
 import { DriveStatusBadge } from "@/features/main/components/drive-status-badge";
@@ -62,7 +62,7 @@ export function DriveDocumentRow({
 
   return (
     <MotionTableRow
-      variants={listItem}
+      {...listItemMotion}
       ref={ref}
       {...rowProps}
       aria-selected={isSelected}

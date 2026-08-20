@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Trash2, X } from "lucide-react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 
 import { Button } from "@/components/ui/button";
 import { DeleteNotesDialog } from "@/features/sticky-notes/components/delete-notes-dialog";
@@ -77,7 +77,7 @@ export function NotesGrid() {
         <div
           inert={isSelecting}
           className={cn(
-            "transition-[opacity,visibility] duration-150 ease-out",
+            "transition-[opacity,visibility] duration-250 ease-out",
             isSelecting && "invisible opacity-0",
           )}
         >
@@ -88,7 +88,7 @@ export function NotesGrid() {
           inert={!isSelecting}
           className={cn(
             "flex w-full items-center justify-between gap-3 bg-input/30 px-3 py-2",
-            "transition-[opacity,visibility] duration-150 ease-out",
+            "transition-[opacity,visibility] duration-250 ease-out",
             !isSelecting && "invisible opacity-0",
           )}
         >
@@ -162,14 +162,16 @@ export function NotesGrid() {
                 variants={listContainer}
                 className="grid grid-cols-2 gap-4  lg:grid-cols-3"
               >
-                {group.notes.map((note) => (
-                  <NoteCard
-                    key={note.id}
-                    note={note}
-                    isFlashing={note.id === flashingId}
-                    onSelect={selectRow}
-                  />
-                ))}
+                <AnimatePresence>
+                  {group.notes.map((note) => (
+                    <NoteCard
+                      key={note.id}
+                      note={note}
+                      isFlashing={note.id === flashingId}
+                      onSelect={selectRow}
+                    />
+                  ))}
+                </AnimatePresence>
               </motion.div>
             </section>
           ))

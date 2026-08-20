@@ -20,6 +20,8 @@ import { DeleteBoardsDialog } from "@/features/board/components/delete-boards-di
 import { RenameBoardDialog } from "@/features/board/components/rename-board-dialog";
 import { useBoardsBrowser } from "@/features/board/hooks/use-boards-browser";
 import { boardPath, type BoardListItem } from "@/features/board/types";
+import { AnimatePresence } from "motion/react";
+
 import { MotionTableBody } from "@/components/motion/motion-table";
 import { ROW_ATTRIBUTE } from "@/hooks/use-row-interaction";
 import { listContainer, mountAnimation } from "@/lib/motion";
@@ -72,7 +74,10 @@ export function BoardsTable() {
       })),
     [boards, router],
   );
-  const { selectRow, selectAll } = useRowSelection(rows, useBoardSelectionStore);
+  const { selectRow, selectAll } = useRowSelection(
+    rows,
+    useBoardSelectionStore,
+  );
 
   // What is on screen decides. Rows can go out from under a selection — deleted
   // from their own menu, filtered away — and reading the ticks back off the
@@ -104,7 +109,7 @@ export function BoardsTable() {
         <div
           inert={isSelecting}
           className={cn(
-            "transition-[opacity,visibility] duration-150 ease-out",
+            "transition-[opacity,visibility] duration-250 ease-out",
             isSelecting && "invisible opacity-0",
           )}
         >
@@ -115,7 +120,7 @@ export function BoardsTable() {
           inert={!isSelecting}
           className={cn(
             "flex w-full items-center justify-between gap-3 bg-input/30 px-3 py-2",
-            "transition-[opacity,visibility] duration-150 ease-out",
+            "transition-[opacity,visibility] duration-250 ease-out",
             !isSelecting && "invisible opacity-0",
           )}
         >
@@ -162,7 +167,9 @@ export function BoardsTable() {
         // and menus speak for themselves. Anything else here is background.
         onClick={(event) => {
           const target = event.target as HTMLElement;
-          if (target.closest(`[${ROW_ATTRIBUTE}], button, a, [role='menuitem']`))
+          if (
+            target.closest(`[${ROW_ATTRIBUTE}], button, a, [role='menuitem']`)
+          )
             return;
           clearSelection();
         }}
@@ -185,15 +192,17 @@ export function BoardsTable() {
             </TableHeader>
             {/* The stagger lives on the body — see `main-content.tsx`. */}
             <MotionTableBody {...mountAnimation} variants={listContainer}>
-              {boards.map((board) => (
-                <BoardRow
-                  key={board.id}
-                  board={board}
-                  onSelect={selectRow}
-                  onRename={setRenaming}
-                  onDelete={setDeleting}
-                />
-              ))}
+              <AnimatePresence>
+                {boards.map((board) => (
+                  <BoardRow
+                    key={board.id}
+                    board={board}
+                    onSelect={selectRow}
+                    onRename={setRenaming}
+                    onDelete={setDeleting}
+                  />
+                ))}
+              </AnimatePresence>
             </MotionTableBody>
           </Table>
         )}

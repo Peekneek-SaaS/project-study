@@ -21,6 +21,8 @@ import { DriveParentRow } from "@/features/main/components/drive-parent-row";
 import { useDriveBrowser } from "@/features/main/hooks/use-drive-browser";
 import { useDriveRowSelection } from "@/features/main/hooks/use-drive-row-selection";
 import { driveSensors } from "@/features/main/lib/drive-sensors";
+import { AnimatePresence } from "motion/react";
+
 import { MotionTableBody } from "@/components/motion/motion-table";
 import { listContainer, mountAnimation } from "@/lib/motion";
 import { ROW_ATTRIBUTE } from "@/hooks/use-row-interaction";
@@ -160,7 +162,7 @@ export function MainContent({ serverView }: { serverView: DriveViewType }) {
           <div
             inert={isSelecting}
             className={cn(
-              "transition-[opacity,visibility] duration-150 ease-out",
+              "transition-[opacity,visibility] duration-250 ease-out",
               isSelecting && "invisible opacity-0",
             )}
           >
@@ -171,7 +173,7 @@ export function MainContent({ serverView }: { serverView: DriveViewType }) {
             inert={!isSelecting}
             className={cn(
               "flex w-full items-center justify-between gap-3 bg-input/30 px-3 py-2",
-              "transition-[opacity,visibility] duration-150 ease-out",
+              "transition-[opacity,visibility] duration-250 ease-out",
               !isSelecting && "invisible opacity-0",
             )}
           >
@@ -277,20 +279,22 @@ export function MainContent({ serverView }: { serverView: DriveViewType }) {
               */}
               <MotionTableBody {...mountAnimation} variants={listContainer}>
                 {!isRoot && <DriveParentRow parentFolderId={parentFolderId} />}
-                {folders.map((folder) => (
-                  <DriveFolderRow
-                    key={folder.id}
-                    folder={folder}
-                    onSelect={selectRow}
-                  />
-                ))}
-                {documents.map((doc) => (
-                  <DriveDocumentRow
-                    key={doc.id}
-                    doc={doc}
-                    onSelect={selectRow}
-                  />
-                ))}
+                <AnimatePresence>
+                  {folders.map((folder) => (
+                    <DriveFolderRow
+                      key={folder.id}
+                      folder={folder}
+                      onSelect={selectRow}
+                    />
+                  ))}
+                  {documents.map((doc) => (
+                    <DriveDocumentRow
+                      key={doc.id}
+                      doc={doc}
+                      onSelect={selectRow}
+                    />
+                  ))}
+                </AnimatePresence>
               </MotionTableBody>
             </Table>
           )}

@@ -29,6 +29,7 @@ import {
 import { selectIsOpen, useModalStore } from "@/lib/stores/modal-store";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
+import { Headphones } from "lucide-react";
 
 /** The floor the router enforces, repeated so the form can say so first. */
 const MIN_SUPPORT_MESSAGE = 10;
@@ -86,7 +87,34 @@ export function SupportModal() {
         });
         handleOpenChange(false);
       },
-      onError: (error) => toast.error(error.message),
+      onError: (error) => {
+        /*
+         * A `BAD_REQUEST` here is the input schema talking, and what it says is
+         * Zod's own wording — "Invalid option: expected one of ..." for a topic
+         * it did not recognise, and similar for the rest. That is a sentence
+         * about a schema, addressed to whoever wrote it; the reader is holding
+         * a form. So the toast says what to do instead, and the fields say
+         * which one is wrong.
+         */
+        if (error.data?.code === "BAD_REQUEST") {
+          setShowErrors(true);
+          toast.error("We could not send that", {
+            description: "Check the form for anything missing and try again.",
+          });
+          return;
+        }
+
+        /*
+         * Anything else is the send itself failing, and that message is not
+         * always one written to be read: an unexpected throw inside the router
+         * arrives here verbatim, which is how `TypeError: Invalid option :
+         * option` came to be a toast. The server logs the real thing, where it
+         * is useful; the reader gets the part that is theirs to act on.
+         */
+        toast.error("We could not send your message", {
+          description: "Please try again in a moment.",
+        });
+      },
     }),
   );
 
@@ -105,6 +133,17 @@ export function SupportModal() {
       trimmedMessage.length >= MIN_SUPPORT_MESSAGE
         ? null
         : "A little more detail helps us help you",
+    /*
+     * Checked even though the picker starts on a topic and only ever offers
+     * these five. It is the one field whose value is a string the server
+     * matches against a fixed list, so it is the one field that can arrive
+     * empty — a select that lost its value has nothing to show for it — and
+     * the server's answer to that is Zod's, not ours. Checking here means the
+     * form says it first, next to the picker, in words.
+     */
+    topic: SUPPORT_TOPICS.some((option) => option.value === topic)
+      ? null
+      : "Pick what this is about",
   };
 
   const isValid = Object.values(errors).every((error) => error === null);
@@ -143,6 +182,7 @@ export function SupportModal() {
     <Modal
       open={isOpen}
       onOpenChange={handleOpenChange}
+      icon={Headphones}
       title="Help and support"
       description="Tell us what is going on and we will reply by email."
       className="sm:max-w-md"
@@ -163,7 +203,7 @@ export function SupportModal() {
               autoComplete="name"
               aria-invalid={showErrors && errors.name !== null}
               onChange={(event) => setNameInput(event.target.value)}
-              className="dark:bg-muted"
+              className="dark:bg-muted p-2"
             />
           </Field>
 
@@ -181,7 +221,7 @@ export function SupportModal() {
               autoComplete="email"
               aria-invalid={showErrors && errors.email !== null}
               onChange={(event) => setEmailInput(event.target.value)}
-              className="dark:bg-muted"
+              className="dark:bg-muted p-2"
             />
           </Field>
         </div>
@@ -190,13 +230,24 @@ export function SupportModal() {
           id="support-topic"
           label="What is this about?"
           hint={selectedTopic.description}
+          error={showErrors ? errors.topic : null}
         >
           <Select
             value={topic}
             onValueChange={(next) => setTopic(next as SupportTopicValue)}
           >
-            <SelectTrigger id="support-topic" className="w-full dark:bg-muted">
-              <SelectValue />
+            <SelectTrigger
+              id="support-topic"
+              aria-invalid={showErrors && errors.topic !== null}
+              className="w-full p-2 dark:bg-muted"
+            >
+              {/*
+                A placeholder for a picker that always starts on something: it
+                is what shows if the value is ever one the list does not hold,
+                and without it that state is an empty box that looks like a
+                rendering glitch rather than something to fix.
+              */}
+              <SelectValue placeholder="Pick a topic" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>

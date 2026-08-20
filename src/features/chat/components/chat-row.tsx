@@ -34,7 +34,7 @@ import {
   selectHasSelection,
   selectIsRowSelected,
 } from "@/lib/stores/create-selection-store";
-import { listItem } from "@/lib/motion";
+import { listItemMotion } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 /**
@@ -81,7 +81,7 @@ export function ChatRow({
 
   return (
     <MotionTableRow
-      variants={listItem}
+      {...listItemMotion}
       {...rowProps}
       onMouseEnter={() => onWarm(chat.id)}
       onFocus={() => onWarm(chat.id)}

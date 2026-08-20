@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  CircleDashed,
   Folder,
   FolderPlus,
   MessageSquare,
@@ -101,6 +102,17 @@ const CreateDropdown = ({
       iconClassName: "fill-yellow-400 stroke-yellow-200",
     },
     {
+      label: "New Todo",
+      icon: CircleDashed,
+      // An overlay like the folder above, so `runFromSidebar` and not a bare
+      // call: opened from the mobile sheet, the composer's dialog has to wait
+      // for the sheet to animate out. The travelling happens *after* the task
+      // is written — see `CreateTodoModal` — because where it goes is whatever
+      // day the composer was left on.
+      onClick: () => runFromSidebar(() => openModal("create-todo")),
+      iconClassName: "stroke-red-400 stroke-2.5",
+    },
+    {
       label: "New Chat",
       icon: MessageSquare,
       /**
@@ -145,7 +157,7 @@ const CreateDropdown = ({
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         <DropdownMenuGroup>
-          {createActions.map(
+          {uploadActions.map(
             ({ label, icon: Icon2, onClick, href, iconClassName }) => (
               <DropdownMenuItem onClick={onClick} key={label}>
                 <Icon2 className={cn("", iconClassName)} />
@@ -154,7 +166,7 @@ const CreateDropdown = ({
             ),
           )}
           <Separator className="my-1" />
-          {uploadActions.map(
+          {createActions.map(
             ({ label, icon: Icon2, onClick, href, iconClassName }) => (
               <DropdownMenuItem onClick={onClick} key={label}>
                 <Icon2 className={cn("", iconClassName)} />

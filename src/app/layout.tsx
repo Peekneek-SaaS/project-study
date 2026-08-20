@@ -95,6 +95,20 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               // the token rather than at a number means the two cannot drift:
               // change the theme's radius and Clerk follows.
               borderRadius: "var(--radius)",
+              /*
+                Clerk's shadcn theme points `colorDanger` at `--destructive`,
+                which in this theme is the pale wash a destructive *surface* is
+                painted with rather than the red written on it. Clerk uses the
+                value as a foreground — "Remove", "Sign out", the destructive
+                buttons — so it was drawing them in something a shade off the
+                background.
+
+                `--danger` is the red of that pair in whichever mode is current;
+                the whole of the reasoning is on it in `globals.css`. Clerk
+                derives its own scale from this one value, so the danger button
+                fills and hovers follow from it too.
+              */
+              colorDanger: "var(--danger)",
             },
             options: {
               elevation: "flush",

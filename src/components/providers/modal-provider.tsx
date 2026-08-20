@@ -2,7 +2,9 @@
 
 import { BulkDeleteModal } from "@/features/main/modal/bulk-delete-modal";
 import { CreateFolderModal } from "@/features/main/modal/create-folder-modal";
+import { CreateTodoModal } from "@/features/main/modal/create-todo-modal";
 import { DeleteModal } from "@/features/main/modal/delete-modal";
+import { DeleteTodosModal } from "@/features/main/modal/delete-todos-modal";
 import { DocumentPreviewModal } from "@/features/main/modal/document-preview-modal";
 import { RenameItemModal } from "@/features/main/modal/rename-item-modal";
 import { SearchModal } from "@/features/main/modal/search-modal";
@@ -23,9 +25,11 @@ export function ModalProvider() {
     <>
       <UploadModal />
       <CreateFolderModal />
+      <CreateTodoModal />
       <RenameItemModal />
       <DeleteModal />
       <BulkDeleteModal />
+      <DeleteTodosModal />
       <DocumentPreviewModal />
       {/* Reads `useSearchStore` rather than `useModalStore` — see that store. */}
       <SearchModal />

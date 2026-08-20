@@ -7,9 +7,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
+import { type LucideIcon } from "lucide-react";
 
 interface ModalProps {
   title: string;
+  icon?: LucideIcon;
+  iconClassName?: string;
   /** Optional, but strongly preferred: it is the dialog's accessible description. */
   description?: React.ReactNode;
   open: boolean;
@@ -27,6 +31,8 @@ interface ModalProps {
  */
 export function Modal({
   title,
+  icon: Icon,
+  iconClassName,
   description,
   open,
   onOpenChange,
@@ -37,7 +43,10 @@ export function Modal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={className}>
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+          <DialogTitle className="flex items-center gap-1">
+            {Icon && <Icon className={cn("size-4", iconClassName)} />}
+            {title}
+          </DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
         {children}

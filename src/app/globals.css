@@ -58,7 +58,6 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 } */
 
-
 /* :root {
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
@@ -147,6 +146,23 @@
   --accent-foreground: oklch(0.2876 0.0071 106.8391);
   --destructive: oklch(0.9034 0.0552 48.0885);
   --destructive-foreground: oklch(0.5916 0.2407 26.3323);
+  /*
+    The red of this pair, whichever half of it happens to be red in this mode.
+
+    This theme uses `--destructive` as a *surface* and `--destructive-foreground`
+    as what is written on it, and the two swap character between modes: a pale
+    wash with red text in light, solid red with white text in dark. That is
+    coherent on its own and the app's own destructive button depends on it — but
+    it is the opposite way round from stock shadcn, and anything that assumes the
+    stock reading paints its warnings in whichever of the two is nearly white.
+
+    Clerk is exactly that: its shadcn theme sets `colorDanger: var(--destructive)`
+    and uses it as a *foreground*, which is why "Remove" and "Sign out" arrived
+    the colour of the background. This token is what those get pointed at
+    instead — see `colorDanger` in `layout.tsx`. Defined per mode rather than as
+    one value so it tracks the theme instead of being a red someone chose once.
+  */
+  --danger: var(--destructive-foreground);
   --border: oklch(0.9236 0.008 73.7406);
   --input: oklch(0.8275 0.0077 80.7187);
   --ring: oklch(0.6043 0.1864 283.5467);
@@ -207,6 +223,8 @@
   --accent-foreground: oklch(1 0 0);
   --destructive: oklch(0.5385 0.221 29.2339);
   --destructive-foreground: oklch(1 0 0);
+  /* The other half is white here, so the red is the fill — see `--danger` above. */
+  --danger: var(--destructive);
   --border: oklch(0.3211 0 0);
   --input: oklch(0.2308 0 0);
   --ring: oklch(0.668 0.22 31.1321);
@@ -299,6 +317,22 @@
   --shadow-lg: var(--shadow-lg);
   --shadow-xl: var(--shadow-xl);
   --shadow-2xl: var(--shadow-2xl);
+
+  /*
+    What every bare `transition-*` in the app runs at.
+
+    Tailwind's own default is 150ms on an ease that stops rather than settles,
+    which is what made hovers, colour changes and the interface's smaller moves
+    feel clipped. 260ms on the same cubic ease-out the motion vocabulary uses
+    — see `src/lib/motion.ts` — puts the CSS transitions and the Motion
+    animations on one curve, so a card that lifts on hover and a row that
+    slides on delete are recognisably the same hand.
+
+    Utilities that name their own `duration-*` still win; this is only the
+    floor.
+  */
+  --default-transition-duration: 260ms;
+  --default-transition-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
 }
 
 @layer base {
@@ -383,8 +417,16 @@
   /* Brand, in the two states Excalidraw asks for it. Same direction as the
      `--color-primary-*` shades above: towards `--foreground`, so both modes
      are covered by one pair of declarations. */
-  --color-brand-hover: color-mix(in oklch, var(--primary) 85%, var(--foreground));
-  --color-brand-active: color-mix(in oklch, var(--primary) 75%, var(--foreground));
+  --color-brand-hover: color-mix(
+    in oklch,
+    var(--primary) 85%,
+    var(--foreground)
+  );
+  --color-brand-active: color-mix(
+    in oklch,
+    var(--primary) 75%,
+    var(--foreground)
+  );
 
   /* The marquee and the ring around a selected shape. On the canvas rather
      than in the chrome, but it is UI, not drawing — nothing exports it. */

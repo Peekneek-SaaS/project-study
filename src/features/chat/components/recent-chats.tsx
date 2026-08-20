@@ -5,6 +5,8 @@ import { Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useRef, useState } from "react";
 
+import { AnimatePresence } from "motion/react";
+
 import { MotionTableBody } from "@/components/motion/motion-table";
 import { Button } from "@/components/ui/button";
 import { Table, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -122,7 +124,7 @@ export function RecentChats() {
           inert={isSelecting}
           className={cn(
             "flex items-center text-xs font-medium text-muted-foreground",
-            "transition-[opacity,visibility] duration-150 ease-out",
+            "transition-[opacity,visibility] duration-250 ease-out",
             isSelecting && "invisible opacity-0",
           )}
         >
@@ -133,7 +135,7 @@ export function RecentChats() {
           inert={!isSelecting}
           className={cn(
             "flex w-full items-center justify-between gap-3 rounded-md bg-input/30 px-2",
-            "transition-[opacity,visibility] duration-150 ease-out",
+            "transition-[opacity,visibility] duration-250 ease-out",
             !isSelecting && "invisible opacity-0",
           )}
         >
@@ -186,7 +188,9 @@ export function RecentChats() {
         // and menus speak for themselves. Anything else here is background.
         onClick={(event) => {
           const target = event.target as HTMLElement;
-          if (target.closest(`[${ROW_ATTRIBUTE}], button, a, [role='menuitem']`))
+          if (
+            target.closest(`[${ROW_ATTRIBUTE}], button, a, [role='menuitem']`)
+          )
             return;
           clearSelection();
         }}
@@ -221,19 +225,23 @@ export function RecentChats() {
           {/* The stagger lives on the body, so the rows deal in one after
               another rather than all arriving at once. */}
           <MotionTableBody {...mountAnimation} variants={listContainer}>
-            {chats.map((chat) => (
-              <ChatRow
-                key={chat.id}
-                chat={chat}
-                onSelect={selectRow}
-                onRename={setRenaming}
-                // One row's menu and a whole selection go to the same dialog:
-                // the copy is a count either way, so there is nothing a
-                // single-chat version would say differently.
-                onDelete={(target: ChatSummary) => setDeletingMany([target.id])}
-                onWarm={warm}
-              />
-            ))}
+            <AnimatePresence>
+              {chats.map((chat) => (
+                <ChatRow
+                  key={chat.id}
+                  chat={chat}
+                  onSelect={selectRow}
+                  onRename={setRenaming}
+                  // One row's menu and a whole selection go to the same dialog:
+                  // the copy is a count either way, so there is nothing a
+                  // single-chat version would say differently.
+                  onDelete={(target: ChatSummary) =>
+                    setDeletingMany([target.id])
+                  }
+                  onWarm={warm}
+                />
+              ))}
+            </AnimatePresence>
           </MotionTableBody>
         </Table>
       </div>

@@ -23,6 +23,16 @@ export interface DeleteSelection {
   documentIds: string[];
 }
 
+/**
+ * The ticked tasks the todo page's delete is being asked to remove.
+ *
+ * Ids and nothing else: the dialog counts them and hands them straight back to
+ * `removeTodos`, and a task's name is already on screen behind it.
+ */
+export interface TodoDeleteSelection {
+  ids: string[];
+}
+
 /** The document the preview overlay is showing. */
 export interface PreviewTarget {
   id: string;
@@ -47,9 +57,17 @@ interface ModalPayloads {
   "paste-into": PasteIntoTarget;
   "upload-file": undefined;
   "create-folder": undefined;
+  /**
+   * The composer that writes one task, from anywhere in the app.
+   *
+   * Payload-less: it opens on today, and the day it actually files
+   * against is decided in the composer's own date chip.
+   */
+  "create-todo": undefined;
   "delete-item": DeleteTarget;
   "rename-item": RenameTarget;
   "delete-items": DeleteSelection;
+  "delete-todos": TodoDeleteSelection;
   "preview-document": PreviewTarget;
   /** The Help & Support form. Reads the signed-in user for itself. */
   "help-support": undefined;
@@ -104,6 +122,13 @@ export const selectRenameTarget = (state: ModalStore) =>
 /** The ticked rows to remove, or `null` when the bulk delete is not on screen. */
 export const selectDeleteSelection = (state: ModalStore) =>
   state.type === "delete-items" ? (state.payload as DeleteSelection) : null;
+
+/**
+ * The ticked tasks to remove, or `null` when the todo page's delete is not on
+ * screen. Guarded by `type` like every selector around it.
+ */
+export const selectTodoDeleteSelection = (state: ModalStore) =>
+  state.type === "delete-todos" ? (state.payload as TodoDeleteSelection) : null;
 
 /** The document to preview, or `null` when the overlay is not the modal on screen. */
 export const selectPreviewTarget = (state: ModalStore) =>

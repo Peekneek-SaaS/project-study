@@ -1,4 +1,9 @@
-import { Settings, type LucideIcon } from "lucide-react";
+import {
+  Settings,
+  ShieldCheck,
+  UserRound,
+  type LucideIcon,
+} from "lucide-react";
 
 /**
  * The panels the settings dialog can show.
@@ -25,6 +30,27 @@ export const SETTINGS_SECTIONS = [
     label: "General",
     icon: Settings,
     description: "How the app looks and behaves.",
+  },
+  // Clerk's account portal, split the way Clerk itself splits it. Its two pages
+  // are two panels here rather than one, because a single panel would be nine
+  // sections deep in a dialog this tall and because the sidebar already exists
+  // to do exactly this kind of dividing.
+  //
+  // The copy stays vague about what is in each: the sections are Clerk's, and
+  // which of them appear — usernames, passkeys, connected accounts — depends on
+  // what the instance has switched on, so naming one would be a promise this
+  // file cannot keep.
+  {
+    id: "account",
+    label: "Account",
+    icon: UserRound,
+    description: "Your profile and how you sign in.",
+  },
+  {
+    id: "security",
+    label: "Security",
+    icon: ShieldCheck,
+    description: "Passwords, passkeys and where you are signed in.",
   },
 ] as const satisfies readonly SettingsSectionMeta[];
 

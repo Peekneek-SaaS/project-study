@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useDriveStore } from "@/lib/stores/drive-store";
 import { selectDeleteTarget, useModalStore } from "@/lib/stores/modal-store";
 import { useTRPC } from "@/trpc/client";
+import { Trash } from "lucide-react";
 
 const DESCRIPTION = {
   document:

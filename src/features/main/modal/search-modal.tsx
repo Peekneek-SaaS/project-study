@@ -240,7 +240,7 @@ export function SearchModal() {
       */}
       <Command className="min-h-0 flex-1 ">
         <CommandInput
-          placeholder="Search files, boards, notes, chats and tasks…"
+          placeholder="Search files, boards, notes, chats and todos…"
           value={query}
           onValueChange={setQuery}
         />
@@ -334,35 +334,8 @@ export function SearchModal() {
               ))}
             </CommandGroup>
           )}
-          {chats.length > 0 && (
-            <CommandGroup heading="Chats">
-              {chats.map((chat) => (
-                <CommandItem
-                  key={chat.id}
-                  /*
-                    Matched on the title alone, unlike a note — which is
-                    searched by everything written in it.
-
-                    A note has no name, so its body is the only handle there is.
-                    A chat's title *is* its first question, written down when the
-                    conversation started, so it already carries the words someone
-                    would search for. Shipping every transcript to the browser to
-                    match on the rest would be a great deal of text for a small
-                    gain, and it is the one group here where that text could run
-                    to megabytes.
-                  */
-                  value={`${chat.title} ${chat.id}`}
-                  onSelect={() => handleSelectChat(chat.id)}
-                >
-                  <MessageSquare className="fill-emerald-500 stroke-emerald-500" />
-                  <span className="truncate">{chat.title}</span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          )}
-
           {todos.length > 0 && (
-            <CommandGroup heading="Tasks">
+            <CommandGroup heading="Todos">
               {todos.map((todo) => (
                 <CommandItem
                   key={todo.id}
@@ -408,6 +381,32 @@ export function SearchModal() {
                       {todo.document.name}
                     </span>
                   )}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+          {chats.length > 0 && (
+            <CommandGroup heading="Chats">
+              {chats.map((chat) => (
+                <CommandItem
+                  key={chat.id}
+                  /*
+                    Matched on the title alone, unlike a note — which is
+                    searched by everything written in it.
+
+                    A note has no name, so its body is the only handle there is.
+                    A chat's title *is* its first question, written down when the
+                    conversation started, so it already carries the words someone
+                    would search for. Shipping every transcript to the browser to
+                    match on the rest would be a great deal of text for a small
+                    gain, and it is the one group here where that text could run
+                    to megabytes.
+                  */
+                  value={`${chat.title} ${chat.id}`}
+                  onSelect={() => handleSelectChat(chat.id)}
+                >
+                  <MessageSquare className="fill-emerald-500 stroke-emerald-500" />
+                  <span className="truncate">{chat.title}</span>
                 </CommandItem>
               ))}
             </CommandGroup>

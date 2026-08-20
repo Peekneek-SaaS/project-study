@@ -13,7 +13,11 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
-import { parseDayKey, toDayKey, todayKey } from "@/features/todo/lib/todo-dates";
+import {
+  parseDayKey,
+  toDayKey,
+  todayKey,
+} from "@/features/todo/lib/todo-dates";
 import { TODO_PATH, todoDatePath } from "@/features/todo/types";
 import { useTRPC } from "@/trpc/client";
 import { cn } from "@/lib/utils";
@@ -96,7 +100,7 @@ const MainCalendarButton = () => {
           {hasUpcoming && (
             <span
               aria-hidden
-              className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-primary ring-2 ring-background"
+              className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-primary ring-2 ring-background"
             />
           )}
         </Button>
@@ -106,6 +110,14 @@ const MainCalendarButton = () => {
         <Calendar
           mode="single"
           selected={undefined}
+          // The default cell is 1.5rem, which leaves the dot sitting on the
+          // numeral. A larger cell gives the two room to stack, and the gaps
+          // below keep the days from reading as one continuous block.
+          className="[--cell-size:--spacing(9)]"
+          classNames={{
+            weekdays: "flex gap-1",
+            week: "mt-1 flex w-full gap-1",
+          }}
           onSelect={(date) => date && goToDay(toDayKey(date))}
           modifiers={{ hasPending: pendingDays, hasDone: doneDays }}
           components={{
