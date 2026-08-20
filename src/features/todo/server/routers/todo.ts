@@ -212,19 +212,32 @@ export const TodoRouter = createTRPCRouter({
         .object({
           priority: z.enum(TODO_PRIORITY_VALUES).nullable().default(null),
           modified: z.enum(MODIFIED_VALUES).nullable().default(null),
+          /**
+           * The documents a task must belong to, or null for "any".
+           *
+           * A list rather than one id, because the question people actually ask
+           * is "what do these two papers need from me this week" — and an empty
+           * list is treated as no filter rather than as "no documents", since
+           * that is what unticking the last box means.
+           */
+          documentIds: z.array(z.string()).nullable().default(null),
         })
-        .default({ priority: null, modified: null }),
+        .default({ priority: null, modified: null, documentIds: null }),
     )
     .query(async ({ ctx, input }) => {
       await sweepElapsedTimers(ctx.userId);
 
       const updatedAt = modifiedRange(input.modified);
+      const documentIds = input.documentIds?.length ? input.documentIds : null;
 
       const rows = await prisma.todo.findMany({
         where: {
           userId: ctx.userId,
           ...(input.priority && { priority: input.priority }),
           ...(updatedAt && { updatedAt }),
+          // Owner-scoped already by the line above, so an id belonging to
+          // somebody else's document simply matches nothing.
+          ...(documentIds && { documentId: { in: documentIds } }),
         },
         orderBy: [{ dueDate: "desc" }, { position: "asc" }, { createdAt: "asc" }],
         select: todoFields,
@@ -232,6 +245,30 @@ export const TodoRouter = createTRPCRouter({
 
       return rows.map(toClient);
     }),
+
+  /**
+   * The documents this user has tasks against, for the toolbar's file filter.
+   *
+   * Only documents something is actually filed under. Listing every file in the
+   * drive would fill the menu with names that narrow the page to nothing, and a
+   * filter whose options can only produce an empty list is a filter that lies.
+   *
+   * Distinct rather than grouped by hand: `distinct` on `documentId` hands back
+   * one row per document, and the relation carries the name the menu shows.
+   */
+  documents: protectedProcedure.query(async ({ ctx }) => {
+    const rows = await prisma.todo.findMany({
+      where: { userId: ctx.userId, documentId: { not: null } },
+      distinct: ["documentId"],
+      select: { document: { select: { id: true, name: true } } },
+      orderBy: { documentId: "asc" },
+    });
+
+    return rows
+      .map((row) => row.document)
+      .filter((document) => document !== null)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }),
 
   /**
    * One document's tasks, for the tab on its work page.

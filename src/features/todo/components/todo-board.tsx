@@ -146,7 +146,7 @@ export function TodoBoard({ serverView }: { serverView: TodoViewType }) {
             {/* `tabular-nums` so counting up does not shuffle everything to the
                 right of the number by a fraction of a character. */}
             <span className="text-sm tabular-nums">
-              {shownCount} {shownCount === 1 ? "task" : "tasks"} selected
+              {shownCount} {shownCount === 1 ? "todo" : "todos"} selected
             </span>
             {/* Hidden rather than dropped once everything is picked, so the
                 Delete beside it does not slide sideways as the last task joins

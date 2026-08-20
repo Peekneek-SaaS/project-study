@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   useSyncExternalStore,
@@ -69,6 +70,8 @@ interface ActiveSelection {
   /** Viewport coordinates, so the toolbar can be `position: fixed`. */
   top: number;
   left: number;
+  /** The underside of the selection, for when the toolbar has to go below it. */
+  bottom: number;
 }
 
 /**
@@ -107,6 +110,7 @@ function readAnswerSelection(root: HTMLElement | null): ActiveSelection | null {
   return {
     text,
     top: rect.top,
+    bottom: rect.bottom,
     left: rect.left + rect.width / 2,
   };
 }
@@ -254,6 +258,55 @@ export function AnswerSelectionProvider({
     };
   }, [cancelSettle, commit]);
 
+  const toolbarRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Puts the toolbar where the selection is, and never off the screen.
+   *
+   * Centred on the selection is right in the middle of a paragraph and wrong at
+   * either end of one: the toolbar is a couple of hundred pixels wide, so a
+   * first or last word near an edge centres it half outside the viewport, and
+   * half the buttons cannot be reached. Both axes are therefore clamped to the
+   * viewport rather than trusted to the selection.
+   *
+   * Vertically it does not clamp but *flips*. The toolbar sits above the words
+   * it describes, so a selection in the top line has nowhere above it to sit —
+   * pinning it to the top edge would only park it over the very text it is
+   * about. Below the selection is the same distance from the same words, and it
+   * is what every editor does in that position.
+   *
+   * Written to the DOM in a layout effect rather than rendered as style, and
+   * measured with `offset*` rather than `getBoundingClientRect`: the box is
+   * mid-animation when this runs, and a rect would report the width it has
+   * *scaled to* rather than the width it lays out at, which would centre it a
+   * few pixels wrong on every appearance. A layout effect lands before paint,
+   * so nothing is ever seen in the unclamped position.
+   */
+  useLayoutEffect(() => {
+    const toolbar = toolbarRef.current;
+    if (!toolbar || !selection) return;
+
+    const width = toolbar.offsetWidth;
+    const height = toolbar.offsetHeight;
+
+    const half = width / 2;
+    const leftLimit = EDGE_PADDING + half;
+    const rightLimit = window.innerWidth - EDGE_PADDING - half;
+    // The two limits cross over on a viewport narrower than the toolbar, where
+    // there is no position that satisfies both. The left one wins, because a
+    // row of buttons is read from its left edge.
+    const centre = Math.min(
+      Math.max(selection.left, leftLimit),
+      Math.max(leftLimit, rightLimit),
+    );
+
+    const above = selection.top - OFFSET - height;
+
+    toolbar.style.left = `${centre - half}px`;
+    toolbar.style.top =
+      above >= EDGE_PADDING ? `${above}px` : `${selection.bottom + OFFSET}px`;
+  }, [selection]);
+
   /**
    * Puts the selection down before acting on it.
    *
@@ -284,16 +337,18 @@ export function AnswerSelectionProvider({
           <AnimatePresence>
             {selection && (
               <motion.div
+                ref={toolbarRef}
                 initial={{ opacity: 0, y: 4, scale: 0.97 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 4, scale: 0.97 }}
                 transition={fastTransition}
-                style={{
-                  top: Math.max(EDGE_PADDING, selection.top - OFFSET),
-                  left: selection.left,
-                }}
                 {...{ [TOOLBAR_ATTRIBUTE]: "" }}
-                className="fixed z-50 -translate-x-1/2 -translate-y-full"
+                // `top` and `left` are the layout effect's above — set from the
+                // measured box, which is the only way to know whether it fits.
+                // No translate here either: half of it used to be worked out by
+                // `-translate-x-1/2`, and a correction that has to fight a
+                // transform it cannot see is a correction that is wrong.
+                className="fixed z-50"
                 // The toolbar must not steal the selection it describes: a
                 // mousedown inside it would collapse the range before the click
                 // handler ever ran.

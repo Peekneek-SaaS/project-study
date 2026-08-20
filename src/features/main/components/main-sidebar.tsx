@@ -34,6 +34,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { useModalStore } from "@/lib/stores/modal-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { cn } from "@/lib/utils";
 import {
@@ -66,6 +67,7 @@ interface MenuGroupProps {
 const MainSidebar = () => {
   const pathName = usePathname();
   const openSettings = useSettingsStore((state) => state.open);
+  const openModal = useModalStore((state) => state.open);
 
   const routes: MenuItemsProps[] = [
     {
@@ -117,8 +119,9 @@ const MainSidebar = () => {
     },
     {
       label: "Help and support",
-      href: "mailto:business@codewithantonio.com",
       icon: Headphones,
+      // Same reasoning as Settings above: a form in a dialog, not a page.
+      onClick: () => openModal("help-support"),
     },
   ];
 

@@ -238,7 +238,7 @@ export function SearchModal() {
         cmdk root has to be supplied — without it the input has no context to
         report into and nothing filters.
       */}
-      <Command className="min-h-0 flex-1">
+      <Command className="min-h-0 flex-1 ">
         <CommandInput
           placeholder="Search files, boards, notes, chats and tasks…"
           value={query}
@@ -378,9 +378,11 @@ export function SearchModal() {
                   onSelect={() => handleSelectTodo(todo)}
                 >
                   <CircleDashed className="stroke-red-500 stroke-2.5" />
+                  {/* Takes the slack, so the document beside it is what is left
+                      over rather than what it is pushed to. */}
                   <span
                     className={cn(
-                      "truncate",
+                      "min-w-0 flex-1 truncate",
                       // Still findable once it is done — a finished task is
                       // often exactly the one being looked for — but shown as
                       // finished rather than as something still to do.
@@ -390,8 +392,19 @@ export function SearchModal() {
                   >
                     {todo.title}
                   </span>
+                  {/*
+                    A column of its own, at the right end, the same width on
+                    every row.
+
+                    `ml-auto` put it at the right end too, but only its *finish*
+                    — where it started depended on how long the name was, so the
+                    document names staggered down the list and read as noise
+                    beside the titles. A fixed width means they begin on one
+                    line, which is what makes a column scannable. Names longer
+                    than it truncate; the row is not where a file is identified.
+                  */}
                   {todo.document && (
-                    <span className="ml-auto truncate pl-2 text-[0.625rem] text-muted-foreground">
+                    <span className="w-24 shrink-0 truncate pl-2 text-[0.625rem] text-muted-foreground sm:w-32">
                       {todo.document.name}
                     </span>
                   )}

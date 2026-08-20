@@ -51,6 +51,8 @@ interface ModalPayloads {
   "rename-item": RenameTarget;
   "delete-items": DeleteSelection;
   "preview-document": PreviewTarget;
+  /** The Help & Support form. Reads the signed-in user for itself. */
+  "help-support": undefined;
 }
 
 export type ModalType = keyof ModalPayloads;

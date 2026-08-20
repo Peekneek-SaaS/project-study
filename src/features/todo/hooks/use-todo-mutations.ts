@@ -74,6 +74,7 @@ export function useTodoMutations({ documentId }: TodoScope = {}) {
             toListInput({
               priority: filters.priority,
               modified: filters.modified,
+              documents: filters.documents,
             }),
           ),
       // Deliberately broader, and deliberately both: every filtered variant of
@@ -87,7 +88,7 @@ export function useTodoMutations({ documentId }: TodoScope = {}) {
       ],
       calendarFilter: trpc.todo.calendar.queryFilter(),
     }),
-    [documentId, filters.modified, filters.priority, trpc],
+    [documentId, filters.documents, filters.modified, filters.priority, trpc],
   );
 
   // `mutateAsync` is pulled off each mutation rather than the result object

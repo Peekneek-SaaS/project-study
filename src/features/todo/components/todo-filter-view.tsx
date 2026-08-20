@@ -7,6 +7,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import MainSelectFilter from "@/features/main/components/main-select-filters";
+import { TodoDocumentFilter } from "@/features/todo/components/todo-document-filter";
 import { todoFilterParsers } from "@/features/todo/lib/params";
 import { TODO_PRIORITIES } from "@/features/todo/lib/todo-priority";
 import { MODIFIED_FILTERS } from "@/lib/list-filters";
@@ -21,7 +22,7 @@ import { cn } from "@/lib/utils";
  * params for the same reason, but its switch sits up by the title — see
  * `TodoViewType`.
  *
- * The filters are the two asked for, and adding a third is adding a parser to
+ * The filters are the three asked for, and adding a fourth is adding a parser to
  * `todoFilterParsers`, a `MainSelectFilter` here, and a `where` clause in the
  * router — deliberately three small edits in three obvious places rather than
  * one clever abstraction.
@@ -40,7 +41,10 @@ const TodoFilterView = () => {
     startTransition,
   });
 
-  const isFiltering = filters.priority !== null || filters.modified !== null;
+  const isFiltering =
+    filters.priority !== null ||
+    filters.modified !== null ||
+    (filters.documents?.length ?? 0) > 0;
 
   return (
     <div className="flex items-center gap-2 py-2">
@@ -60,12 +64,19 @@ const TodoFilterView = () => {
         values={MODIFIED_FILTERS}
       />
 
+      <TodoDocumentFilter
+        value={filters.documents}
+        onChange={(documents) => setFilters({ documents })}
+      />
+
       {isFiltering && (
         <Button
           variant="ghost"
           size="sm"
           className="h-8"
-          onClick={() => setFilters({ priority: null, modified: null })}
+          onClick={() =>
+            setFilters({ priority: null, modified: null, documents: null })
+          }
         >
           <X />
           Clear

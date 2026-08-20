@@ -9,6 +9,7 @@ import { SearchModal } from "@/features/main/modal/search-modal";
 import { SettingsModal } from "@/features/main/modal/settings-modal";
 import { UploadModal } from "@/features/main/modal/upload-modal";
 import { PasteIntoModal } from "@/features/main/modal/paste-into-modal";
+import { SupportModal } from "@/features/main/modal/support-modal";
 
 /**
  * Mounts every modal once, at the root, so anything on the page can open one
@@ -31,6 +32,7 @@ export function ModalProvider() {
       {/* And this one `useSettingsStore`, for the reasons written there. */}
       <SettingsModal />
       <PasteIntoModal />
+      <SupportModal />
     </>
   );
 }

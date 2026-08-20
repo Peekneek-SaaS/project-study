@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { CalendarIcon, Flag, Timer, TimerOff } from "lucide-react";
+import { useLayoutEffect, useRef, useState } from "react";
+import { CalendarIcon, ChevronLeft, Flag, Timer, TimerOff } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,7 +32,11 @@ import {
   TODO_PRIORITIES,
   type TodoPriority,
 } from "@/features/todo/lib/todo-priority";
-import { formatDuration, TIMER_OPTIONS } from "@/features/todo/lib/todo-timer";
+import {
+  formatDuration,
+  MAX_TIMER_SECONDS,
+  TIMER_OPTIONS,
+} from "@/features/todo/lib/todo-timer";
 import { cn } from "@/lib/utils";
 
 /**
@@ -132,6 +137,88 @@ export function TodoDateChip({
   );
 }
 
+/**
+ * A timer this short is not a timer — and the router refuses it.
+ *
+ * One minute, which is also the floor `todo.create` and `todo.update` validate
+ * against. Named here so the picker can grey its button out rather than let the
+ * save fail on a limit the user was never shown.
+ */
+const MIN_TIMER_SECONDS = 60;
+
+/** The two columns' contents. A day is the ceiling, so hours stop at 24. */
+const HOUR_VALUES = Array.from({ length: 25 }, (_, hour) => hour);
+const MINUTE_VALUES = Array.from({ length: 60 }, (_, minute) => minute);
+
+/**
+ * One scrolling column of numbers.
+ *
+ * A list to run a thumb down rather than a field to type into: "an hour and a
+ * half" is picked, not spelled, and a pair of number inputs asked people to
+ * type an estimate they were only ever going to point at.
+ *
+ * The chosen row is scrolled to the middle when the column appears, by writing
+ * the viewport's `scrollTop` rather than calling `scrollIntoView` — that one
+ * walks up every scrollable ancestor, and the nearest ancestors here are a
+ * dropdown inside a page that would both go for a ride.
+ */
+function TimerColumn({
+  label,
+  values,
+  selected,
+  onSelect,
+}: {
+  label: string;
+  values: readonly number[];
+  selected: number;
+  onSelect: (value: number) => void;
+}) {
+  const selectedRef = useRef<HTMLButtonElement>(null);
+
+  useLayoutEffect(() => {
+    const option = selectedRef.current;
+    const viewport = option?.closest<HTMLElement>(
+      '[data-slot="scroll-area-viewport"]',
+    );
+    if (!option || !viewport) return;
+
+    viewport.scrollTop =
+      option.offsetTop - viewport.clientHeight / 2 + option.clientHeight / 2;
+    // On appearing, and never again: re-centring as the user picks would drag
+    // the list out from under the pointer between one click and the next.
+  }, []);
+
+  return (
+    <div className="flex min-w-0 flex-1 flex-col gap-1">
+      <p className="text-center text-[0.625rem] tracking-wide text-muted-foreground uppercase">
+        {label}
+      </p>
+
+      <ScrollArea className="h-36 rounded-md border">
+        <div className="flex flex-col p-1">
+          {values.map((option) => (
+            <button
+              key={option}
+              ref={option === selected ? selectedRef : undefined}
+              type="button"
+              onClick={() => onSelect(option)}
+              aria-pressed={option === selected}
+              className={cn(
+                "rounded-sm py-1 text-center text-xs tabular-nums transition-colors",
+                option === selected
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground",
+              )}
+            >
+              {String(option).padStart(2, "0")}
+            </button>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+}
+
 export function TodoTimerChip({
   value,
   onChange,
@@ -141,8 +228,58 @@ export function TodoTimerChip({
   onChange: (seconds: number | null) => void;
   className?: string;
 }) {
+  const [open, setOpen] = useState(false);
+
+  /**
+   * Which of the menu's two faces is showing.
+   *
+   * A step rather than a panel below the presets, because both are lists and
+   * two scrolling lists inside a scrolling menu is three things fighting for
+   * the same wheel. The list of lengths is what opens; "Custom" swaps to the
+   * columns, and the arrow swaps back.
+   */
+  const [isCustom, setIsCustom] = useState(false);
+
+  /**
+   * The custom length, as the two numbers it is made of.
+   *
+   * Seconds are deliberately not among them. "How long will this take" is not a
+   * question anybody answers to the second, so every custom length lands on
+   * `:00` — a third column would make this read as a countdown being set rather
+   * than an estimate being made.
+   */
+  const [hours, setHours] = useState(0);
+  const [minutes, setMinutes] = useState(0);
+
+  const custom = hours * 3600 + minutes * 60;
+  const canSetCustom =
+    custom >= MIN_TIMER_SECONDS && custom <= MAX_TIMER_SECONDS;
+
+  const applyCustom = () => {
+    if (!canSetCustom) return;
+    onChange(custom);
+    setOpen(false);
+  };
+
   return (
-    <DropdownMenu>
+    <DropdownMenu
+      open={open}
+      // Seeded from whatever the chip is already carrying, so opening this on a
+      // task with "1 hr 30 min" offers those two numbers to adjust rather than
+      // an empty pair to retype.
+      onOpenChange={(next) => {
+        if (next) {
+          const seconds = value ?? 0;
+          setHours(Math.floor(seconds / 3600));
+          setMinutes(Math.floor((seconds % 3600) / 60));
+          // Always opens on the lengths. The custom columns are the long way
+          // round, and a menu that remembered them would make the short way
+          // round take a click to get back to.
+          setIsCustom(false);
+        }
+        setOpen(next);
+      }}
+    >
       <DropdownMenuTrigger asChild>
         <Button
           type="button"
@@ -159,26 +296,109 @@ export function TodoTimerChip({
           {value === null ? "Timer" : formatDuration(value)}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
-        {TIMER_OPTIONS.map((option) => (
-          <DropdownMenuItem
-            key={option.value}
-            onSelect={() => onChange(option.value)}
-            className={cn(value === option.value && "bg-accent")}
-          >
-            <Timer />
-            {option.label}
-          </DropdownMenuItem>
-        ))}
+      <DropdownMenuContent
+        align="start"
+        // Sized to whichever face is showing: the lengths are a long list that
+        // scrolls, the columns are a fixed block that must not.
+        className={cn(isCustom ? "w-60" : "max-h-72 overflow-y-auto")}
+        // The columns are lists of their own, and a menu reads keystrokes as
+        // typeahead — without this, arrowing down a column would move the
+        // menu's highlight instead.
+        onKeyDown={(event) => {
+          if (isCustom) event.stopPropagation();
+        }}
+      >
+        {isCustom ? (
+          <div className="p-1">
+            <div className="flex items-center gap-1 pb-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Back to the lengths"
+                className="size-6"
+                onClick={() => setIsCustom(false)}
+              >
+                <ChevronLeft />
+              </Button>
+              <span className="text-xs font-medium">Custom</span>
+              {/* What the two columns currently add up to, said the way the
+                  chip will say it — so the answer is readable before it is
+                  committed to. */}
+              <span className="ml-auto pr-1 text-xs text-muted-foreground tabular-nums">
+                {canSetCustom ? formatDuration(custom) : "—"}
+              </span>
+            </div>
 
-        {/* Only offered once there is a timer to take off. */}
-        {value !== null && (
+            <div className="flex gap-2">
+              <TimerColumn
+                label="hours"
+                values={HOUR_VALUES}
+                selected={hours}
+                onSelect={setHours}
+              />
+              <TimerColumn
+                label="min"
+                values={MINUTE_VALUES}
+                selected={minutes}
+                onSelect={setMinutes}
+              />
+            </div>
+
+            <Button
+              type="button"
+              size="sm"
+              className="mt-2 h-7 w-full text-xs"
+              // The bounds are the router's own — a minute at the floor, a day
+              // at the ceiling. Refusing here beats a save that fails after the
+              // editor has closed, naming a limit nobody was shown.
+              disabled={!canSetCustom}
+              onClick={applyCustom}
+            >
+              {custom > MAX_TIMER_SECONDS
+                ? "A day at most"
+                : custom < MIN_TIMER_SECONDS
+                  ? "A minute at least"
+                  : "Set timer"}
+            </Button>
+          </div>
+        ) : (
           <>
+            {TIMER_OPTIONS.map((option) => (
+              <DropdownMenuItem
+                key={option.value}
+                onSelect={() => onChange(option.value)}
+                className={cn(value === option.value && "bg-accent")}
+              >
+                <Timer />
+                {option.label}
+              </DropdownMenuItem>
+            ))}
+
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => onChange(null)}>
-              <TimerOff />
-              No timer
+
+            {/* Kept open on select: this one leads somewhere rather than
+                answering. */}
+            <DropdownMenuItem
+              onSelect={(event) => {
+                event.preventDefault();
+                setIsCustom(true);
+              }}
+            >
+              <Timer />
+              Custom…
             </DropdownMenuItem>
+
+            {/* Only offered once there is a timer to take off. */}
+            {value !== null && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => onChange(null)}>
+                  <TimerOff />
+                  No timer
+                </DropdownMenuItem>
+              </>
+            )}
           </>
         )}
       </DropdownMenuContent>

@@ -1,4 +1,8 @@
-import { dayLabel, shiftDayKey, type DayKey } from "@/features/todo/lib/todo-dates";
+import {
+  dayLabel,
+  shiftDayKey,
+  type DayKey,
+} from "@/features/todo/lib/todo-dates";
 import type { Todo } from "@/features/todo/types";
 
 /**
@@ -50,10 +54,25 @@ export interface TodoDayGroup {
  * `useTodayKey`, which also re-renders all of it when that answer changes at
  * midnight.
  */
+export interface GroupTodosOptions {
+  /** Days to keep in the window whatever else is true — see above. */
+  pinned?: readonly DayKey[];
+  /**
+   * Drop the days nothing landed on.
+   *
+   * For a *filtered* page, where the window's empty days are noise: asking for
+   * one document's tasks and being shown a fortnight of headings with "No
+   * todos" under all but two of them buries the answer in the question. Off by
+   * default, because an unfiltered page is a planner — an empty tomorrow with
+   * an "Add todo" under it is the point of it.
+   */
+  onlyWithTodos?: boolean;
+}
+
 export function groupTodosByDay(
   todos: Todo[],
   today: DayKey,
-  pinned: readonly DayKey[] = [],
+  { pinned = [], onlyWithTodos = false }: GroupTodosOptions = {},
 ): TodoDayGroup[] {
   const byDay = new Map<DayKey, Todo[]>();
 
@@ -64,9 +83,18 @@ export function groupTodosByDay(
   }
 
   const keys = new Set<DayKey>(byDay.keys());
-  for (let offset = FUTURE_DAYS; offset >= -PAST_DAYS; offset--) {
-    keys.add(shiftDayKey(today, offset));
+
+  // The window is what gives an empty tomorrow a heading — so it is exactly
+  // what a filtered page does not want. The days something was filed on are
+  // already in the set above, from the todos themselves.
+  if (!onlyWithTodos) {
+    for (let offset = FUTURE_DAYS; offset >= -PAST_DAYS; offset--) {
+      keys.add(shiftDayKey(today, offset));
+    }
   }
+
+  // Pinned days survive either way: one was asked for by name, and answering
+  // with nothing at all would look like the link had failed.
   for (const day of pinned) keys.add(day);
 
   return (

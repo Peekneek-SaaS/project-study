@@ -182,6 +182,170 @@ export function TodoItem({
   // doable on the day it was meant for.
   const isMissed = isPast && !todo.completed;
 
+  /*
+    The parts of a task, built once and arranged twice.
+
+    A row has the width to say everything on one line. A card does not — the
+    grid's column is 18rem, and a document name, a flag, a countdown and a menu
+    laid out beside the title left the title a few pixels to truncate into,
+    which is to say the task was the one thing the card did not show. So the
+    card gives the name a line of its own and puts everything *about* it
+    underneath, where they read as annotations rather than as competitors.
+
+    Held as values rather than split into a second component, so the two
+    arrangements cannot drift: the tick box, the title, the chip, the flag, the
+    countdown and the menu are literally the same nodes in both.
+  */
+  const checkbox = (
+    <span {...stopRowGestures}>
+      <TodoCheckbox
+        completed={todo.completed}
+        priority={todo.priority}
+        // The ring is only a countdown while it is counting. A paused timer
+        // showing a half-filled ring would be indistinguishable from a running
+        // one at a glance.
+        progress={isRunning ? timer.progress : null}
+        onToggle={() => void setCompleted(todo.id, !todo.completed)}
+      />
+    </span>
+  );
+
+  /*
+    A button where the row has no gestures of its own, and plain text where it
+    has: with a click meaning "select", a title that also opened the editor on
+    click would give one press two answers.
+  */
+  const titleNode = createElement(
+    isSelectable ? "span" : "button",
+    {
+      ...(isSelectable
+        ? {}
+        : {
+            type: "button" as const,
+            onClick: () => setIsEditing(true),
+            title: "Edit task",
+          }),
+      className: cn(
+        "min-w-0 flex-1 truncate text-left text-sm transition-colors",
+        !isSelectable && "hover:text-primary",
+        /*
+          Both kinds of "not on the list any more" are struck through rather
+          than faded.
+
+          Fading the whole row took the title, the flag, the timer and the menu
+          down with it — a row you could still click but could barely read, and
+          on a day full of finished tasks the page went grey. A line through the
+          words says the one thing that is actually true about the task, leaves
+          everything around it at full contrast, and keeps the two states apart
+          by colour: done is quiet, missed is the day heading's own red.
+        */
+        todo.completed &&
+          "text-muted-foreground line-through decoration-muted-foreground",
+        isMissed && "line-through decoration-destructive/70",
+      ),
+    },
+    todo.title,
+  );
+
+  /*
+    Where the task came from, when it came from somewhere.
+
+    A link rather than a label, because "read chapter 4" is a task you want to
+    be one click from the thing you have to read. Only on the todo page — inside
+    the document's own tab this would be the same words on every row — and only
+    the name, since the icon already says what kind of thing it is.
+  */
+  const documentChip = todo.document && !documentId && (
+    <span {...stopRowGestures}>
+      <Link
+        href={workPath(todo.document.id)}
+        title={`Open ${todo.document.name}`}
+        className="flex min-w-0 max-w-40 shrink items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[0.625rem] text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <FileText className="size-3 shrink-0 fill-orange-400 stroke-orange-200" />
+        <span className="truncate">{todo.document.name}</span>
+      </Link>
+    </span>
+  );
+
+  /* Only worth a mark when it is actually saying something. */
+  const priorityFlag = todo.priority !== "NONE" && !todo.completed && (
+    <Flag
+      className={cn("size-3.5 shrink-0", meta.className)}
+      aria-label={`${meta.label} priority`}
+    />
+  );
+
+  const timerButton = todo.timerSeconds !== null && !todo.completed && (
+    <span {...stopRowGestures}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() =>
+          void setTimerRunning(todo.id, isRunning ? "pause" : "start")
+        }
+        aria-label={isRunning ? "Pause timer" : "Start timer"}
+        className={cn(
+          "h-7 shrink-0 gap-1.5 rounded-full px-2.5 text-xs tabular-nums",
+          isRunning
+            ? "bg-primary/10 text-primary hover:bg-primary/15"
+            : "text-muted-foreground",
+        )}
+      >
+        {isRunning ? <Pause className="size-3" /> : <Play className="size-3" />}
+        {formatCountdown(timer.remaining)}
+      </Button>
+    </span>
+  );
+
+  const actionsMenu = (
+    <span {...stopRowGestures}>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Task actions"
+            // Out of the way until wanted, but never for a keyboard: hiding it
+            // on focus would make it unreachable without a mouse.
+            className="size-7 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/todo:opacity-100 focus-visible:opacity-100"
+          >
+            <MoreHorizontal />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={() => setIsEditing(true)}>
+            <Flag />
+            Edit task
+          </DropdownMenuItem>
+
+          {todo.timerSeconds !== null && (
+            <DropdownMenuItem
+              onSelect={() => void setTimerRunning(todo.id, "reset")}
+            >
+              <RotateCcw />
+              Reset timer
+            </DropdownMenuItem>
+          )}
+
+          <DropdownMenuSeparator />
+
+          <DropdownMenuItem
+            variant="destructive"
+            onSelect={() => void removeTodo(todo.id)}
+          >
+            <Trash2 />
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </span>
+  );
+
+  /** Whether the card's second line has anything to put on it. */
+  const hasMeta = Boolean(documentChip || priorityFlag || timerButton);
+
   return (
     <motion.div
       variants={listItem}
@@ -192,167 +356,67 @@ export function TodoItem({
       // properly would mean making every day a listbox.
       data-selected={isSelected || undefined}
       className={cn(
-        "group/todo flex items-center gap-3",
+        "group/todo flex",
+        // A card stacks its two lines; a row is the one line.
         isCard
-          ? "rounded-xl border bg-card px-3 py-2.5 shadow-xs transition-shadow hover:shadow-sm"
-          : "border-b px-1 py-2.5 last:border-b-0",
+          ? "flex-col gap-1.5 rounded-xl border bg-card px-3 py-2.5 shadow-xs transition-shadow hover:shadow-sm"
+          : "items-center gap-3 border-b px-1 py-2.5 last:border-b-0",
         isSelectable &&
           "cursor-default rounded-lg select-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
-        // A tick box already lives on the left of this row, so a *picked* task
-        // cannot be marked with another one — the row itself lights up instead.
-        isSelected && "bg-primary/10 ring-1 ring-primary/40",
+        /*
+          A tick box already lives on the left of this row, so a *picked* task
+          cannot be marked with another one — the row itself lights up instead.
+
+          `ring-inset`, and that is the whole of the fix: a ring is a
+          box-shadow, drawn *outside* the border box, so every scroller between
+          this row and the page clipped the edges that sat against them — the
+          left and right on the list's own scroller, the top of the first card
+          on the grid column's. Half an outline read as a broken one. Inside the
+          box there is nothing left to clip it.
+
+          Full strength rather than `/40` for the same reason: at one pixel
+          against a tinted background, a 40% line is a suggestion.
+        */
+        isSelected && "bg-primary/10 ring-1 ring-primary ring-inset",
       )}
     >
-      <span {...stopRowGestures}>
-        <TodoCheckbox
-          completed={todo.completed}
-          priority={todo.priority}
-          // The ring is only a countdown while it is counting. A paused timer
-          // showing a half-filled ring would be indistinguishable from a
-          // running one at a glance.
-          progress={isRunning ? timer.progress : null}
-          onToggle={() => void setCompleted(todo.id, !todo.completed)}
-        />
-      </span>
+      {isCard ? (
+        <>
+          {/* The task itself, and the one control that acts on the whole of
+              it. Nothing else is allowed on this line. */}
+          <div className="flex items-center gap-3">
+            {checkbox}
+            <div className="flex min-w-0 flex-1 items-center">{titleNode}</div>
+            {actionsMenu}
+          </div>
 
-      <div className="flex min-w-0 flex-1 items-center gap-2">
-        {/*
-          A button where the row has no gestures of its own, and plain text
-          where it has: with a click meaning "select", a title that also opened
-          the editor on click would give one press two answers.
-        */}
-        {createElement(
-          isSelectable ? "span" : "button",
-          {
-            ...(isSelectable
-              ? {}
-              : {
-                  type: "button" as const,
-                  onClick: () => setIsEditing(true),
-                  title: "Edit task",
-                }),
-            className: cn(
-              "min-w-0 flex-1 truncate text-left text-sm transition-colors",
-              !isSelectable && "hover:text-primary",
-              /*
-              Both kinds of "not on the list any more" are struck through
-              rather than faded.
+          {/* What is true *about* the task, on a line of its own, indented
+              under the title rather than under the tick box. Wrapping, because
+              three of these in an 18rem column is one too many for one line —
+              and a second line of annotations costs less than a countdown
+              nobody can read. */}
+          {hasMeta && (
+            <div className="flex flex-wrap items-center gap-2 pl-8">
+              {documentChip}
+              {/* {priorityFlag} */}
+              {timerButton}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          {checkbox}
 
-              Fading the whole row took the title, the flag, the timer and the
-              menu down with it — a row you could still click but could barely
-              read, and on a day full of finished tasks the page went grey. A
-              line through the words says the one thing that is actually true
-              about the task, leaves everything around it at full contrast, and
-              keeps the two states apart by colour: done is quiet, missed is
-              the day heading's own red.
-            */
-              todo.completed &&
-                "text-muted-foreground line-through decoration-muted-foreground",
-              isMissed && "line-through decoration-destructive/70",
-            ),
-          },
-          todo.title,
-        )}
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            {titleNode}
+            {documentChip}
+            {/* {priorityFlag} */}
+          </div>
 
-        {/*
-          Where the task came from, when it came from somewhere.
-
-          A link rather than a label, because "read chapter 4" is a task you
-          want to be one click from the thing you have to read. Only on the todo
-          page — inside the document's own tab this would be the same words on
-          every row — and only the name, since the icon already says what kind
-          of thing it is.
-        */}
-        {todo.document && !documentId && (
-          <span {...stopRowGestures}>
-            <Link
-              href={workPath(todo.document.id)}
-              title={`Open ${todo.document.name}`}
-              className="flex min-w-0 max-w-40 shrink items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[0.625rem] text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <FileText className="size-3 shrink-0 fill-orange-400 stroke-orange-200" />
-              <span className="truncate">{todo.document.name}</span>
-            </Link>
-          </span>
-        )}
-
-        {/* Only worth a mark when it is actually saying something. */}
-        {todo.priority !== "NONE" && !todo.completed && (
-          <Flag
-            className={cn("size-3.5 shrink-0", meta.className)}
-            aria-label={`${meta.label} priority`}
-          />
-        )}
-      </div>
-
-      {todo.timerSeconds !== null && !todo.completed && (
-        <span {...stopRowGestures}>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() =>
-              void setTimerRunning(todo.id, isRunning ? "pause" : "start")
-            }
-            aria-label={isRunning ? "Pause timer" : "Start timer"}
-            className={cn(
-              "h-7 shrink-0 gap-1.5 rounded-full px-2.5 text-xs tabular-nums",
-              isRunning
-                ? "bg-primary/10 text-primary hover:bg-primary/15"
-                : "text-muted-foreground",
-            )}
-          >
-            {isRunning ? (
-              <Pause className="size-3" />
-            ) : (
-              <Play className="size-3" />
-            )}
-            {formatCountdown(timer.remaining)}
-          </Button>
-        </span>
+          {timerButton}
+          {actionsMenu}
+        </>
       )}
-
-      <span {...stopRowGestures}>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Task actions"
-              // Out of the way until wanted, but never for a keyboard: hiding it
-              // on focus would make it unreachable without a mouse.
-              className="size-7 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/todo:opacity-100 focus-visible:opacity-100"
-            >
-              <MoreHorizontal />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={() => setIsEditing(true)}>
-              <Flag />
-              Edit task
-            </DropdownMenuItem>
-
-            {todo.timerSeconds !== null && (
-              <DropdownMenuItem
-                onSelect={() => void setTimerRunning(todo.id, "reset")}
-              >
-                <RotateCcw />
-                Reset timer
-              </DropdownMenuItem>
-            )}
-
-            <DropdownMenuSeparator />
-
-            <DropdownMenuItem
-              variant="destructive"
-              onSelect={() => void removeTodo(todo.id)}
-            >
-              <Trash2 />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </span>
     </motion.div>
   );
 }

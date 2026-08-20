@@ -218,7 +218,7 @@ export function ChatConversation({ chatId }: { chatId: string }) {
         so a long one is the normal case and not the exception. The whole of it
         is a hover away.
       */}
-      <div className="flex h-11 shrink-0 items-center gap-1 border-b px-2">
+      <div className="flex h-11 shrink-0 items-center gap-1 px-2">
         <Button size="sm" variant="ghost" asChild aria-label="Back to chats">
           <Link href={CHAT_PATH}>
             <ArrowLeft />

@@ -2,6 +2,7 @@ import { BoardRouter } from "@/features/board/server/routers/board";
 import { ChatRouter } from "@/features/chat/server/routers/chat";
 import { DocumentRouter } from "@/features/main/server/routers/document";
 import { FolderRouter } from "@/features/main/server/routers/folder";
+import { SupportRouter } from "@/features/support/server/routers/support";
 import { StickyNoteRouter } from "@/features/sticky-notes/server/routers/sticky-note";
 import { TodoRouter } from "@/features/todo/server/routers/todo";
 import { createTRPCRouter } from "../init";
@@ -13,6 +14,7 @@ export const appRouter = createTRPCRouter({
   stickyNote: StickyNoteRouter,
   chat: ChatRouter,
   todo: TodoRouter,
+  support: SupportRouter,
 });
 // export type definition of API
 export type AppRouter = typeof appRouter;

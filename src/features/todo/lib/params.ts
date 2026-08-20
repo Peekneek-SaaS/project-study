@@ -1,4 +1,9 @@
-import { createLoader, parseAsStringLiteral } from "nuqs/server";
+import {
+  createLoader,
+  parseAsArrayOf,
+  parseAsString,
+  parseAsStringLiteral,
+} from "nuqs/server";
 
 import { TODO_PRIORITY_VALUES } from "@/features/todo/lib/todo-priority";
 import { MODIFIED_VALUES } from "@/lib/list-filters";
@@ -20,6 +25,14 @@ import { MODIFIED_VALUES } from "@/lib/list-filters";
 export const todoFilterParsers = {
   priority: parseAsStringLiteral(TODO_PRIORITY_VALUES),
   modified: parseAsStringLiteral(MODIFIED_VALUES),
+  /**
+   * The documents whose tasks to show, as ids.
+   *
+   * A list, because "these two papers" is a real question and "this one paper"
+   * is only the common case of it. Ids rather than names: a rename must not
+   * quietly empty a filtered page somebody had bookmarked.
+   */
+  documents: parseAsArrayOf(parseAsString),
 };
 
 /**
@@ -32,8 +45,17 @@ export const todoFilterParsers = {
 export function toListInput(filters: {
   priority: (typeof TODO_PRIORITY_VALUES)[number] | null;
   modified: (typeof MODIFIED_VALUES)[number] | null;
+  documents?: string[] | null;
 }) {
-  return { priority: filters.priority, modified: filters.modified };
+  return {
+    priority: filters.priority,
+    modified: filters.modified,
+    // Named for what the server filters on rather than for the parameter it
+    // arrived in. An empty list is sent as "no filter", which is what unticking
+    // the last file means — the alternative reading, "documents: none of them",
+    // would empty the page in answer to a click that cleared a filter.
+    documentIds: filters.documents?.length ? filters.documents : null,
+  };
 }
 
 /** Server-side reader for the above. Takes a page's `searchParams` promise. */

@@ -72,9 +72,21 @@ export function useTodosBrowser(serverView: TodoViewType) {
     setPinnedDays([...pinnedDays, requestedDay]);
   }
 
+  const isFiltering =
+    filters.priority !== null ||
+    filters.modified !== null ||
+    (filters.documents?.length ?? 0) > 0;
+
   const groups = useMemo(
-    () => groupTodosByDay(todos, today, pinnedDays),
-    [todos, today, pinnedDays],
+    () =>
+      groupTodosByDay(todos, today, {
+        pinned: pinnedDays,
+        // A filtered page shows the days that answer the filter and no others —
+        // which is what "show me this document's tasks" means. Unfiltered, the
+        // window stays: the page is a planner before it is a search result.
+        onlyWithTodos: isFiltering,
+      }),
+    [todos, today, pinnedDays, isFiltering],
   );
 
   return {
@@ -83,7 +95,7 @@ export function useTodosBrowser(serverView: TodoViewType) {
     today,
     view,
     // An empty page means two different things, and only this knows which.
-    isFiltering: filters.priority !== null || filters.modified !== null,
+    isFiltering,
     // What decides whether the page keeps a clock running — see `useTodoClock`.
     hasRunningTimer: todos.some(
       (todo) => todo.timerStartedAt !== null && !todo.completed,
