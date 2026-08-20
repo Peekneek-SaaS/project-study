@@ -795,3 +795,41 @@
     display: none;
   }
 }
+
+/*
+  Fields that do not make the phone zoom in on them.
+
+  Safari on iOS zooms the page whenever a focused field's text is smaller than
+  16px — it is treating the small text as unreadable and doing the reader a
+  favour. Nothing about it is configurable, and the page never zooms back out
+  on blur, so the whole app is left magnified and scrolled sideways until it is
+  pinched back by hand. This app's inputs are `text-sm` and `text-xs`, so every
+  one of them triggers it.
+
+  16px is therefore not a style choice here; it is the threshold. Anything at
+  or above it is left alone, which is why this raises rather than sets.
+
+  What this is *not* is the other well-known fix — `maximum-scale=1` or
+  `user-scalable=no` in the viewport meta. That one takes pinch-zoom away from
+  everybody in order to stop the automatic zoom for a few, which is a real
+  accessibility loss for anyone who magnifies to read. Safari has also ignored
+  it since iOS 10, so it does not even work.
+
+  Unlayered on purpose. Tailwind's utilities are a layer, and layered styles
+  lose to unlayered ones whatever their specificity — which is exactly what is
+  wanted: a `text-xs` on a field cannot quietly reinstate the zoom. Inline
+  styles still win, so a canvas that sizes its own editing field — Excalidraw's
+  text tool — is untouched.
+
+  Scoped to touch devices with no hover, so a desktop with a fine pointer keeps
+  the smaller text the layouts were drawn around. Only the fields grow, and only
+  where growing them buys something.
+*/
+@media (pointer: coarse) and (hover: none) {
+  input:not([type="checkbox"], [type="radio"], [type="range"]),
+  textarea,
+  select,
+  [contenteditable]:not([contenteditable="false"]) {
+    font-size: max(16px, 1em);
+  }
+}
