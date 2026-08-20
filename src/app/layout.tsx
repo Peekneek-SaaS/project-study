@@ -1,6 +1,7 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
+import { Suspense } from "react";
 import { shadcn } from "@clerk/ui/themes";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 
@@ -138,10 +139,28 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                   its optimistic write belongs to. Outside the adapter that hook
                   throws, so the picker would crash on the step that saves.
                 */}
-                <NuqsAdapter>
-                  <MotionProvider>{children}</MotionProvider>
-                  <ModalProvider />
-                </NuqsAdapter>
+                {/*
+                  The adapter reads the query string through `useSearchParams`,
+                  which on a statically prerendered page has no value to give
+                  until the request arrives. Without a boundary to suspend on,
+                  Next refuses to prerender *any* fully static page under this
+                  layout — which was every page that does not fetch: `/` and
+                  `/_not-found` both failed the build with
+                  "useSearchParams() should be wrapped in a suspense boundary".
+
+                  The boundary goes here, around the adapter, rather than around
+                  each page that happens to use `nuqs`: the adapter is what
+                  reads the params, and it is mounted once for the whole app.
+                  No fallback, deliberately — the boundary exists to let the
+                  prerender bail out to the client, and a spinner in it would
+                  flash on every page in the app on the way past.
+                */}
+                <Suspense>
+                  <NuqsAdapter>
+                    <MotionProvider>{children}</MotionProvider>
+                    <ModalProvider />
+                  </NuqsAdapter>
+                </Suspense>
                 {/* Above the toaster: uploads started from a modal report into it. */}
                 <Toaster position="top-center" />
               </TooltipProvider>
