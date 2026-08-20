@@ -204,7 +204,14 @@ export function RecentChats() {
               {/* <TableHead className={cn(STICKY_HEAD, "hidden sm:table-cell")}>
                 Model
               </TableHead> */}
-              <TableHead className={STICKY_HEAD}>Last active</TableHead>
+              {/*
+                Dropped on a phone, where the row has room for the title and
+                nothing else: a name truncated to make space for "3 days ago" is
+                the wrong half to keep. The cell goes with it — see `ChatRow`.
+              */}
+              <TableHead className={cn(STICKY_HEAD, "hidden sm:table-cell")}>
+                Last active
+              </TableHead>
               <TableHead className={cn(STICKY_HEAD, "w-12 text-right")}>
                 Actions
               </TableHead>

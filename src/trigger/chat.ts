@@ -194,11 +194,41 @@ export const studyChat = chat
       return chatTools({ userId: scope.userId, documentId: scope.documentId });
     },
 
+    /**
+     * Says, in the database, that an answer is being written right now.
+     *
+     * The counterpart to the flag cleared in `onTurnComplete`, and the reason
+     * both edges are here rather than in the browser: a turn outlives the tab
+     * that asked for it, so the only place that can honestly report "still
+     * going" is the run doing the going.
+     *
+     * The token and the run id are written now as well as at the end. They used
+     * to be recorded only on completion, which left the whole of the first
+     * answer with no session for a reload to attach to — refreshing mid-answer
+     * showed a question with nothing arriving under it, and the reply appeared
+     * only after a later refetch. `lastEventId` is deliberately not touched:
+     * there is no cursor yet this turn, and writing a null over the last one
+     * would send the next reconnect back to the start of the stream.
+     */
+    onTurnStart: async ({ chatId, runId, chatAccessToken }) => {
+      await prisma.chat.updateMany({
+        where: { id: chatId },
+        data: {
+          isStreaming: true,
+          sessionRunId: runId,
+          sessionToken: chatAccessToken,
+        },
+      });
+    },
+
     run: async ({ messages, tools, signal, chatId, clientData }) => {
       const scope = await scopeFor(chatId);
       const system = await systemPromptFor(scope);
 
-      const fallback = createFallbackModel("chat", clientData?.provider ?? null);
+      const fallback = createFallbackModel(
+        "chat",
+        clientData?.provider ?? null,
+      );
 
       // Registered before the stream starts, read after it finishes — see
       // `answeredBy`. A getter rather than a value, because which provider
@@ -253,7 +283,8 @@ export const studyChat = chat
         // A stopped turn can leave an assistant message with nothing in it —
         // the user pressed stop before the first token. A partial answer is
         // worth keeping; an empty bubble is not.
-        if (message.role === "assistant" && message.parts.length === 0) continue;
+        if (message.role === "assistant" && message.parts.length === 0)
+          continue;
 
         await saveMessage({
           chatId,
@@ -280,6 +311,11 @@ export const studyChat = chat
           sessionRunId: runId,
           sessionToken: chatAccessToken,
           lastEventId,
+          // And the turn is over. Written here rather than left to the browser
+          // because this hook runs whether or not anyone is still watching —
+          // including when the turn threw, which is the case a flag cleared on
+          // the client would strand set forever.
+          isStreaming: false,
         },
       });
 
@@ -287,7 +323,9 @@ export const studyChat = chat
       // with the default title in the filter is what makes that a single
       // statement: a chat the user has since renamed matches nothing and keeps
       // their name.
-      const firstUser = newUIMessages.find((message) => message.role === "user");
+      const firstUser = newUIMessages.find(
+        (message) => message.role === "user",
+      );
       const title = titleFromMessage(firstUser);
 
       if (title) {

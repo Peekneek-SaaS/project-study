@@ -106,6 +106,14 @@ export async function clearChatSession(chatId: string) {
 
   await prisma.chat.updateMany({
     where: { id: chatId, userId },
-    data: { sessionRunId: null, sessionToken: null, lastEventId: null },
+    data: {
+      sessionRunId: null,
+      sessionToken: null,
+      lastEventId: null,
+      // Belt and braces for the one case the run cannot report: a worker that
+      // died mid-turn never reaches `onTurnComplete`, so the flag would stay
+      // set and every later visit would wait on a stream nobody is writing.
+      isStreaming: false,
+    },
   });
 }

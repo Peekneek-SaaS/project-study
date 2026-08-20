@@ -172,6 +172,7 @@ export function DocumentChatPanel({ documentId }: { documentId: string }) {
             [chatId]: {
               publicAccessToken: data.chat.sessionToken,
               lastEventId: data.chat.lastEventId ?? undefined,
+              isStreaming: data.chat.isStreaming,
             },
           }
         : undefined,
@@ -214,8 +215,9 @@ export function DocumentChatPanel({ documentId }: { documentId: string }) {
     id: chatId,
     messages: initialMessages,
     transport,
-    // Only where there is a run to rejoin — see the universal conversation.
-    resume: initialMessages.length > 0,
+    // Only where a turn is actually in flight — see the universal
+    // conversation, which explains what asking on "has messages" cost.
+    resume: data.chat?.isStreaming ?? false,
     onFinish: () => {
       // The stored transcript has changed underneath the query that seeded
       // this. Refetching keeps a remount — switching tabs and back — from

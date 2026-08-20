@@ -126,6 +126,9 @@ export const ChatRouter = createTRPCRouter({
           // handing out a session token safe.
           sessionToken: true,
           lastEventId: true,
+          // Whether a turn is in flight *now*, which is the only honest reason
+          // to reconnect — see the column, and `resume` on the page.
+          isStreaming: true,
           messages: { select: messageFields, orderBy: { createdAt: "asc" } },
         },
       });
@@ -167,9 +170,11 @@ export const ChatRouter = createTRPCRouter({
               id: true,
               title: true,
               provider: true,
-              // As in `get` — the cursor a returning tab resumes from.
+              // As in `get` — the cursor a returning tab resumes from, and
+              // whether there is anything to resume.
               sessionToken: true,
               lastEventId: true,
+              isStreaming: true,
               messages: {
                 select: messageFields,
                 orderBy: { createdAt: "asc" },

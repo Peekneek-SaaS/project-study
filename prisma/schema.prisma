@@ -308,6 +308,20 @@ model Chat {
   sessionRunId String?
   lastEventId  String?
 
+  /// Whether a turn is being written *right now*.
+  ///
+  /// The one thing the three fields above cannot say. They are written when a
+  /// turn finishes and are then true forever — a session outlives its runs by
+  /// design — so "this chat has a session" is not "this chat is mid-answer".
+  /// Resuming on the first of those means every visit to every past
+  /// conversation reopens a stream with nothing to say, and the page waits on
+  /// it: a spinner over a finished answer, and a Stop button where Send
+  /// belongs.
+  ///
+  /// Set by the run itself, on both edges — which is what makes it survive the
+  /// tab being closed mid-answer, the case a browser-side flag cannot cover.
+  isStreaming Boolean @default(false)
+
   /// The session-scoped token the browser reconnects with.
   ///
   /// Not a secret in the ambient sense — it is scoped to this one chat's session

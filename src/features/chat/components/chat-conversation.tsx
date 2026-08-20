@@ -3,7 +3,16 @@
 import { useChat } from "@ai-sdk/react";
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useTriggerChatTransport } from "@trigger.dev/sdk/chat/react";
+import { ArrowLeft, MessageSquare } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo } from "react";
+
+import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 import { ChatComposer } from "@/features/chat/components/chat-composer";
 import { ChatGreeting } from "@/features/chat/components/chat-greeting";
@@ -21,6 +30,7 @@ import {
   mintChatAccessToken,
   startStudyChatSession,
 } from "@/features/chat/server/actions";
+import { CHAT_PATH } from "@/features/chat/types";
 import { useChatDraftStore } from "@/lib/stores/chat-draft-store";
 import { useTRPC } from "@/trpc/client";
 // Type-only, so nothing from the worker bundle reaches the browser. It is what
@@ -62,11 +72,7 @@ export function ChatConversation({ chatId }: { chatId: string }) {
    * the selected model and the one that actually answered are different
    * questions. A mark that is merely probably right would be worse than none.
    */
-  const providers = useMemo(
-    () => providersById(chat?.messages ?? []),
-    [chat],
-  );
-
+  const providers = useMemo(() => providersById(chat?.messages ?? []), [chat]);
 
   /** When each stored message was written — see `timestampsById`. */
   const timestamps = useMemo(
@@ -80,8 +86,12 @@ export function ChatConversation({ chatId }: { chatId: string }) {
    * Handing this to the transport is what turns "reload the page" into "rejoin
    * the stream": with a token and a cursor it resubscribes past everything
    * already seen, so a half-written answer continues from the word it was on
-   * instead of replaying or restarting. Absent for a chat with no live run —
-   * a brand new one, or one whose run has since ended.
+   * instead of replaying or restarting.
+   *
+   * `isStreaming` is passed with them because the transport uses it to skip the
+   * reconnect entirely on a settled chat. Without it, every visit to every past
+   * conversation opens an SSE and waits for the server to say "nothing here" —
+   * which is what a spinner over a finished answer was.
    */
   const sessions = useMemo(
     () =>
@@ -90,6 +100,7 @@ export function ChatConversation({ chatId }: { chatId: string }) {
             [chatId]: {
               publicAccessToken: chat.sessionToken,
               lastEventId: chat.lastEventId ?? undefined,
+              isStreaming: chat.isStreaming,
             },
           }
         : undefined,
@@ -141,10 +152,18 @@ export function ChatConversation({ chatId }: { chatId: string }) {
     /**
      * Reconnect on mount, but only where there is something to reconnect to.
      *
-     * A brand new chat has no run behind it, and asking to resume one produces
-     * a subscription that waits for a stream nobody is writing.
+     * "Has messages" is not that something. A session outlives the runs inside
+     * it, so a chat answered last week still has a token and a cursor, and
+     * resuming on those means every past conversation reopens a stream with
+     * nothing to say. `useChat` goes to `submitted` the moment it is asked to
+     * resume — so the transcript showed a thinking indicator and the composer
+     * showed Stop, on a conversation that finished days ago.
+     *
+     * The flag is written by the run on both edges of a turn, so it stays right
+     * when the tab that asked the question is long gone — which is exactly the
+     * case this has to survive: ask, navigate away, come back.
      */
-    resume: initialMessages.length > 0,
+    resume: chat?.isStreaming ?? false,
     onFinish: () => {
       // The recents list is now stale twice over — a new chat is missing from
       // it, and an existing one has moved to the top with a new title.
@@ -174,8 +193,49 @@ export function ChatConversation({ chatId }: { chatId: string }) {
 
   const isStreaming = status === "streaming" || status === "submitted";
 
+  /**
+   * What to call this conversation in the bar.
+   *
+   * A chat opened from the landing page has no row yet — the id is minted in
+   * the browser and written by the first question — so this stands in until the
+   * title arrives, which it does on `onFinish`'s refetch a moment after the
+   * first answer.
+   */
+  const title = chat?.title ?? "New chat";
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {/*
+        Which conversation this is, and the way back out of it.
+
+        Worth a bar of its own here where it is not on the landing page: a
+        conversation is a thing with a name, and the only other places that name
+        appears are the browser tab and the recents list behind you. The way back
+        matters most on a phone, where the sidebar is a sheet that has to be
+        opened before it can be used.
+
+        Capped rather than left to run: a chat is titled from its first question,
+        so a long one is the normal case and not the exception. The whole of it
+        is a hover away.
+      */}
+      <div className="flex h-11 shrink-0 items-center gap-1 border-b px-2">
+        <Button size="sm" variant="ghost" asChild aria-label="Back to chats">
+          <Link href={CHAT_PATH}>
+            <ArrowLeft />
+          </Link>
+        </Button>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="flex min-w-0 items-center gap-1.5 text-xs font-medium">
+              <MessageSquare className="size-3.5 shrink-0 fill-emerald-500 stroke-emerald-500" />
+              <span className="truncate">{title}</span>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{title}</TooltipContent>
+        </Tooltip>
+      </div>
+
       {messages.length === 0 ? (
         /*
           A conversation nobody has spoken in yet.
@@ -195,9 +255,7 @@ export function ChatConversation({ chatId }: { chatId: string }) {
 
           <ChatSuggestions
             suggestions={UNIVERSAL_SUGGESTIONS}
-            onSuggestion={(question) =>
-              sendMessage({ text: question })
-            }
+            onSuggestion={(question) => sendMessage({ text: question })}
             className="mt-6"
           />
         </div>
@@ -208,10 +266,8 @@ export function ChatConversation({ chatId }: { chatId: string }) {
           error={error}
           onRetry={() => regenerate()}
           providers={providers}
-        timestamps={timestamps}
-          onRetryMessage={(messageId) =>
-            regenerate({ messageId })
-          }
+          timestamps={timestamps}
+          onRetryMessage={(messageId) => regenerate({ messageId })}
         />
       )}
 

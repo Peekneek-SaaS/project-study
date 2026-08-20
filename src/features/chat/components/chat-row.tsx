@@ -116,7 +116,9 @@ export function ChatRow({
         )}
       </TableCell> */}
 
-      <TableCell className="whitespace-nowrap text-muted-foreground">
+      {/* Hidden below `sm` in step with its heading — a column is both, and
+          leaving the cell behind would shift every row's actions out of line. */}
+      <TableCell className="hidden whitespace-nowrap text-muted-foreground sm:table-cell">
         {/* Wrapped because this arrives as an ISO string, not a `Date` — there
             is no transformer on the tRPC client. */}
         {formatDistanceToNow(new Date(chat.updatedAt), { addSuffix: true })}
