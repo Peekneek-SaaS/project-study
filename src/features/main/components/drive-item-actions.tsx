@@ -149,7 +149,10 @@ function folderItems(
       icon: Trash2,
       label: "Delete",
       onSelect: confirmDelete,
-      variant: "default",
+      // As on a document. This was the one delete in the app that read as an
+      // ordinary entry, which made deleting a folder — the more destructive of
+      // the two, since it takes everything inside with it — the quieter one.
+      variant: "destructive",
     },
   ];
 }

@@ -46,6 +46,70 @@ function scrollToDay(day: string, behavior: ScrollBehavior, view: TodoViewType) 
 }
 
 /**
+ * Keeps trying a scroll until it has taken, then stops.
+ *
+ * Both journeys on this page need this, for two different reasons. The landing
+ * on today needs its position *held*, because the router, a restored offset and
+ * the rows staggering in all move the page just after it — see the layout
+ * effect. A day arrived at by name needs its section to *exist*, which can be a
+ * commit later than the effect that asks for it.
+ *
+ * `hold` is what separates them. Without it the loop ends the moment the scroll
+ * lands, which is what a smooth one requires: re-asserting an animation every
+ * frame restarts it every frame, and the page would creep towards the day
+ * forever instead of travelling there.
+ *
+ * Any sign of the reader taking over ends it immediately. Four hundred
+ * milliseconds is far too short a window to scroll in on purpose, but a landing
+ * that fought the reader even once would be worse than one that missed.
+ */
+function keepScrolling(
+  scroll: () => boolean,
+  { hold, onEnd }: { hold: boolean; onEnd?: () => void },
+) {
+  let frame = 0;
+  let stopped = false;
+  const deadline = performance.now() + ANCHOR_SETTLE_MS;
+
+  const stop = () => {
+    stopped = true;
+  };
+
+  for (const type of TAKEOVER_EVENTS) {
+    window.addEventListener(type, stop, { passive: true });
+  }
+
+  const release = () => {
+    window.cancelAnimationFrame(frame);
+    for (const type of TAKEOVER_EVENTS) {
+      window.removeEventListener(type, stop);
+    }
+  };
+
+  const settle = () => {
+    if (stopped || performance.now() > deadline) {
+      release();
+      onEnd?.();
+      return;
+    }
+
+    const landed = scroll();
+
+    if (landed && !hold) {
+      release();
+      onEnd?.();
+      return;
+    }
+
+    frame = window.requestAnimationFrame(settle);
+  };
+
+  frame = window.requestAnimationFrame(settle);
+
+  return release;
+}
+
+/**
  * Puts the reader where they meant to be: on today, or on the day something
  * pointed them at.
  *
@@ -92,8 +156,9 @@ export function useTodoDayNavigation(view: TodoViewType) {
     // and giving up there is what would leave the page at the top for good. The
     // loop below keeps trying for as long as it keeps trying anything.
     const anchor = () => {
-      if (!scrollToDay(todayKey(), "instant", view)) return;
+      if (!scrollToDay(todayKey(), "instant", view)) return false;
       anchoredView.current = view;
+      return true;
     };
 
     anchor();
@@ -113,38 +178,8 @@ export function useTodoDayNavigation(view: TodoViewType) {
       So the anchor is simply re-asserted until the page stops moving under it.
       Instant, and always the same target, so there is nothing to watch: every
       call after the first is a no-op unless something has displaced it.
-
-      Any sign of the reader taking over ends it immediately. Four hundred
-      milliseconds is far too short a window to scroll in on purpose, but a
-      landing that fought the reader even once would be worse than one that
-      missed.
     */
-    let frame = 0;
-    let stopped = false;
-    const deadline = performance.now() + ANCHOR_SETTLE_MS;
-
-    const stop = () => {
-      stopped = true;
-    };
-
-    for (const type of TAKEOVER_EVENTS) {
-      window.addEventListener(type, stop, { passive: true });
-    }
-
-    const settle = () => {
-      if (stopped || performance.now() > deadline) return;
-      anchor();
-      frame = window.requestAnimationFrame(settle);
-    };
-
-    frame = window.requestAnimationFrame(settle);
-
-    return () => {
-      window.cancelAnimationFrame(frame);
-      for (const type of TAKEOVER_EVENTS) {
-        window.removeEventListener(type, stop);
-      }
-    };
+    return keepScrolling(anchor, { hold: true });
   }, [targetDay, view]);
 
   useEffect(() => {
@@ -163,36 +198,47 @@ export function useTodoDayNavigation(view: TodoViewType) {
     // the re-render that clears the parameter as an unanchored arrival.
     anchoredView.current = view;
 
-    // Deferred a frame so the scroll measures a laid-out page rather than one
-    // mid-commit — and so the work happens in a callback, which is where
-    // reacting to something outside React by setting state belongs.
-    const frame = window.requestAnimationFrame(() => {
-      scrollToDay(
-        targetDay,
-        // Arriving from another page starts at the top of a fortnight of days;
-        // animating all the way down from there is a long scroll nobody asked
-        // to watch. Moving between days while already here is worth seeing.
-        first ? "instant" : "smooth",
-        view,
-      );
-      setFlashingDay(targetDay);
+    // Arriving from another page starts at the top of a fortnight of days;
+    // animating all the way down from there is a long scroll nobody asked to
+    // watch. Moving between days while already here is worth seeing.
+    const behavior: ScrollBehavior = first ? "instant" : "smooth";
 
-      // Cleared last, deliberately. Clearing it first would re-render with no
-      // target, run this effect's cleanup, and cancel the frame before it ever
-      // fired.
-      //
-      // Only this parameter rather than the whole query string: the filters
-      // live there too, and following the calendar to a day should not take
-      // them down with it.
-      const rest = new URLSearchParams(searchParams);
-      rest.delete(TODO_DATE_PARAM);
-      const query = rest.toString();
-      const path = pathname || TODO_PATH;
+    // Held for the settle window only when the landing is instant. An arrival
+    // has the router, the restored offset and the staggering rows to survive,
+    // exactly as the anchor above does; a smooth scroll on a page that is
+    // already still has nothing to fight, and re-asserting one would only
+    // restart it.
+    return keepScrolling(
+      () => {
+        if (!scrollToDay(targetDay, behavior, view)) return false;
+        // Set on landing rather than on asking, so the highlight and the
+        // journey cannot come apart — a day that took a few frames to appear
+        // would otherwise have spent some of its three seconds off screen.
+        setFlashingDay(targetDay);
+        return true;
+      },
+      {
+        hold: first,
+        // Cleared once the scrolling is over rather than alongside it.
+        // Stripping the parameter re-renders this hook with no target, which
+        // runs this effect's cleanup — so doing it any earlier would cancel the
+        // very loop that had not finished yet. That is also why the day is
+        // pinned into the window by `useTodosBrowser` and not read from here:
+        // the section has to outlive the parameter that asked for it.
+        //
+        // Only this parameter rather than the whole query string: the filters
+        // live there too, and following the calendar to a day should not take
+        // them down with it.
+        onEnd: () => {
+          const rest = new URLSearchParams(searchParams);
+          rest.delete(TODO_DATE_PARAM);
+          const query = rest.toString();
+          const path = pathname || TODO_PATH;
 
-      router.replace(query ? `${path}?${query}` : path, { scroll: false });
-    });
-
-    return () => window.cancelAnimationFrame(frame);
+          router.replace(query ? `${path}?${query}` : path, { scroll: false });
+        },
+      },
+    );
   }, [pathname, router, searchParams, targetDay, view]);
 
   // Kept apart from the effect above so the countdown is not restarted by the

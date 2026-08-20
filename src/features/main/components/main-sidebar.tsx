@@ -23,15 +23,18 @@ import { redirect, usePathname } from "next/navigation";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarRail,
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { useSettingsStore } from "@/lib/stores/settings-store";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -62,6 +65,7 @@ interface MenuGroupProps {
 
 const MainSidebar = () => {
   const pathName = usePathname();
+  const openSettings = useSettingsStore((state) => state.open);
 
   const routes: MenuItemsProps[] = [
     {
@@ -95,18 +99,21 @@ const MainSidebar = () => {
       icon: MessageSquare,
       iconClassName: "fill-emerald-500 stroke-emerald-500",
     },
-    {
-      label: "Focus",
-      href: "/focus",
-      icon: Focus,
-      iconClassName: "stroke-cyan-500 fill-cyan-500",
-    },
+    // {
+    //   label: "Focus",
+    //   href: "/focus",
+    //   icon: Focus,
+    //   iconClassName: "stroke-cyan-500 fill-cyan-500",
+    // },
   ];
 
   const otherRoutes: MenuItemsProps[] = [
     {
       label: "Settings",
       icon: Settings,
+      // No `href`: settings are a dialog rather than a page, so this row opens
+      // one instead of navigating. `NavItems` calls `onClick` for exactly this.
+      onClick: () => openSettings(),
     },
     {
       label: "Help and support",
@@ -131,8 +138,17 @@ const MainSidebar = () => {
       {/* <div className="border-b border-dashed border-border" /> */}
       <SidebarContent>
         <NavItems items={routes} pathName={pathName} />
-        <NavItems groupLabel="Others" items={otherRoutes} pathName={pathName} />
       </SidebarContent>
+
+      {/*
+        No horizontal padding of its own: `NavItems` renders a `SidebarGroup`,
+        which brings `px-2` with it, and `SidebarContent` above adds none — so
+        the footer's `p-2` would inset these rows 8px further than every row
+        above them, and park the collapsed icons off-centre in the rail.
+      */}
+      <SidebarFooter className="px-0">
+        <NavItems groupLabel="Others" items={otherRoutes} pathName={pathName} />
+      </SidebarFooter>
     </Sidebar>
   );
 };

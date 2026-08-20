@@ -75,6 +75,20 @@ function ContextMenuContent({
   )
 }
 
+/**
+ * A menu entry.
+ *
+ * `variant="destructive"` is deliberately red-500 rather than the theme's
+ * `destructive` token, and the same red is used in the context menu and the
+ * menubar so every delete in the app reads the same. The token is tuned for
+ * filled surfaces — the confirm button in a delete dialog — and as *text* on
+ * this theme's menu background it does not read as a warning at all. Focus
+ * deepens the text and lays a red wash behind it, so hovering a delete looks
+ * like deleting rather than like hovering any other entry.
+ *
+ * Worth knowing before re-adding this component from the registry, which would
+ * put the token back.
+ */
 function ContextMenuItem({
   className,
   inset,
@@ -90,7 +104,7 @@ function ContextMenuItem({
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        "group/context-menu-item relative flex min-h-7 cursor-default items-center gap-2 rounded-md px-2 py-1 text-xs/relaxed outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7.5 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 data-[variant=destructive]:*:[svg]:text-destructive",
+        "group/context-menu-item relative flex min-h-7 cursor-default items-center gap-2 rounded-md px-2 py-1 text-xs/relaxed outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7.5 data-[variant=destructive]:text-red-500 data-[variant=destructive]:focus:bg-red-500/10 data-[variant=destructive]:focus:text-red-600 data-[variant=destructive]:focus:*:[svg]:text-red-600 dark:data-[variant=destructive]:focus:text-red-400 dark:data-[variant=destructive]:focus:*:[svg]:text-red-400 dark:data-[variant=destructive]:focus:bg-red-500/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 data-[variant=destructive]:*:[svg]:text-red-500",
         className
       )}
       {...props}

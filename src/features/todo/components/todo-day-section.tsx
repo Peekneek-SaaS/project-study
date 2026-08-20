@@ -18,6 +18,7 @@ import { DAY_ATTRIBUTE } from "@/features/todo/hooks/use-todo-day-navigation";
 import { useTodoMutations } from "@/features/todo/hooks/use-todo-mutations";
 import type { TodoDayGroup } from "@/features/todo/lib/group-todos-by-day";
 import { isPastDay, longDayLabel } from "@/features/todo/lib/todo-dates";
+import type { RowSelectModifiers } from "@/hooks/use-row-interaction";
 import { listContainer, mountAnimation } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +42,7 @@ export function TodoDaySection({
   now,
   variant,
   isFlashing = false,
+  onSelect,
   documentId,
 }: {
   group: TodoDayGroup;
@@ -50,6 +52,14 @@ export function TodoDaySection({
   now: number | null;
   variant: "list" | "grid";
   isFlashing?: boolean;
+  /**
+   * Selection, passed straight through to the rows.
+   *
+   * The day cannot answer a shift-click on its own — a range runs across the
+   * days above and below it — so this comes from the board, which is the only
+   * thing that knows the page's order. See `useRowSelection`.
+   */
+  onSelect?: (modifiers: RowSelectModifiers, id: string) => void;
   /**
    * The document whose tab this section is being drawn in, if it is in one.
    *
@@ -144,7 +154,7 @@ export function TodoDaySection({
             // everything else is measured from — so it is the one heading that
             // is allowed to be loud.
             group.isToday && "text-primary",
-            isOverdue && "line-through decoration-red-500",
+            isOverdue && "line-through decoration-red-500 decoration-2",
           )}
         >
           {group.label}
@@ -225,6 +235,7 @@ export function TodoDaySection({
                 todo={todo}
                 now={now}
                 variant={isGrid ? "card" : "row"}
+                onSelect={onSelect}
                 documentId={documentId}
                 // The day already knows; the rows should not each ask the clock
                 // again and risk disagreeing with the heading over them.

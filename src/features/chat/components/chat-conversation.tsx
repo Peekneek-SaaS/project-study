@@ -226,6 +226,9 @@ export function ChatConversation({ chatId }: { chatId: string }) {
           // turns into one transcript. The stop button is offered instead.
           disabled={isStreaming}
           autoFocus
+          // Under a transcript rather than alone on a page: every row this box
+          // takes is a row of the answer above it that scrolls out of view.
+          size="compact"
         />
       </div>
     </div>

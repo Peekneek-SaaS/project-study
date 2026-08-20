@@ -116,11 +116,19 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 be the one part of the app without a tooltip context.
               */}
               <TooltipProvider>
-                <MotionProvider>
-                  <NuqsAdapter>{children}</NuqsAdapter>
-                </MotionProvider>
+                {/*
+                  Around the modals as well, for the same reason as the tooltips
+                  above: a modal is mounted here rather than beside its trigger,
+                  and one of them now renders the todo editor — which reads the
+                  todo page's filters through `nuqs` to know which cached list
+                  its optimistic write belongs to. Outside the adapter that hook
+                  throws, so the picker would crash on the step that saves.
+                */}
+                <NuqsAdapter>
+                  <MotionProvider>{children}</MotionProvider>
+                  <ModalProvider />
+                </NuqsAdapter>
                 {/* Above the toaster: uploads started from a modal report into it. */}
-                <ModalProvider />
                 <Toaster position="top-center" />
               </TooltipProvider>
             </TRPCReactProvider>

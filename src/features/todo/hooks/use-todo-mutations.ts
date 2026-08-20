@@ -111,6 +111,9 @@ export function useTodoMutations({ documentId }: TodoScope = {}) {
   const { mutateAsync: removeTodoMutation } = useMutation(
     trpc.todo.remove.mutationOptions(),
   );
+  const { mutateAsync: removeManyMutation } = useMutation(
+    trpc.todo.removeMany.mutationOptions(),
+  );
   const { mutateAsync: clearDayMutation } = useMutation(
     trpc.todo.clearDay.mutationOptions(),
   );
@@ -304,6 +307,24 @@ export function useTodoMutations({ documentId }: TodoScope = {}) {
     [optimistically, removeTodoMutation],
   );
 
+  /** Everything the selection bar has ticked, in one request. */
+  const removeTodos = useCallback(
+    async (ids: string[]) => {
+      if (ids.length === 0) return null;
+
+      const removing = new Set(ids);
+
+      return optimistically(
+        (todos) => todos.filter((todo) => !removing.has(todo.id)),
+        () => removeManyMutation({ ids }),
+        ids.length === 1
+          ? "Could not delete the task"
+          : "Could not delete those tasks",
+      );
+    },
+    [optimistically, removeManyMutation],
+  );
+
   const clearDay = useCallback(
     async (dueDate: string, completedOnly: boolean) =>
       optimistically(
@@ -326,6 +347,7 @@ export function useTodoMutations({ documentId }: TodoScope = {}) {
     setCompleted,
     setTimerRunning,
     removeTodo,
+    removeTodos,
     clearDay,
     isCreating,
   };

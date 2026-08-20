@@ -23,6 +23,11 @@ import {
 } from "@/components/ui/resizable";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import BoardDynamic from "@/features/board/components/board-dynamic";
 import { DocumentChatPanel } from "@/features/chat/components/document-chat-panel";
 import { DRIVE_PATH } from "@/features/main/types";
@@ -354,12 +359,31 @@ export function WorkWorkspace({
             </Link>
           </Button>
 
-          <span
-            className="hidden min-w-0 truncate text-sm font-medium @md:block"
-            title={workspace.name}
-          >
-            {workspace.name}
-          </span>
+          {/*
+            Cut to a few characters, with the whole name a hover away.
+
+            A ceiling in `ch` rather than a share of the row: this bar's other
+            half is the tabs, and a name allowed to take whatever it wanted
+            would push them off centre before it ever started truncating. The
+            ceiling lifts with the page — the same `@container` the tab labels
+            read — so a wide screen spends its room on the name and a phone
+            keeps it to something that still leaves the tabs their place.
+
+            The ellipsis has to be on the text itself, not on this row: a flex
+            container has no text to overflow, so `truncate` on the element
+            holding the icon would clip the name dead rather than trail it off.
+          */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="flex min-w-0 items-center gap-1.5 text-xs font-medium">
+                <FileText className="size-3 shrink-0 fill-orange-400 stroke-orange-200" />
+                <span className="max-w-[12ch] truncate @md:max-w-[24ch] @2xl:max-w-[40ch]">
+                  {workspace.name}
+                </span>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{workspace.name}</TooltipContent>
+          </Tooltip>
         </div>
 
         {/*
@@ -388,7 +412,7 @@ export function WorkWorkspace({
                 className="hover:bg-transparent"
               >
                 <FileText className="fill-orange-400 stroke-orange-200" />
-                <span className="hidden @lg:inline">Document</span>
+                <span className="hidden lg:inline">Document</span>
               </Button>
             )}
 
@@ -408,7 +432,7 @@ export function WorkWorkspace({
               onClick={() => openTab("board")}
             >
               <Shapes className="stroke-purple-500 fill-purple-500" />
-              <span className="hidden @lg:inline">Board</span>
+              <span className="hidden lg:inline">Board</span>
             </TabsTrigger>
             <TabsTrigger
               value="notes"
@@ -416,7 +440,7 @@ export function WorkWorkspace({
               onClick={() => openTab("notes")}
             >
               <StickyNote className="fill-yellow-400 stroke-yellow-200" />
-              <span className="hidden @lg:inline">Note</span>
+              <span className="hidden lg:inline">Note</span>
             </TabsTrigger>
             <TabsTrigger
               value="todo"
@@ -424,7 +448,7 @@ export function WorkWorkspace({
               onClick={() => openTab("todo")}
             >
               <CircleDashed className="stroke-red-500" strokeWidth={2.5} />
-              <span className="hidden @lg:inline">Todo</span>
+              <span className="hidden lg:inline">Todo</span>
             </TabsTrigger>
             <TabsTrigger
               value="chat"
@@ -432,7 +456,7 @@ export function WorkWorkspace({
               onClick={() => openTab("chat")}
             >
               <MessageSquare className="fill-emerald-500 stroke-emerald-500" />
-              <span className="hidden @lg:inline">Chat</span>
+              <span className="hidden lg:inline">Chat</span>
             </TabsTrigger>
           </TabsList>
         </div>

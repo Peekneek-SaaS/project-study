@@ -318,9 +318,13 @@ export function AnswerSelectionProvider({
                     size="sm"
                     variant="ghost"
                     className="h-8 gap-1.5 text-xs"
-                    onClick={() => {}}
+                    onClick={() =>
+                      consume((text) =>
+                        openModal("paste-into", { kind: "todos", text }),
+                      )
+                    }
                   >
-                    <CircleDashed className="size-3.5  stroke-red-500" />
+                    <CircleDashed className="size-3.5  stroke-red-500 stroke-2.5" />
                   </Button>
                   <Button
                     type="button"

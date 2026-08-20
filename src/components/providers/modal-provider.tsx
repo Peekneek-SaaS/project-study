@@ -6,6 +6,7 @@ import { DeleteModal } from "@/features/main/modal/delete-modal";
 import { DocumentPreviewModal } from "@/features/main/modal/document-preview-modal";
 import { RenameItemModal } from "@/features/main/modal/rename-item-modal";
 import { SearchModal } from "@/features/main/modal/search-modal";
+import { SettingsModal } from "@/features/main/modal/settings-modal";
 import { UploadModal } from "@/features/main/modal/upload-modal";
 import { PasteIntoModal } from "@/features/main/modal/paste-into-modal";
 
@@ -27,6 +28,8 @@ export function ModalProvider() {
       <DocumentPreviewModal />
       {/* Reads `useSearchStore` rather than `useModalStore` — see that store. */}
       <SearchModal />
+      {/* And this one `useSettingsStore`, for the reasons written there. */}
+      <SettingsModal />
       <PasteIntoModal />
     </>
   );

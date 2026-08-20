@@ -12,6 +12,7 @@ import {
 import { useTodoMutations } from "@/features/todo/hooks/use-todo-mutations";
 import type { DayKey } from "@/features/todo/lib/todo-dates";
 import type { TodoPriority } from "@/features/todo/lib/todo-priority";
+import { MAX_TODO_TITLE } from "@/features/todo/lib/todo-title";
 import type { Todo } from "@/features/todo/types";
 import { cn } from "@/lib/utils";
 
@@ -99,7 +100,7 @@ export function TodoEditor({
         autoFocus
         value={title}
         onChange={(event) => setTitle(event.target.value)}
-        maxLength={500}
+        maxLength={MAX_TODO_TITLE}
         aria-label="Task name"
         className="w-full bg-transparent px-1 text-sm outline-none"
       />

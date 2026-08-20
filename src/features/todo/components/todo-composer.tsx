@@ -15,6 +15,7 @@ import {
   DEFAULT_PRIORITY,
   type TodoPriority,
 } from "@/features/todo/lib/todo-priority";
+import { MAX_TODO_TITLE } from "@/features/todo/lib/todo-title";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 
@@ -37,12 +38,31 @@ export function TodoComposer({
   /** The day this composer was opened under. Where the task lands by default. */
   day,
   onClose,
+  onCreated,
+  initialTitle = "",
   autoFocus = true,
   className,
   documentId,
 }: {
   day: DayKey;
   onClose: () => void;
+  /**
+   * Called once a task has been added, where adding one is the end of
+   * something rather than the middle of it.
+   *
+   * Absent on the page, and deliberately: a composer there clears its field and
+   * waits for the next task, because tasks arrive in handfuls. Somewhere the
+   * composer was opened to write down *one* particular thing — the paste
+   * picker, which opens it on an excerpt — there is nothing to wait for, and
+   * the caller says so by passing this.
+   */
+  onCreated?: () => void;
+  /**
+   * The title to start from, for a composer opened on something already
+   * written. Only the first render's value is read: after that the field is the
+   * user's, and a task typed over the top of a paste is not to be reverted.
+   */
+  initialTitle?: string;
   autoFocus?: boolean;
   className?: string;
   /**
@@ -56,7 +76,7 @@ export function TodoComposer({
 }) {
   const { createTodo, isCreating } = useTodoMutations({ documentId });
 
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(initialTitle);
   const [dueDate, setDueDate] = useState<DayKey>(day);
   const [priority, setPriority] = useState<TodoPriority>(DEFAULT_PRIORITY);
   const [timerSeconds, setTimerSeconds] = useState<number | null>(null);
@@ -90,6 +110,14 @@ export function TodoComposer({
     setTitle("");
 
     await createTodo(pending);
+
+    // Whoever opened this for one task takes it from here — usually by
+    // unmounting the composer, which is why nothing below runs for them.
+    if (onCreated) {
+      onCreated();
+      return;
+    }
+
     inputRef.current?.focus();
   };
 
@@ -119,7 +147,7 @@ export function TodoComposer({
         value={title}
         onChange={(event) => setTitle(event.target.value)}
         placeholder="What needs doing?"
-        maxLength={500}
+        maxLength={MAX_TODO_TITLE}
         aria-label="Task name"
         /*
           Stripped back to the text and nothing else, in every state.

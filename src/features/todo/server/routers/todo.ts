@@ -5,13 +5,12 @@ import type { Prisma } from "@/generated/prisma/client";
 
 import { DAY_KEY_PATTERN } from "@/features/todo/lib/todo-dates";
 import { TODO_PRIORITY_VALUES } from "@/features/todo/lib/todo-priority";
+import { MAX_TODO_TITLE } from "@/features/todo/lib/todo-title";
 import { MAX_TIMER_SECONDS } from "@/features/todo/lib/todo-timer";
 import { MODIFIED_VALUES, modifiedRange } from "@/lib/list-filters";
 import { prisma } from "@/lib/prisma";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
-/** A todo's title. Long enough for a sentence, short enough to stay one line. */
-const MAX_TITLE = 500;
 
 const dayKey = z.string().regex(DAY_KEY_PATTERN, "Expected a yyyy-MM-dd date");
 
@@ -321,7 +320,7 @@ export const TodoRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
       z.object({
-        title: z.string().trim().min(1).max(MAX_TITLE),
+        title: z.string().trim().min(1).max(MAX_TODO_TITLE),
         dueDate: dayKey,
         priority: z.enum(TODO_PRIORITY_VALUES).optional(),
         timerSeconds: timerSeconds.nullish(),
@@ -367,7 +366,7 @@ export const TodoRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.string(),
-        title: z.string().trim().min(1).max(MAX_TITLE).optional(),
+        title: z.string().trim().min(1).max(MAX_TODO_TITLE).optional(),
         dueDate: dayKey.optional(),
         priority: z.enum(TODO_PRIORITY_VALUES).optional(),
         timerSeconds: timerSeconds.nullish(),
@@ -508,6 +507,27 @@ export const TodoRouter = createTRPCRouter({
       await assertOwned(input.id, ctx.userId);
       await prisma.todo.delete({ where: { id: input.id } });
       return { id: input.id };
+    }),
+
+  /**
+   * Deletes a handful of tasks at once — what the selection bar calls.
+   *
+   * Scoped by `userId` in the `where` rather than checked one row at a time, so
+   * an id that is not the caller's matches nothing instead of erroring. That is
+   * the right answer for a bulk delete: the request is "remove these", and a
+   * list containing one stale id — a task a second tab finished with a moment
+   * ago — should still remove the others rather than failing whole.
+   *
+   * The count comes back so the caller can say what it did.
+   */
+  removeMany: protectedProcedure
+    .input(z.object({ ids: z.array(z.string()).min(1).max(200) }))
+    .mutation(async ({ ctx, input }) => {
+      const { count } = await prisma.todo.deleteMany({
+        where: { userId: ctx.userId, id: { in: input.ids } },
+      });
+
+      return { count };
     }),
 
   /**

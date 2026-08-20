@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUp, Square } from "lucide-react";
+import { ArrowUp, FileText, Square } from "lucide-react";
 import { motion } from "motion/react";
 import {
   useCallback,
@@ -43,8 +43,23 @@ import { Textarea } from "@/components/ui/textarea";
  * limit eventually pushes the conversation off the top of the screen.
  */
 
+/**
+ * How much room the composer is allowed to take.
+ *
+ * `default` is the composer as the middle of the landing page, where it is the
+ * only thing on screen and the question being written is the whole task.
+ * `compact` is the composer *under a conversation* — a document's panel, an
+ * open chat — where the transcript is what the reader is there for and every
+ * row the box takes is a row of the answer they lose. Same control, less of it:
+ * a lower ceiling before it scrolls, tighter padding, smaller buttons.
+ */
+export type ComposerSize = "default" | "compact";
+
 /** How tall the box may grow before it starts scrolling instead, in px. */
-const MAX_HEIGHT = 220;
+const MAX_HEIGHT: Record<ComposerSize, number> = {
+  default: 220,
+  compact: 120,
+};
 
 /**
  * Everything the text field and the layer behind it must agree on.
@@ -59,8 +74,14 @@ const MAX_HEIGHT = 220;
  * So the metrics are written once, here, and handed to both. `md:text-xs` is
  * part of that: the base textarea changes size at that breakpoint, and a layer
  * that did not would be misaligned on every desktop.
+ *
+ * Per size for the same reason they exist at all: the compact box sheds a row
+ * of padding, and it has to shed it from both layers at once.
  */
-const FIELD_METRICS = "px-2 py-1.5 text-sm leading-relaxed md:text-xs/relaxed";
+const FIELD_METRICS: Record<ComposerSize, string> = {
+  default: "px-2 py-1.5 text-sm leading-relaxed md:text-xs/relaxed",
+  compact: "px-2 py-1 text-sm leading-relaxed md:text-xs/relaxed",
+};
 
 export function ChatComposer({
   onSubmit,
@@ -73,6 +94,7 @@ export function ChatComposer({
   autoFocus = false,
   disabled = false,
   mentions = true,
+  size = "default",
   className,
 }: {
   /** Given the question, trimmed and known non-empty. */
@@ -107,8 +129,14 @@ export function ChatComposer({
    * going to refuse.
    */
   mentions?: boolean;
+  /** How much vertical room this composer may take — see `ComposerSize`. */
+  size?: ComposerSize;
   className?: string;
 }) {
+  const isCompact = size === "compact";
+  const maxHeight = MAX_HEIGHT[size];
+  const fieldMetrics = FIELD_METRICS[size];
+
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   /** The layer the marks are drawn on — see `FIELD_METRICS`. */
@@ -243,8 +271,8 @@ export function ChatComposer({
     if (!textarea) return;
 
     textarea.style.height = "auto";
-    textarea.style.height = `${Math.min(textarea.scrollHeight, MAX_HEIGHT)}px`;
-  }, [value]);
+    textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
+  }, [maxHeight, value]);
 
   useEffect(() => {
     if (autoFocus) textareaRef.current?.focus();
@@ -377,8 +405,21 @@ export function ChatComposer({
       className={cn(
         // The whole thing is one surface that reacts to focus, rather than a
         // bordered textarea with controls parked underneath it.
-        "group/composer relative flex flex-col gap-1 border bg-card p-2 shadow-sm transition-[box-shadow,border-color] duration-200",
+        "group/composer relative flex border bg-card shadow-sm transition-[box-shadow,border-color] duration-200",
         "focus-within:border-ring/60 focus-within:shadow-md dark:bg-muted",
+        /*
+          Both arrangements are columns; what differs is how many rows the parts
+          take. Default gives each of the three its own — label, question,
+          controls. Compact folds the last two together, so the question and the
+          buttons share a line and only the label is above them.
+
+          Which is the only way to have all three where they are wanted. In one
+          row the three are siblings, so the field is the middle sibling by
+          construction: the name holds the left end, the buttons hold the right,
+          and the question can start only where the name stops — an input adrift
+          in the middle of the box the longer the document is called.
+        */
+        isCompact ? "flex-col gap-0.5 px-2 py-1.5" : "flex-col gap-1 p-2",
         // The measure lives here rather than on each caller. Left to the
         // callers it was forgotten in the document panel, so the box ran the
         // full width of the panel while the answers above it sat in a column —
@@ -388,10 +429,19 @@ export function ChatComposer({
         className,
       )}
     >
-      {/* Above the text and inside the border, so it reads as a label on the
-          box rather than a separate control floating over it. */}
+      {/*
+        Inside the border, so it reads as a label on the box rather than a
+        separate control floating over it — and on its own line at the top of
+        it, which is what leaves the left edge to the question. A long name
+        truncates rather than taking the row from the field.
+      */}
       {attachment && (
-        <div className="flex min-w-0 items-center gap-1.5 px-2 pb-1.5 text-xs text-muted-foreground">
+        <div
+          className={cn(
+            "flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground",
+            isCompact ? "px-2 pb-0.5" : "px-2 pb-1.5",
+          )}
+        >
           {attachment}
         </div>
       )}
@@ -407,106 +457,184 @@ export function ChatComposer({
       )}
 
       {/*
+        The question and the buttons, on one line in compact and on two
+        otherwise.
+
+        `contents` is what makes the second case cost nothing: the wrapper stops
+        generating a box of its own and its children become the form's own flex
+        items again, exactly as they were before this div existed. So the
+        stacked layout is untouched and the row is one class rather than two
+        copies of the parts.
+      */}
+      <div className={cn(isCompact ? "flex items-end gap-1" : "contents")}>
+        {/*
         The text and its highlight, stacked. `relative` is what the layer below
         is positioned against, and the wrapper takes its size from the textarea
         — which is the one that actually measures the content.
       */}
-      <div className="relative">
-        {/*
-          The marks, painted behind the real text.
+        <div className={cn("relative", isCompact && "min-w-0 flex-1")}>
+          {/*
+          The question as it is actually read, once a file has been named.
 
-          Only mounted once something has been chosen, so a composer nobody has
-          mentioned a file in carries none of this. `aria-hidden` and
-          `select-none` because it is a duplicate of the question: a screen
-          reader has already been given the textarea, and text that could be
-          selected here would be selected *instead* of the words on top of it.
+          Note which layer is which. While there are no references this is not
+          mounted at all and the textarea shows its own text; the moment one is
+          chosen, this takes over the drawing and the textarea goes transparent
+          on top of it. That swap is what lets a mention be dark words on solid
+          yellow: a textarea cannot colour part of its own value, so the words
+          over a mark can only be black if they are not the textarea's words.
+
+          Seamless because the two share `FIELD_METRICS` to the pixel — the same
+          reason the marks line up with the text in the first place.
+
+          `aria-hidden` and `select-none` because this is a duplicate: the real
+          value, the one a screen reader reads and the one a selection has to
+          come from, is still the textarea's.
 
           It scrolls with the textarea rather than clipping: the box scrolls
           once a question runs past its ceiling, and a layer that stayed put
           would leave the marks behind a few lines up.
         */}
-        {mentioned.length > 0 && (
-          <div
-            ref={highlightRef}
-            aria-hidden
-            className={cn(
-              "pointer-events-none absolute inset-0 overflow-hidden text-transparent select-none",
-              "whitespace-pre-wrap wrap-break-word",
-              FIELD_METRICS,
-            )}
-          >
-            {splitMentions(value, mentioned).map((segment, index) =>
-              segment.isMention ? (
-                <mark
-                  key={index}
-                  /*
+          {mentioned.length > 0 && (
+            <div
+              ref={highlightRef}
+              aria-hidden
+              className={cn(
+                "pointer-events-none absolute inset-0 overflow-hidden select-none",
+                "whitespace-pre-wrap wrap-break-word",
+                fieldMetrics,
+              )}
+            >
+              {splitMentions(value, mentioned).map((segment, index) =>
+                segment.isMention ? (
+                  <mark
+                    key={index}
+                    /*
                     Background and colour only — no padding, no margin, no
                     border. Anything that took up space would push the text of
-                    this layer out of step with the text above it, and the marks
-                    would drift further from their words with every mention in
-                    the line. `box-decoration-break` is what keeps a mention that
-                    wraps looking like one mark rather than two.
+                    this layer out of step with the caret and the selection
+                    above it, and a mention would drift further from its own
+                    mark with every one in the line. `box-decoration-break` is
+                    what keeps a mention that wraps looking like one mark rather
+                    than two.
+
+                    Black on yellow in both themes. The mark is a solid,
+                    light-coloured surface whatever the page is doing around it,
+                    so it takes its own foreground rather than the theme's —
+                    white on yellow, which is what dark mode would otherwise
+                    give it, is the one combination here that cannot be read.
                   */
-                  className=" bg-yellow-200/80 text-transparent [box-decoration-break:clone] dark:bg-yellow-500/80"
-                >
-                  {segment.text}
-                </mark>
-              ) : (
-                <span key={index}>{segment.text}</span>
-              ),
-            )}
-            {/* A trailing newline has no height of its own, so the layer would
+                    className="rounded-[3px] bg-blue-200 text-black [box-decoration-break:clone] dark:bg-blue-300"
+                  >
+                    {/*
+                    The `@` wearing a file icon, rather than an icon put in
+                    front of it.
+
+                    Nothing on this layer may take up space that the textarea
+                    above does not: an icon inserted into the flow would push
+                    every word after it to the right, and since the caret and
+                    the selection come from the textarea — which has no icon —
+                    they would sit further from the words with each mention in
+                    the line. So the sigil keeps its own box and its own advance
+                    width, goes transparent, and the icon is laid over it. The
+                    text moves not at all, and the token reads as a file rather
+                    than as an address.
+                  */}
+                    <span className="relative text-transparent">
+                      {segment.text.slice(0, 1)}
+                      <FileText
+                        aria-hidden
+                        // Centred on the `@` and a touch wider than it, so it
+                        // reads as a glyph rather than a speck. Black-stroked
+                        // rather than the drive's pale outline: at this size, on
+                        // yellow, the outline is what carries the shape.
+                        className="absolute top-1/2 left-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 fill-orange-400 stroke-orange-200"
+                      />
+                    </span>
+                    {segment.text.slice(1)}
+                  </mark>
+                ) : (
+                  <span key={index}>{segment.text}</span>
+                ),
+              )}
+              {/* A trailing newline has no height of its own, so the layer would
                 come up short of the textarea's scroll height and the last line
                 would sit a row off. */}
-            {"\n"}
-          </div>
-        )}
-
-        <Textarea
-          ref={textareaRef}
-          value={value}
-          onChange={(event) => {
-            setValue(event.target.value);
-            refreshMention();
-          }}
-          // Every other way the caret moves: clicking into the middle of a
-          // sentence, the arrow keys, a selection. `onChange` alone would leave
-          // the menu open over a token the cursor had walked out of.
-          onSelect={refreshMention}
-          onBlur={() => setMention(null)}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          disabled={disabled}
-          rows={1}
-          // The ceiling is set from the same constant the resize effect clamps to,
-          // rather than repeated as a utility class — written twice, the scroll
-          // threshold and the visible height drift apart and the box ends up
-          // either clipping early or growing past its own limit.
-          style={{ maxHeight: MAX_HEIGHT }}
-          // Kept in step with the layer behind it, which cannot scroll itself.
-          onScroll={(event) => {
-            if (highlightRef.current) {
-              highlightRef.current.scrollTop = event.currentTarget.scrollTop;
-            }
-          }}
-          // `field-sizing-content` is deliberately absent — see the note above.
-          //
-          // The background stays transparent so the marks underneath show
-          // through, and `relative` puts the words themselves above them.
-          className={cn(
-            "relative w-full resize-none border-none bg-transparent outline-none focus-visible:ring-0",
-            "placeholder:text-muted-foreground/70 disabled:opacity-60 dark:bg-transparent",
-            FIELD_METRICS,
+              {"\n"}
+            </div>
           )}
-        />
-      </div>
 
-      <div className="flex items-center gap-1">
-        <div className="ml-auto flex items-center gap-2">
+          <Textarea
+            ref={textareaRef}
+            value={value}
+            onChange={(event) => {
+              setValue(event.target.value);
+              refreshMention();
+            }}
+            // Every other way the caret moves: clicking into the middle of a
+            // sentence, the arrow keys, a selection. `onChange` alone would leave
+            // the menu open over a token the cursor had walked out of.
+            onSelect={refreshMention}
+            onBlur={() => setMention(null)}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            disabled={disabled}
+            rows={1}
+            // The ceiling is set from the same constant the resize effect clamps to,
+            // rather than repeated as a utility class — written twice, the scroll
+            // threshold and the visible height drift apart and the box ends up
+            // either clipping early or growing past its own limit.
+            style={{ maxHeight }}
+            // Kept in step with the layer behind it, which cannot scroll itself.
+            onScroll={(event) => {
+              if (highlightRef.current) {
+                highlightRef.current.scrollTop = event.currentTarget.scrollTop;
+              }
+            }}
+            // `field-sizing-content` is deliberately absent — see the note above.
+            //
+            // The background stays transparent so the layer underneath shows
+            // through, and `relative` keeps this above it — which is what makes
+            // the caret, the selection and every pointer target the real field.
+            className={cn(
+              "relative w-full resize-none border-none bg-transparent outline-none focus-visible:ring-0",
+              "placeholder:text-muted-foreground/70 disabled:opacity-60 dark:bg-transparent",
+              fieldMetrics,
+              /*
+              Once the layer below is drawing the question, this stops drawing
+              it — two copies of the same words a pixel apart is what "not
+              properly seen" looks like.
+
+              Which leaves two things to hand back, both of which follow
+              `color` and would have gone transparent with the text. The caret
+              is named explicitly, and the selection is given a translucent wash
+              rather than the solid default, so selecting a sentence still shows
+              the sentence rather than a bar over it.
+            */
+              mentioned.length > 0 &&
+                "text-transparent caret-foreground selection:bg-primary/25 selection:text-transparent",
+            )}
+          />
+        </div>
+
+        {/*
+          The right end of whichever line they are on. `ml-auto` is what does it
+          when they have the line to themselves; beside the field, the field's
+          `flex-1` has already taken the slack and this simply follows it.
+        */}
+        <div
+          className={cn(
+            "ml-auto flex items-center gap-2",
+            isCompact && "shrink-0",
+          )}
+        >
           <ProviderPicker
             value={provider}
             onChange={onProviderChange}
             disabled={disabled}
+            // Important, deliberately: the picker sets its own `h-8`, and two
+            // height utilities of the same family on one element are settled by
+            // stylesheet order rather than by which was written last.
+            className={cn(isCompact && "h-7!")}
           />
           {isStreaming && onStop ? (
             <Button
@@ -515,7 +643,7 @@ export function ChatComposer({
               variant="secondary"
               onClick={onStop}
               aria-label="Stop generating"
-              className="size-8"
+              className={cn(isCompact ? "size-7 rounded-full" : "size-8")}
             >
               <Square className="size-3 fill-current" />
             </Button>
@@ -532,9 +660,14 @@ export function ChatComposer({
                 size="icon"
                 disabled={!canSend}
                 aria-label="Send"
-                className="size-8 transition-opacity disabled:opacity-40"
+                className={cn(
+                  "transition-opacity disabled:opacity-40",
+                  // Round, in the row: the pill's own shape repeated at the end
+                  // of it, which is what a square button in a stadium is not.
+                  isCompact ? "size-7 rounded-full" : "size-8",
+                )}
               >
-                <ArrowUp className="size-4" />
+                <ArrowUp className={cn(isCompact ? "size-3.5" : "size-4")} />
               </Button>
             </motion.div>
           )}

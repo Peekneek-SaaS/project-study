@@ -1,11 +1,19 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
+import { Trash2, X } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 import { TodoDaySection } from "@/features/todo/components/todo-day-section";
 import { TodoEmptyState } from "@/features/todo/components/todo-empty-state";
 import TodoFilterView from "@/features/todo/components/todo-filter-view";
 import { useTodoClock } from "@/features/todo/hooks/use-todo-clock";
 import { useTodoDayNavigation } from "@/features/todo/hooks/use-todo-day-navigation";
+import { useTodoMutations } from "@/features/todo/hooks/use-todo-mutations";
 import { useTodosBrowser } from "@/features/todo/hooks/use-todos-browser";
+import { ROW_ATTRIBUTE } from "@/hooks/use-row-interaction";
+import { useRowSelection } from "@/hooks/use-row-selection";
+import { useTodoSelectionStore } from "@/lib/stores/todo-selection-store";
 import type { TodoViewType } from "@/lib/stores/todo-view-store";
 import { cn } from "@/lib/utils";
 
@@ -24,11 +32,66 @@ import { cn } from "@/lib/utils";
  * visibly disagree by a fraction of a second.
  */
 export function TodoBoard({ serverView }: { serverView: TodoViewType }) {
-  const { groups, today, view, isFiltering, hasRunningTimer } =
+  const { todos, groups, today, view, isFiltering, hasRunningTimer } =
     useTodosBrowser(serverView);
 
   const now = useTodoClock(hasRunningTimer);
   const flashingDay = useTodoDayNavigation(view);
+
+  const { removeTodos } = useTodoMutations();
+
+  const selectedIds = useTodoSelectionStore((state) => state.ids);
+  const clearSelection = useTodoSelectionStore((state) => state.clear);
+
+  // The page's order, flattened out of the days. Both things `useRowSelection`
+  // answers are questions about order — which rows lie between the anchor and
+  // the one clicked, which row is below this one — and a day on its own cannot
+  // answer either, which is why this lives here rather than in a section.
+  const rows = useMemo(
+    () =>
+      groups.flatMap((group) =>
+        group.todos.map((todo) => ({
+          id: todo.id,
+          // Opening a task is opening its editor, which belongs to the row.
+          // Enter therefore has nothing to call from up here — the row's own
+          // handler covers it — so this is deliberately empty rather than
+          // duplicating the editor's state on the page.
+          open: () => {},
+        })),
+      ),
+    [groups],
+  );
+
+  const { selectRow, selectAll } = useRowSelection(rows, useTodoSelectionStore);
+
+  // A selection describes what is on screen, so it does not outlive the page.
+  // Ticks left behind would be waiting on the next visit, pointing at tasks the
+  // reader had long since stopped thinking about.
+  //
+  // Only on the way out. A filter narrowing the list mid-selection needs no
+  // cleanup, because what the bar counts and what Delete is given are both read
+  // back off the visible tasks below — a ticked row that has been filtered away
+  // is simply not in either.
+  useEffect(() => clearSelection, [clearSelection]);
+
+  // Read back off what is on screen, as the drive and the wall do: a task can
+  // leave the list while still ticked — deleted from its own menu, or filtered
+  // away — and a stale id would otherwise ride into the count and the request.
+  const selected = todos
+    .filter((todo) => selectedIds.has(todo.id))
+    .map((todo) => todo.id);
+
+  const isSelecting = selected.length > 0;
+  const allSelected = todos.length > 0 && selected.length === todos.length;
+
+  // The bar stays mounted through its own fade, so it needs something to say on
+  // the way out — reading the live count there would flash "0 selected" across
+  // the fade. Updated during the render that changes it rather than in an
+  // effect, which would paint the old number for a frame first.
+  const [shownCount, setShownCount] = useState(selected.length);
+  if (isSelecting && shownCount !== selected.length) {
+    setShownCount(selected.length);
+  }
 
   // Only a filter can empty this page — see `TodoEmptyState`.
   const isEmpty = groups.every((group) => group.todos.length === 0);
@@ -38,11 +101,90 @@ export function TodoBoard({ serverView }: { serverView: TodoViewType }) {
 
   return (
     <>
-      {/* Parked under the title bar, which is itself parked under the header.
-          The offsets those read are declared by the view — the drive's
-          arrangement, spelled out in `main-content.tsx`. */}
-      <div className="sticky top-[calc(var(--drive-sticky-top)+var(--drive-title-h))] z-20 -mx-4 h-(--drive-toolbar-h) bg-background px-4">
-        <TodoFilterView />
+      {/*
+        Parked under the title bar, which is itself parked under the header. The
+        offsets those read are declared by the view — the drive's arrangement,
+        spelled out in `main-content.tsx`.
+
+        The filters and the selection bar share the one grid cell, stacked, so
+        the days underneath never step up or down as a selection starts and
+        ends. They cross-fade in place rather than swapping: mounting one
+        subtree and unmounting the other let this bar collapse to nothing for a
+        frame in between, which read as a flick. `inert` takes the hidden one
+        out of the tab order and off the pointer the moment it starts to leave,
+        so only the live bar can be reached however long the fade runs. The same
+        arrangement, for the same reasons, as the drive's.
+      */}
+      <div className="sticky top-[calc(var(--drive-sticky-top)+var(--drive-title-h))] z-20 -mx-4 grid h-(--drive-toolbar-h) grid-cols-1 grid-rows-1 bg-background px-4 *:col-start-1 *:row-start-1">
+        <div
+          inert={isSelecting}
+          className={cn(
+            "transition-[opacity,visibility] duration-150 ease-out",
+            isSelecting && "invisible opacity-0",
+          )}
+        >
+          <TodoFilterView />
+        </div>
+
+        <div
+          inert={!isSelecting}
+          className={cn(
+            "flex w-full items-center justify-between gap-3 py-2",
+            "transition-[opacity,visibility] duration-150 ease-out",
+            !isSelecting && "invisible opacity-0",
+          )}
+        >
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearSelection}
+              aria-label="Clear the selection"
+            >
+              <X />
+            </Button>
+            {/* `tabular-nums` so counting up does not shuffle everything to the
+                right of the number by a fraction of a character. */}
+            <span className="text-sm tabular-nums">
+              {shownCount} {shownCount === 1 ? "task" : "tasks"} selected
+            </span>
+            {/* Hidden rather than dropped once everything is picked, so the
+                Delete beside it does not slide sideways as the last task joins
+                the selection. ⌘A does the same thing from the keyboard. */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={selectAll}
+              inert={allSelected}
+              className={cn(allSelected && "invisible")}
+            >
+              Select all
+            </Button>
+          </div>
+
+          {/*
+            Straight to the delete, with no dialog in the way.
+
+            Deliberately matching the rest of this page rather than the drive:
+            a task's own menu deletes on the spot, and so does a day's "Delete
+            all", because a task is a line somebody wrote in a second and can
+            write again. A confirmation here and nowhere else would be the odd
+            one out.
+          */}
+          <Button
+            variant="destructive"
+            size="sm"
+            aria-label="Delete the selected tasks"
+            onClick={() => {
+              const ids = selected;
+              clearSelection();
+              void removeTodos(ids);
+            }}
+          >
+            <Trash2 />
+            Delete
+          </Button>
+        </div>
       </div>
 
       {/*
@@ -59,7 +201,25 @@ export function TodoBoard({ serverView }: { serverView: TodoViewType }) {
         instead. The chain has to be unbroken: one wrapper without it is enough
         to push the width back out.
       */}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col pt-2">
+      <div
+        className="flex min-h-0 min-w-0 flex-1 flex-col pt-2"
+        // Clicking past the tasks drops the selection, the way clicking empty
+        // space in a file manager does. Rows carry a row key and answer their
+        // own clicks; buttons, links and menu entries speak for themselves.
+        // Anything else here is background.
+        //
+        // Wrapped around the days alone rather than the whole view, because the
+        // selection bar sits above it — a "Select all" that cleared the
+        // selection on the way back up would be worse than none.
+        onClick={(event) => {
+          const target = event.target as HTMLElement;
+          if (
+            target.closest(`[${ROW_ATTRIBUTE}], button, a, [role='menuitem']`)
+          )
+            return;
+          clearSelection();
+        }}
+      >
         {showEmptyState ? (
           <TodoEmptyState />
         ) : (
@@ -111,6 +271,7 @@ export function TodoBoard({ serverView }: { serverView: TodoViewType }) {
                 now={now}
                 variant={isGrid ? "grid" : "list"}
                 isFlashing={group.key === flashingDay}
+                onSelect={selectRow}
               />
             ))}
           </div>

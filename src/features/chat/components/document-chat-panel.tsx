@@ -330,6 +330,9 @@ export function DocumentChatPanel({ documentId }: { documentId: string }) {
           provider={provider}
           onProviderChange={setProvider}
           disabled={isStreaming}
+          // The narrowest surface the composer appears on, and the one sharing
+          // its height with a document — see `ComposerSize`.
+          size="compact"
           placeholder="Ask about this document…"
           // No `@` picker here: this conversation can only search the document
           // it belongs to, so a menu of the others would offer references it is

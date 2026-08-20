@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import {
+  CircleDashed,
   CornerDownLeft,
   FileText,
   Folder,
@@ -376,7 +377,7 @@ export function SearchModal() {
                   value={`${todo.title} ${todo.document?.name ?? ""} ${todo.id}`}
                   onSelect={() => handleSelectTodo(todo)}
                 >
-                  <SquareCheck className="fill-sky-500 stroke-background" />
+                  <CircleDashed className="stroke-red-500 stroke-2.5" />
                   <span
                     className={cn(
                       "truncate",

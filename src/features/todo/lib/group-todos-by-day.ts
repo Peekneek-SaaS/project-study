@@ -36,6 +36,11 @@ export interface TodoDayGroup {
  * beyond that window when something is actually filed on it, which keeps a todo
  * six months out reachable without rendering the six months in between.
  *
+ * `pinned` is the other way a day gets in: one the reader has asked for by
+ * name, from the header's calendar. Without it, following the calendar to an
+ * empty day three months out would scroll to a section that does not exist —
+ * the window has no opinion about a day nobody has filed anything on.
+ *
  * Grouped here rather than by the database because the window is a question
  * about the reader's today, and the server does not have their clock — the same
  * reason the notes wall groups in the browser.
@@ -45,7 +50,11 @@ export interface TodoDayGroup {
  * `useTodayKey`, which also re-renders all of it when that answer changes at
  * midnight.
  */
-export function groupTodosByDay(todos: Todo[], today: DayKey): TodoDayGroup[] {
+export function groupTodosByDay(
+  todos: Todo[],
+  today: DayKey,
+  pinned: readonly DayKey[] = [],
+): TodoDayGroup[] {
   const byDay = new Map<DayKey, Todo[]>();
 
   for (const todo of todos) {
@@ -58,6 +67,7 @@ export function groupTodosByDay(todos: Todo[], today: DayKey): TodoDayGroup[] {
   for (let offset = FUTURE_DAYS; offset >= -PAST_DAYS; offset--) {
     keys.add(shiftDayKey(today, offset));
   }
+  for (const day of pinned) keys.add(day);
 
   return (
     [...keys]

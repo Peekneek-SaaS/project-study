@@ -58,6 +58,20 @@ function DropdownMenuGroup({
   )
 }
 
+/**
+ * A menu entry.
+ *
+ * `variant="destructive"` is deliberately red-500 rather than the theme's
+ * `destructive` token, and the same red is used in the context menu and the
+ * menubar so every delete in the app reads the same. The token is tuned for
+ * filled surfaces — the confirm button in a delete dialog — and as *text* on
+ * this theme's menu background it does not read as a warning at all. Focus
+ * deepens the text and lays a red wash behind it, so hovering a delete looks
+ * like deleting rather than like hovering any other entry.
+ *
+ * Worth knowing before re-adding this component from the registry, which would
+ * put the token back.
+ */
 function DropdownMenuItem({
   className,
   inset,
@@ -73,7 +87,7 @@ function DropdownMenuItem({
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        "group/dropdown-menu-item relative flex min-h-7 cursor-default items-center gap-2 rounded-md px-2 py-1 text-xs/relaxed transition-colors outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:not-data-[variant=success]:focus:**:text-accent-foreground data-inset:pl-7.5 data-[variant=destructive]:text-primary dark:data-[variant=destructive]:text-accent-foreground data-[variant=destructive]:focus:bg-primary data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/40 data-[variant=success]:bg-emerald-300/25 data-[variant=success]:text-emerald-700 data-[variant=success]:focus:bg-emerald-300/45 data-[variant=success]:focus:text-emerald-800 dark:data-[variant=success]:bg-emerald-400/15 dark:data-[variant=success]:text-emerald-400 dark:data-[variant=success]:focus:bg-emerald-400/25 dark:data-[variant=success]:focus:text-emerald-300 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 data-[variant=destructive]:*:[svg]:text-destructive data-[variant=success]:*:[svg]:text-emerald-600 dark:data-[variant=success]:*:[svg]:text-emerald-400",
+        "group/dropdown-menu-item relative flex min-h-7 cursor-default items-center gap-2 rounded-md px-2 py-1 text-xs/relaxed transition-colors outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:not-data-[variant=success]:focus:**:text-accent-foreground data-inset:pl-7.5 data-[variant=destructive]:text-red-500 dark:data-[variant=destructive]:text-red-500 data-[variant=destructive]:focus:bg-red-500/10 data-[variant=destructive]:focus:text-red-600 data-[variant=destructive]:focus:*:[svg]:text-red-600 dark:data-[variant=destructive]:focus:text-red-400 dark:data-[variant=destructive]:focus:*:[svg]:text-red-400 dark:data-[variant=destructive]:focus:bg-red-500/20 data-[variant=success]:bg-emerald-300/25 data-[variant=success]:text-emerald-700 data-[variant=success]:focus:bg-emerald-300/45 data-[variant=success]:focus:text-emerald-800 dark:data-[variant=success]:bg-emerald-400/15 dark:data-[variant=success]:text-emerald-400 dark:data-[variant=success]:focus:bg-emerald-400/25 dark:data-[variant=success]:focus:text-emerald-300 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 data-[variant=destructive]:*:[svg]:text-red-500 data-[variant=success]:*:[svg]:text-emerald-600 dark:data-[variant=success]:*:[svg]:text-emerald-400",
         className
       )}
       {...props}

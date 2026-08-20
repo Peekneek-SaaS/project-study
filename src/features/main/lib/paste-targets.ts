@@ -11,7 +11,13 @@
  * was made. Which matters here, because the selection's own component is gone
  * by the time the modal opens — the click that opened it cleared the selection.
  */
-export const PASTE_TARGETS = ["notes", "boards", "chats", "documents"] as const;
+export const PASTE_TARGETS = [
+  "notes",
+  "todos",
+  "boards",
+  "chats",
+  "documents",
+] as const;
 
 export type PasteTargetKind = (typeof PASTE_TARGETS)[number];
 
@@ -25,13 +31,24 @@ export interface PasteIntoTarget {
 /** The picker's copy, per kind. */
 export const PASTE_TARGET_COPY: Record<
   PasteTargetKind,
-  { title: string; description: string; placeholder: string; heading: string }
+  {
+    title: string;
+    description: string;
+    heading: string;
+    /** Absent on a kind whose picker is not a search — see `todos`. */
+    placeholder?: string;
+  }
 > = {
   notes: {
     title: "Write in a note",
     description: "Choose the note to add this text to.",
     placeholder: "Search your notes…",
     heading: "Notes",
+  },
+  todos: {
+    title: "Make it a task",
+    description: "Choose the day this task is due.",
+    heading: "Tasks",
   },
   boards: {
     title: "Write on a board",
