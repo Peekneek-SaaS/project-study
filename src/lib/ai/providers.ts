@@ -149,7 +149,7 @@ export interface ResolvedProvider {
 }
 
 export interface FallbackModel {
-  /** Hand this to `streamText`, `generateText` or `generateObject`. */
+  /** Hand this to `generateText` or `streamText`. */
   model: LanguageModel;
   /** The chain it will walk, first to last. */
   chain: AiProvider[];

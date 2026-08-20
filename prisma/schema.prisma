@@ -409,6 +409,7 @@ model StickyNote {
   content    String    @default("")
   color      String    @default("amber")
   textColor  String    @default("ink")
+  fontFamily String    @default("sans")
   fontSize   Int       @default(14)
   showGrid   Boolean   @default(false)
   createdAt  DateTime  @default(now())

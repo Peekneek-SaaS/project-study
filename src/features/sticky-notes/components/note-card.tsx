@@ -61,14 +61,44 @@ export function NoteCard({
    */
   documentId?: string;
 }) {
-  const { saveContent, patchAppearance, removeNote, isRemoving } =
-    useNoteMutations(note.id, documentId);
+  const {
+    saveContent,
+    patchAppearance,
+    removeNote,
+    isRemoving,
+    hasPendingContent,
+  } = useNoteMutations(note.id, documentId);
 
-  // Seeded once. The row's `content` is not read again for the life of this
-  // card, deliberately — see above.
   const [content, setContent] = useState(note.content);
   const [isEditing, setIsEditing] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+
+  /*
+    The row as the server last described it — and the gate for taking a newer
+    one.
+
+    This card holds the text rather than reading it off the row, so a refetch
+    cannot replace a half-written sentence. That is still right, but it was too
+    absolute: it also ignored writes that came from somewhere else entirely.
+    Sending a passage from a chat answer into a note appends to it on the
+    server, the list refetches with the new text, and this card carried on
+    showing the copy it seeded with — the note "only updated on refresh",
+    because a reload was the only thing that mounted a fresh card.
+
+    So a change in the row is adopted, unless this card is the one causing it:
+    not while it is being written on, not while its modal is open, and not
+    while a keystroke is still sitting in the debounce. Any of those means the
+    text on screen is *newer* than the row, and the row would be overwriting it.
+
+    Adjusted during the render that sees the change rather than in an effect —
+    the pattern the day sections and the link dialog use — so the new text
+    paints in the same frame instead of one after it.
+  */
+  const [knownContent, setKnownContent] = useState(note.content);
+  if (note.content !== knownContent) {
+    setKnownContent(note.content);
+    if (!isEditing && !isOpen && !hasPendingContent()) setContent(note.content);
+  }
 
   const articleRef = useRef<HTMLElement>(null);
 
@@ -154,6 +184,10 @@ export function NoteCard({
         // stays free of anything specific to this note.
         style={{
           ...noteAppearanceStyle(appearance),
+          // The card is one surface. The fields on top paint it too, but a
+          // note whose colour depended on its children covering every pixel is
+          // a note that shows a seam the first time one of them does not.
+          backgroundColor: "var(--note-bg)",
           borderColor: "var(--note-edge)",
         }}
         className={cn(
@@ -199,8 +233,6 @@ export function NoteCard({
           `data-state="open"` on the trigger, which stays inside this toolbar.
         */}
         <NoteToolbar
-          appearance={appearance}
-          onAppearanceChange={(patch) => void patchAppearance(patch)}
           onDelete={() => void removeNote()}
           onEdit={startEditing}
           noteTitle={noteDisplayTitle(content)}

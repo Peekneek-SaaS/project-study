@@ -7,6 +7,7 @@ import {
   MAX_NOTE_FONT_SIZE,
   MIN_NOTE_FONT_SIZE,
   NOTE_COLORS,
+  NOTE_FONT_FAMILIES,
   NOTE_TEXT_COLORS,
   randomNoteColor,
 } from "@/features/sticky-notes/lib/note-appearance";
@@ -32,6 +33,7 @@ const MAX_CONTENT = MAX_NOTE_CONTENT;
 const appearanceInput = {
   color: z.enum(NOTE_COLORS).optional(),
   textColor: z.enum(NOTE_TEXT_COLORS).optional(),
+  fontFamily: z.enum(NOTE_FONT_FAMILIES).optional(),
   fontSize: z
     .number()
     .int()
@@ -46,6 +48,7 @@ const noteFields = {
   content: true,
   color: true,
   textColor: true,
+  fontFamily: true,
   fontSize: true,
   showGrid: true,
   createdAt: true,
@@ -153,6 +156,34 @@ export const StickyNoteRouter = createTRPCRouter({
     }),
 
   /**
+   * Every note filed under a document, each carrying the document it belongs to.
+   *
+   * The third listing, and it exists for one caller: the picker that sends an
+   * excerpt from a chat answer into a note. `list` is standalone notes and
+   * `listForDocument` is one document's — neither can answer "all the notes
+   * this person could paste into", and a picker that showed only the standalone
+   * ones quietly hid every note taken *while reading*, which is where most
+   * notes about a document are.
+   *
+   * Its own procedure rather than a flag on `list`, for the reason
+   * `listForDocument` is its own: separate cache keys mean the wall and the
+   * work page are not refetched because a picker was opened.
+   */
+  listInDocuments: protectedProcedure.query(async ({ ctx }) => {
+    const notes = await prisma.stickyNote.findMany({
+      where: { userId: ctx.userId, documentId: { not: null } },
+      orderBy: { updatedAt: "desc" },
+      select: { ...noteFields, document: { select: { id: true, name: true } } },
+    });
+
+    // The relation is nullable in the schema and not in the `where` — narrowed
+    // here so the picker can name the document without a check of its own.
+    return notes.flatMap((note) =>
+      note.document ? [{ ...note, document: note.document }] : [],
+    );
+  }),
+
+  /**
    * Adds a note.
    *
    * The colour is random unless asked for, which is what makes a wall of them
@@ -185,6 +216,7 @@ export const StickyNoteRouter = createTRPCRouter({
           content: input?.content ?? "",
           color: input?.color ?? randomNoteColor(),
           textColor: input?.textColor ?? DEFAULT_NOTE_APPEARANCE.textColor,
+          fontFamily: input?.fontFamily ?? DEFAULT_NOTE_APPEARANCE.fontFamily,
           fontSize: input?.fontSize ?? DEFAULT_NOTE_APPEARANCE.fontSize,
           showGrid: input?.showGrid ?? DEFAULT_NOTE_APPEARANCE.showGrid,
         },

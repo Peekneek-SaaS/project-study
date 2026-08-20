@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MoreVertical, Palette, Pen, Trash2 } from "lucide-react";
+import { MoreVertical, Pen, PenLine, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -10,35 +10,49 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { DeleteNoteDialog } from "@/features/sticky-notes/components/delete-note-dialog";
-import { NoteAppearanceControls } from "@/features/sticky-notes/components/note-appearance-controls";
 import { NO_DRAG_ATTRIBUTE } from "@/features/main/lib/drive-sensors";
-import type { NoteAppearance } from "@/features/sticky-notes/lib/note-appearance";
 import { cn } from "@/lib/utils";
 
 /**
- * What can be done to a note, wherever it is being looked at.
+ * What can be *done* to a note, wherever it is being looked at.
  *
- * Shared by the card and the modal — the modal is the same note at a readable
- * size, so it would be odd for it to be the one place the colours cannot be
- * changed.
+ * Deliberately only that: opening it for writing, and deleting it. How a note
+ * looks used to be here too, and is not any more — a palette on every card put
+ * a control for choosing colours on the wall, over the notes it was for, when
+ * the place anybody actually adjusts a note is the one where they are reading
+ * it at full size. Those controls live in the modal's formatting bar now, next
+ * to the bold and the lists, which is where the rest of "how this note reads"
+ * already was.
  */
 export function NoteToolbar({
-  appearance,
-  onAppearanceChange,
   onDelete,
+  /**
+   * Which surface this row is sitting on.
+   *
+   * `note` is the card, where the buttons are over the paper and take its ink.
+   * `app` is the modal, where they are on the dialog's own chrome — and where
+   * the note's ink would be wrong twice over: it is a colour chosen to read
+   * against the paper, and the paper is not what is behind them there.
+   */
+  tone = "note",
   onEdit,
+  /**
+   * Show or hide the note's whole editing bar — formatting and appearance both.
+   *
+   * Absent on the card, which has no bar to reveal. In the modal it is the pen,
+   * and the argument for hiding it is the same for both halves: they are things
+   * you reach for deliberately, a few times, and then stop thinking about,
+   * while the note itself is what you came to read. Out of the way, the dialog
+   * opens on the words.
+   */
+  onCustomise,
+  isCustomising = false,
   noteTitle,
   isDeleting = false,
   className,
 }: {
-  appearance: NoteAppearance;
-  onAppearanceChange: (patch: Partial<NoteAppearance>) => void;
+  tone?: "note" | "app";
   /** Called once the delete has been confirmed, never straight off the menu. */
   onDelete: () => void;
   /** Names the note in the confirmation — see `noteDisplayTitle`. */
@@ -50,6 +64,8 @@ export function NoteToolbar({
    * editor and has nothing to switch into.
    */
   onEdit?: () => void;
+  onCustomise?: () => void;
+  isCustomising?: boolean;
   className?: string;
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -57,7 +73,11 @@ export function NoteToolbar({
   return (
     <div
       {...{ [NO_DRAG_ATTRIBUTE]: "" }}
-      className={cn("flex items-center text-muted", className)}
+      className={cn(
+        "flex items-center",
+        tone === "app" ? "text-muted-foreground" : "text-muted",
+        className,
+      )}
       // The toolbar sits on a note that answers its own clicks — selecting on
       // one, opening on two. A click on a button here is about the button.
       onClick={(event) => event.stopPropagation()}
@@ -71,49 +91,50 @@ export function NoteToolbar({
       */}
       {onEdit && (
         <Button
-          // variant="ghost"
+          variant="note"
           size="icon-xs"
           aria-label="Write on this note"
-          style={{ color: "var(--note-ink)" }}
+          style={tone === "note" ? { color: "var(--note-ink)" } : undefined}
           onClick={onEdit}
-          className={cn("hover:bg-primary/90")}
+          className={cn("")}
         >
-          <Pen className="text-muted " />
+          <Pen className="" />
         </Button>
       )}
 
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            // variant="ghost"
-            size="icon-xs"
-            aria-label="Change how this note looks"
-            style={{ color: "var(--note-ink)" }}
-            className={cn("hover:bg-primary/70")}
-          >
-            <Palette className="text-muted" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-64">
-          {/* The same controls the settings modal will use — this one is
-              pointed at a note, that one will be pointed at the defaults. */}
-          <NoteAppearanceControls
-            value={appearance}
-            onChange={onAppearanceChange}
-          />
-        </PopoverContent>
-      </Popover>
+      {/* Before the dots and the close, so the three read left to right as
+          "change how this looks", "do something to it", "leave". */}
+      {onCustomise && (
+        <Button
+          variant="note"
+          size="icon-xs"
+          // Named for what a press does rather than for where you are: "Edit"
+          // on a bar that is already open says nothing about what the button
+          // is for.
+          aria-label={isCustomising ? "Hide editing tools" : "Edit this note"}
+          aria-pressed={isCustomising}
+          title={isCustomising ? "Hide editing tools" : "Edit this note"}
+          style={tone === "note" ? { color: "var(--note-ink)" } : undefined}
+          // The bar it opens sits over a field with a live selection — pressing
+          // this must not take the caret with it.
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={onCustomise}
+          className={cn(isCustomising && "border-primary")}
+        >
+          <PenLine />
+        </Button>
+      )}
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
-            // variant="ghost"
+            variant="note"
             size="icon-xs"
             aria-label="Note actions"
             style={{ color: "var(--note-ink)" }}
-            className={cn("hover:bg-primary/90")}
+            className={cn("")}
           >
-            <MoreVertical className="text-muted " />
+            <MoreVertical className="" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-auto min-w-36">

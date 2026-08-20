@@ -11,7 +11,7 @@
  * and neither survives a client bundle quietly.
  */
 
-import { generateObject } from "ai";
+import { generateText, Output } from "ai";
 import z from "zod";
 
 import {
@@ -195,7 +195,13 @@ async function describeDocument(
 ): Promise<
   Pick<
     ProcessedDocument,
-    "title" | "subject" | "summary" | "topics" | "outline" | "provider" | "model"
+    | "title"
+    | "subject"
+    | "summary"
+    | "topics"
+    | "outline"
+    | "provider"
+    | "model"
   >
 > {
   const empty = {
@@ -213,10 +219,15 @@ async function describeDocument(
   try {
     const fallback = createFallbackModel("extraction", preferred);
 
-    const { object } = await generateObject({
+    // `generateText` with an `Output` spec rather than `generateObject`, which
+    // the SDK deprecated in v6 and will remove: same one call, same validated
+    // object, and `output` throws rather than returning something half-shaped
+    // if the model answers with nothing the schema accepts — which the catch
+    // below already treats as "no structure for this document".
+    const { output } = await generateText({
       model: fallback.model,
-      schema: structureSchema,
-      system:
+      output: Output.object({ schema: structureSchema }),
+      instructions:
         "You catalogue study documents so they can be searched and cited " +
         "accurately. You are given the opening of every page, in order. Work " +
         "only from what is there: never invent a chapter, a page number or a " +
@@ -241,13 +252,13 @@ async function describeDocument(
       //
       // Empty strings are the schema's way of saying "not stated" — turned into
       // nulls here so the database holds one kind of absence, not two.
-      title: stripUnstorable(object.title).trim() || stripExtension(fileName),
-      subject: stripUnstorable(object.subject).trim() || null,
-      summary: stripUnstorable(object.summary).trim(),
-      topics: object.topics
+      title: stripUnstorable(output.title).trim() || stripExtension(fileName),
+      subject: stripUnstorable(output.subject).trim() || null,
+      summary: stripUnstorable(output.summary).trim(),
+      topics: output.topics
         .map((topic) => stripUnstorable(topic).trim())
         .filter(Boolean),
-      outline: sanitiseOutline(object.outline, pages.length),
+      outline: sanitiseOutline(output.outline, pages.length),
       provider: used?.provider ?? null,
       model: used?.model ?? null,
     };
@@ -276,15 +287,14 @@ function sanitiseOutline(
       pageStart: Math.max(1, Math.min(pageCount, Math.round(entry.pageStart))),
       pageEnd: Math.max(1, Math.min(pageCount, Math.round(entry.pageEnd))),
     }))
-    .filter((entry) => entry.title.length > 0 && entry.pageStart <= entry.pageEnd)
+    .filter(
+      (entry) => entry.title.length > 0 && entry.pageStart <= entry.pageEnd,
+    )
     .sort((a, b) => a.pageStart - b.pageStart);
 }
 
 /** Which chapter a page falls in, or null if the outline does not cover it. */
-function sectionForPage(
-  outline: OutlineEntry[],
-  page: number,
-): string | null {
+function sectionForPage(outline: OutlineEntry[], page: number): string | null {
   const entry = outline.find(
     (candidate) => page >= candidate.pageStart && page <= candidate.pageEnd,
   );
@@ -434,10 +444,10 @@ async function transcribeScanned(
   try {
     const fallback = createFallbackModel("extraction", preferred);
 
-    const { object } = await generateObject({
+    const { output } = await generateText({
       model: fallback.model,
-      schema: transcriptionSchema,
-      system:
+      output: Output.object({ schema: transcriptionSchema }),
+      instructions:
         "You transcribe scanned documents. Return the text of every page in " +
         "order, exactly as written, preserving headings. Do not summarise, " +
         "translate or comment. If a page is blank, return an empty string for it.",
@@ -460,7 +470,7 @@ async function transcribeScanned(
       ],
     });
 
-    const pages = object.pages
+    const pages = output.pages
       .filter((page) => Number.isFinite(page.page) && page.page >= 1)
       .map((page) => ({
         page: Math.round(page.page),

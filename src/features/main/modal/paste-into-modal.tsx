@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { StickyNote } from "lucide-react";
+import { CircleSlash, FileText, StickyNote } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -137,9 +137,27 @@ function NotesPasteBody({ text, placeholder, onDone }: PasteBodyProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  const { data: notes, isLoading } = useQuery(
+  /*
+    Both kinds of note, because both are somewhere an excerpt can go.
+
+    A note taken against a document is where most notes *about* a document
+    already are — written while reading it — so a picker offering only the
+    standalone wall was hiding the likelier destination. Two queries rather than
+    one: each router entry keeps answering for its own rows, and neither the
+    wall nor a work page is refetched because this dialog opened.
+  */
+  const { data: standalone, isLoading: isLoadingStandalone } = useQuery(
     trpc.stickyNote.list.queryOptions(),
   );
+  const { data: inDocuments, isLoading: isLoadingInDocuments } = useQuery(
+    trpc.stickyNote.listInDocuments.queryOptions(),
+  );
+
+  const isLoading = isLoadingStandalone || isLoadingInDocuments;
+  const notes = standalone ?? [];
+  const documentNotes = inDocuments ?? [];
+  const isEmpty = notes.length === 0 && documentNotes.length === 0;
+
   const update = useMutation(trpc.stickyNote.update.mutationOptions());
 
   const handlePick = async (note: { id: string; content: string }) => {
@@ -164,38 +182,92 @@ function NotesPasteBody({ text, placeholder, onDone }: PasteBodyProps) {
     <PasteSearchShell text={text} placeholder={placeholder}>
       {isLoading && <PasteLoading />}
 
-      {!isLoading && (!notes || notes.length === 0) && (
+      {!isLoading && isEmpty && (
         <CommandEmpty className="text-muted-foreground">
           You have no notes yet.
         </CommandEmpty>
       )}
 
-      {notes && notes.length > 0 && (
+      {!isEmpty && (
         <>
           <CommandEmpty className="text-muted-foreground">
             No note matches that.
           </CommandEmpty>
-          <CommandGroup heading={PASTE_TARGET_COPY.notes.heading}>
-            {notes.map((note) => (
-              <CommandItem
-                key={note.id}
-                // Matched on the whole note, shown by its first line — a note
-                // is remembered by something written in it, which is rarely its
-                // opening words. The same rule the search palette uses.
-                value={`${noteDisplayTitle(note.content)} ${note.content} ${note.id}`}
-                disabled={update.isPending}
-                onSelect={() => void handlePick(note)}
-              >
-                <StickyNote className="fill-yellow-400 stroke-yellow-200" />
-                <span className="truncate">
-                  {noteDisplayTitle(note.content)}
-                </span>
-              </CommandItem>
-            ))}
-          </CommandGroup>
+
+          {notes.length > 0 && (
+            <CommandGroup heading={PASTE_TARGET_COPY.notes.heading}>
+              {notes.map((note) => (
+                <NotePasteItem
+                  key={note.id}
+                  note={note}
+                  isBusy={update.isPending}
+                  onPick={() => void handlePick(note)}
+                />
+              ))}
+            </CommandGroup>
+          )}
+
+          {/*
+            A second group rather than one flat list: which document a note
+            belongs to is most of what tells two "Chapter 4" notes apart, and a
+            heading says it once instead of on every row. The document's name
+            still rides on each row as well — the groups collapse to nothing
+            when the list is filtered, and a match on its own has to say where
+            it lives.
+          */}
+          {documentNotes.length > 0 && (
+            <CommandGroup heading="Notes on documents">
+              {documentNotes.map((note) => (
+                <NotePasteItem
+                  key={note.id}
+                  note={note}
+                  document={note.document}
+                  isBusy={update.isPending}
+                  onPick={() => void handlePick(note)}
+                />
+              ))}
+            </CommandGroup>
+          )}
         </>
       )}
     </PasteSearchShell>
+  );
+}
+
+/**
+ * One note in the picker.
+ *
+ * Matched on the whole note and on its document's name, shown by its first line
+ * — a note is remembered by something written in it, which is rarely its
+ * opening words, and a note about a document is remembered by the document.
+ * The same rule the search palette uses.
+ */
+function NotePasteItem({
+  note,
+  document,
+  isBusy,
+  onPick,
+}: {
+  note: { id: string; content: string };
+  document?: { id: string; name: string };
+  isBusy: boolean;
+  onPick: () => void;
+}) {
+  return (
+    <CommandItem
+      value={`${noteDisplayTitle(note.content)} ${note.content} ${document?.name ?? ""} ${note.id}`}
+      disabled={isBusy}
+      onSelect={onPick}
+    >
+      <StickyNote className="fill-yellow-400 stroke-yellow-200" />
+      <span className="truncate">{noteDisplayTitle(note.content)}</span>
+      {document && (
+        <span className="ml-auto flex min-w-0 shrink items-center gap-1 truncate text-xs text-muted-foreground">
+          <FileText className="size-3 shrink-0 fill-orange-400 stroke-orange-200" />
+          <span className="truncate">{document.name}</span>
+        </span>
+      )}
+    </CommandItem>
   );
 }
 
@@ -224,7 +296,31 @@ function TodosPasteBody({ text, onDone }: PasteBodyProps) {
   const trpc = useTRPC();
   const { data: days } = useQuery(trpc.todo.calendar.queryOptions());
 
+  /*
+    Every document in the drive, not only the ones that already have tasks.
+
+    `todo.documents` exists for the toolbar's *filter*, where offering a
+    document with nothing filed under it would be an option that narrows the
+    page to nothing. This is the opposite question — what could this task be
+    about — and the first task against a document has to be possible to write.
+  */
+  const { data: driveItems } = useQuery(trpc.folder.getAllItems.queryOptions());
+
   const [day, setDay] = useState<DayKey | null>(null);
+  /**
+   * Which document the task is about — once that has been answered.
+   *
+   * Two pieces of state rather than one nullable id, because `null` is a real
+   * answer here and not a missing one: a task standing on its own is the common
+   * case, and "nothing in particular" has to be something somebody can *choose*
+   * rather than the absence of a choice. `about` is what was picked; `asked` is
+   * whether the question has been put yet.
+   *
+   * A document does not decide *where* the task shows — it appears in its day
+   * either way — it decides what it is filed under. See the router's `create`.
+   */
+  const [about, setAbout] = useState<string | null>(null);
+  const [asked, setAsked] = useState(false);
 
   const { pendingDays, doneDays } = useMemo(() => {
     const all = days ?? [];
@@ -239,26 +335,85 @@ function TodosPasteBody({ text, onDone }: PasteBodyProps) {
     };
   }, [days]);
 
+  const documents = driveItems?.documents ?? [];
+
+  /*
+    Which file, asked the way "which note" is asked.
+
+    A searchable list rather than the dropdown this started as: a drive holds
+    more files than a menu wants to scroll, and the way to find one here should
+    be the way to find one everywhere else in this dialog — type a few letters
+    of its name. Same shell, same input, same keyboard.
+
+    Top of the list is "nothing in particular", so the common case is one Enter
+    and the question never becomes a toll on the way to the composer. A drive
+    with no files in it is not asked at all.
+  */
+  if (day && !asked && documents.length > 0) {
+    return (
+      <PasteSearchShell text={text} placeholder="Search your files…">
+        <CommandEmpty className="text-muted-foreground">
+          No file matches that.
+        </CommandEmpty>
+
+        <CommandGroup heading="What is this task about?">
+          <CommandItem
+            value="nothing in particular no file none"
+            onSelect={() => {
+              setAbout(null);
+              setAsked(true);
+            }}
+          >
+            <CircleSlash className="text-muted-foreground" />
+            <span>Nothing in particular</span>
+          </CommandItem>
+
+          {documents.map((document) => (
+            <CommandItem
+              key={document.id}
+              value={`${document.name} ${document.id}`}
+              onSelect={() => {
+                setAbout(document.id);
+                setAsked(true);
+              }}
+            >
+              <FileText className="fill-orange-400 stroke-orange-200" />
+              <span className="truncate">{document.name}</span>
+            </CommandItem>
+          ))}
+        </CommandGroup>
+      </PasteSearchShell>
+    );
+  }
+
   if (day) {
     return (
-      <TodoComposer
-        day={day}
-        // Cut to what the column takes. The composer's own field enforces the
-        // same limit as you type, but a value put *into* it is not typed — so
-        // without this a long excerpt would be rejected by the router after the
-        // dialog had closed, naming a limit the user was never shown. Trimmed
-        // here rather than on save, so what will be written is on screen.
-        initialTitle={text.slice(0, MAX_TODO_TITLE)}
-        // Backing out returns to the month rather than closing the dialog: the
-        // selection is gone by now, so a dismissed picker cannot be reopened on
-        // the same text, and "wrong day" should not cost the paste.
-        onClose={() => setDay(null)}
-        onCreated={() => {
-          toast.success(`Task added for ${dayLabel(day)}`);
-          onDone();
-        }}
-        className="m-3 rounded-xl border"
-      />
+      <div className="flex min-h-0 flex-col">
+        <TodoComposer
+          day={day}
+          // Cut to what the column takes. The composer's own field enforces the
+          // same limit as you type, but a value put *into* it is not typed — so
+          // without this a long excerpt would be rejected by the router after the
+          // dialog had closed, naming a limit the user was never shown. Trimmed
+          // here rather than on save, so what will be written is on screen.
+          initialTitle={text.slice(0, MAX_TODO_TITLE)}
+          // Backing out unwinds one step rather than closing the dialog: the
+          // selection is gone by now, so a dismissed picker cannot be reopened
+          // on the same text, and a wrong turn should not cost the paste. From
+          // the composer that is the file question; from there, the month.
+          onClose={() => setAsked(false)}
+          // What the task is about. The composer writes it through
+          // `useTodoMutations`, which also decides which cached list the
+          // optimistic row lands in — so the task appears on the document's own
+          // tab straight away, not only on the todo page.
+          documentId={about ?? undefined}
+          onCreated={() => {
+            toast.success(`Task added for ${dayLabel(day)}`);
+            onDone();
+          }}
+          className="m-3 rounded-xl border"
+        />
+      </div>
     );
   }
 

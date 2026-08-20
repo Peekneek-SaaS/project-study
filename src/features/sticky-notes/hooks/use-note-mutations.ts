@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import type { NoteAppearance } from "@/features/sticky-notes/lib/note-appearance";
+import type { NoteAppearancePatch } from "@/features/sticky-notes/lib/note-appearance";
 import type { StickyNote } from "@/features/sticky-notes/types";
 import { useTRPC } from "@/trpc/client";
 
@@ -42,16 +42,23 @@ export function useNoteMutations(noteId: string, documentId?: string) {
     updateRef.current = update.mutateAsync;
   });
 
-  // Whichever list this note is in. The filter is deliberately broader than the
-  // key: `list` is cached per `modified` filter, so an unfiltered `queryFilter`
-  // is what reaches every variant of the wall, while the key has to be the exact
-  // one the grid is rendering from for an optimistic write to be seen.
+  /*
+    Whichever list this note is in — as a *filter*, and never as a single key.
+
+    `list` is cached per set of filters: the wall reads it with whatever the
+    toolbar is asking for, so its key holds `{ modified, q, … }`. An optimistic
+    write aimed at `list.queryKey()` with no input is therefore aimed at a
+    different cache entry than the one on screen — it landed in an entry nobody
+    was rendering, the note did not move, and the change only appeared once a
+    refetch replaced the visible entry from the server. Which is exactly what
+    "it changes when I refresh" is.
+
+    A filter matches every variant, so the paint reaches the one being looked at
+    whatever the wall is currently filtered to.
+  */
   const listFilter = documentId
     ? trpc.stickyNote.listForDocument.queryFilter({ documentId })
     : trpc.stickyNote.list.queryFilter();
-  const listKey = documentId
-    ? trpc.stickyNote.listForDocument.queryKey({ documentId })
-    : trpc.stickyNote.list.queryKey();
 
   const flushContent = async () => {
     if (timer.current !== null) {
@@ -97,12 +104,12 @@ export function useNoteMutations(noteId: string, documentId?: string) {
     };
   }, []);
 
-  const patchAppearance = async (patch: Partial<NoteAppearance>) => {
+  const patchAppearance = async (patch: NoteAppearancePatch) => {
     // Painted first: the cached list is what the grid renders from, so writing
     // through it is what makes the colour land on the click rather than on the
-    // response.
-    const previous = queryClient.getQueryData<StickyNote[]>(listKey);
-    queryClient.setQueryData<StickyNote[]>(listKey, (notes) =>
+    // response. Every cached variant, for the reason on `listFilter`.
+    const previous = queryClient.getQueriesData<StickyNote[]>(listFilter);
+    queryClient.setQueriesData<StickyNote[]>(listFilter, (notes) =>
       notes?.map((note) => (note.id === noteId ? { ...note, ...patch } : note)),
     );
 
@@ -110,8 +117,11 @@ export function useNoteMutations(noteId: string, documentId?: string) {
       await update.mutateAsync({ id: noteId, ...patch });
     } catch (error) {
       // Straight back to what it was — an optimistic paint that failed is worse
-      // than one that never happened, because it looks saved.
-      if (previous) queryClient.setQueryData(listKey, previous);
+      // than one that never happened, because it looks saved. Each variant is
+      // restored to its own snapshot rather than to a shared one.
+      for (const [key, notes] of previous) {
+        queryClient.setQueryData(key, notes);
+      }
       toast.error(
         error instanceof Error ? error.message : "Could not update the note",
       );
@@ -134,5 +144,18 @@ export function useNoteMutations(noteId: string, documentId?: string) {
     patchAppearance,
     removeNote,
     isRemoving: remove.isPending,
+    /**
+     * Whether a keystroke is still waiting on the debounce.
+     *
+     * Read by the card before it accepts a newer copy of the note from the
+     * server: between the last keystroke and the flush there is a window where
+     * the database is *behind* what is on screen, and adopting its answer then
+     * would type the user's sentence backwards.
+     *
+     * A function rather than a value because it is asked during a render and
+     * must not cause one — the answer lives in a ref, and nothing re-renders
+     * when it changes.
+     */
+    hasPendingContent: () => pending.current !== null,
   };
 }

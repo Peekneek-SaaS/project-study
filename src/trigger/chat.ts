@@ -241,7 +241,9 @@ export const studyChat = chat
         // quietly missing rather than failing loudly.
         ...chat.toStreamTextOptions({ tools }),
         model: fallback.model,
-        system,
+        // `instructions`, not `system`: the SDK deprecated the older name in
+        // v7 and it is slated for removal. Same prompt, current spelling.
+        instructions: system,
         messages,
         // Load-bearing for the stop button: without it, stopping updates the UI
         // while the model carries on generating — and being a background job,

@@ -714,6 +714,21 @@
   --note-slate: oklch(0.94 0.01 260);
   --note-slate-edge: oklch(0.84 0.02 260);
 
+  /*
+    The hands a note can be written in.
+
+    Stacks rather than webfonts, and deliberately: a sticky note is a small
+    amount of text on a coloured square, so the cost of shipping a font for it
+    would be out of all proportion to what it buys. `--note-hand` degrades to
+    whatever cursive the machine has and then to the app's own sans, which is
+    the honest failure — a note in the wrong font still reads.
+  */
+  --note-font-sans: var(--font-sans);
+  --note-font-serif: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+  --note-font-mono: var(--font-mono);
+  --note-font-hand:
+    "Segoe Print", "Bradley Hand", "Snell Roundhand", cursive, var(--font-sans);
+
   --note-ink-ink: oklch(0.22 0.01 260);
   --note-ink-muted: oklch(0.48 0.01 260);
   --note-ink-crimson: oklch(0.45 0.17 20);
