@@ -85,6 +85,33 @@ const TRACK_B = [
 const TRACK_A_Y = 52;
 const TRACK_B_Y = 190;
 
+/**
+ * The centre line: where the file sits, and where the two tracks come back
+ * together.
+ *
+ * Derived from the tracks rather than typed as a number, because it has to be
+ * the exact midpoint of their two centres or the fan-out on the left and the
+ * merge on the right stop mirroring each other — which at this size reads as
+ * the diagram being slightly crooked rather than as a deliberate offset.
+ */
+const MID_Y = (TRACK_A_Y + TRACK_B_Y + NODE_H) / 2;
+
+/** The right edge of the last box in either track — where the merge sets off. */
+const TRACK_END_X = 610 + NODE_W;
+
+/**
+ * The vertical the two tracks join on, kept clear of the boxes.
+ *
+ * Outside `TRACK_END_X`, not inside it. It used to sit at 744 — four pixels to
+ * the *left* of the 748 the boxes end at — so both lines left the box, doubled
+ * back on themselves, and only then turned down. Running the spine to the
+ * right of everything is what makes the merge read as two tracks arriving.
+ */
+const MERGE_X = 790;
+
+/** Where the joined spine hands off to the terminal dot. */
+const READY_X = 824;
+
 function PipelineDiagram() {
   /** A connector that draws itself, then hands off to the next one. */
   const wire = (delay: number) => ({
@@ -107,8 +134,8 @@ function PipelineDiagram() {
 
   return (
     <svg
-      viewBox="0 0 800 280"
-      className="h-auto w-full min-w-[760px]"
+      viewBox="0 0 860 280"
+      className="h-auto w-full min-w-[820px]"
       fill="none"
       role="img"
       aria-label="One upload starts two independent jobs: building the workspace, and reading the document."
@@ -116,10 +143,10 @@ function PipelineDiagram() {
       {/* ---- The file, where both tracks start ---- */}
       <motion.g {...node(0)}>
         <rect
-          x="10" y={(TRACK_A_Y + TRACK_B_Y) / 2 + 4} width={NODE_W} height={NODE_H}
+          x="10" y={MID_Y - NODE_H / 2} width={NODE_W} height={NODE_H}
           fill="var(--card)" stroke="var(--foreground)" strokeOpacity="0.85" strokeWidth="1.5"
         />
-        <foreignObject x="10" y={(TRACK_A_Y + TRACK_B_Y) / 2 + 4} width={NODE_W} height={NODE_H}>
+        <foreignObject x="10" y={MID_Y - NODE_H / 2} width={NODE_W} height={NODE_H}>
           <div className="flex h-full flex-col justify-center gap-0.5 px-3">
             <span className="flex items-center gap-1.5 text-[12px] font-semibold text-foreground">
               <UploadCloud className="size-3.5 text-primary" />
@@ -134,12 +161,12 @@ function PipelineDiagram() {
 
       {/* ---- The fan-out ---- */}
       <motion.path
-        d={`M${10 + NODE_W} ${(TRACK_A_Y + TRACK_B_Y) / 2 + 30} H200 V${TRACK_A_Y + NODE_H / 2} H${TRACK_A[0].x - 6}`}
+        d={`M${10 + NODE_W} ${MID_Y} H200 V${TRACK_A_Y + NODE_H / 2} H${TRACK_A[0].x - 6}`}
         stroke="var(--foreground)" strokeOpacity="0.28" strokeWidth="1.5"
         {...wire(0.25)}
       />
       <motion.path
-        d={`M${10 + NODE_W} ${(TRACK_A_Y + TRACK_B_Y) / 2 + 30} H200 V${TRACK_B_Y + NODE_H / 2} H${TRACK_B[0].x - 6}`}
+        d={`M${10 + NODE_W} ${MID_Y} H200 V${TRACK_B_Y + NODE_H / 2} H${TRACK_B[0].x - 6}`}
         stroke="var(--foreground)" strokeOpacity="0.28" strokeWidth="1.5"
         {...wire(0.25)}
       />
@@ -204,21 +231,30 @@ function PipelineDiagram() {
         )),
       )}
 
-      {/* ---- The two tracks meeting at the workspace ---- */}
+      {/* ---- The two tracks meeting at the workspace ----
+           Out of the right-hand side of each last box, along to the spine at
+           `MERGE_X`, then in to the dot. Both elbows are drawn as their own
+           path so each track visibly arrives; the short stub into the dot is
+           separate again, so the two do not redraw the same segment twice. */}
       <motion.path
-        d={`M${610 + NODE_W} ${TRACK_A_Y + NODE_H / 2} H744 V${(TRACK_A_Y + TRACK_B_Y) / 2 + 30} H770`}
+        d={`M${TRACK_END_X} ${TRACK_A_Y + NODE_H / 2} H${MERGE_X} V${MID_Y}`}
         stroke="var(--primary)" strokeOpacity="0.5" strokeWidth="1.5"
         {...wire(1.6)}
       />
       <motion.path
-        d={`M${610 + NODE_W} ${TRACK_B_Y + NODE_H / 2} H744 V${(TRACK_A_Y + TRACK_B_Y) / 2 + 30} H770`}
+        d={`M${TRACK_END_X} ${TRACK_B_Y + NODE_H / 2} H${MERGE_X} V${MID_Y}`}
         stroke="var(--primary)" strokeOpacity="0.5" strokeWidth="1.5"
         {...wire(1.6)}
       />
-      <motion.g {...node(1.85)}>
-        <circle cx="778" cy={(TRACK_A_Y + TRACK_B_Y) / 2 + 30} r="7" fill="var(--primary)" />
+      <motion.path
+        d={`M${MERGE_X} ${MID_Y} H${READY_X - 8}`}
+        stroke="var(--primary)" strokeOpacity="0.5" strokeWidth="1.5"
+        {...wire(1.8)}
+      />
+      <motion.g {...node(1.95)}>
+        <circle cx={READY_X} cy={MID_Y} r="7" fill="var(--primary)" />
         <text
-          x="778" y={(TRACK_A_Y + TRACK_B_Y) / 2 + 56} textAnchor="middle"
+          x={READY_X} y={MID_Y + 26} textAnchor="middle"
           fontSize="9.5" fill="var(--primary)" fontFamily="var(--font-mono)"
         >
           READY

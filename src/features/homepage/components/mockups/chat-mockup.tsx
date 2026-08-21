@@ -1,7 +1,14 @@
 "use client";
 
 import { motion } from "motion/react";
-import { ArrowUp, MessageSquare, Search } from "lucide-react";
+import {
+  ArrowUp,
+  CircleDashed,
+  MessageSquare,
+  Reply,
+  Search,
+  StickyNote,
+} from "lucide-react";
 
 import { DURATION, EASE_OUT } from "@/lib/motion";
 import { cn } from "@/lib/utils";
@@ -14,13 +21,21 @@ import { cn } from "@/lib/utils";
  * searches the passages and reads the pages, and the transcript says so. The
  * citation chips at the end are links in the product — they open the document
  * panel at that page — so they are drawn as links here.
+ *
+ * `selection` adds the toolbar that appears when you highlight part of an
+ * answer. Off by default because the hero's copy of this panel is 290px wide
+ * and already carrying the page's first impression; it is switched on for the
+ * "Ask it" tab, where there is room to read it.
  */
 export function ChatMockup({
   className,
   compact,
+  selection,
 }: {
   className?: string;
   compact?: boolean;
+  /** Show a highlighted passage with the note / todo / reply toolbar over it. */
+  selection?: boolean;
 }) {
   return (
     <div
@@ -36,7 +51,22 @@ export function ChatMockup({
         </span>
       </div>
 
-      <div className={cn("flex-1 space-y-2.5 p-2.5", compact ? "" : "p-3.5")}>
+      {/*
+        A measure, not the full width of the panel.
+
+        The real transcript pins itself to one column — `CHAT_COLUMN`, about
+        ninety characters — and both the answers and the composer are measured
+        against it. Without the same limit here the "Ask it" panel stretched
+        every answer into a single edge-to-edge line, which reads as a log file
+        rather than as a conversation. It has no effect on the narrow hero copy,
+        which never reaches the limit.
+      */}
+      <div
+        className={cn(
+          "mx-auto w-full flex-1 space-y-2.5 p-2.5",
+          compact ? "" : "max-w-lg p-3.5",
+        )}
+      >
         {/* The question, right-aligned the way the transcript renders it. */}
         <motion.div
           initial={{ opacity: 0, y: 6 }}
@@ -83,9 +113,49 @@ export function ChatMockup({
             the cytoplasm. Pressure builds against the membrane until it
             ruptures — lysis.
           </p>
-          <p className="text-foreground/55">
-            Plant cells survive it: the cell wall holds the pressure and the
-            cell becomes turgid instead.
+          {/*
+            The selected passage, and what the product offers to do with it.
+
+            Scoped to the *answer* here for the same reason it is scoped there:
+            the real toolbar only appears over text inside an answer, never
+            over your own question or the tool activity, because "reply to the
+            thing I just typed" means nothing.
+          */}
+          {/*
+            Padding above the line, only when the toolbar is showing.
+
+            The real toolbar floats over whatever happens to be above the
+            selection — correct behaviour for a popover, and unavoidable when
+            the selection is on the second line of a paragraph. In a still
+            screenshot that just reads as two elements colliding, so the mock
+            opens a gap for it to land in. `pt-*` rather than `mt-*` because the
+            parent's `space-y` already owns these paragraphs' top margins and
+            would win the specificity fight.
+          */}
+          <p className={cn("text-foreground/55", selection ? "pt-8" : undefined)}>
+            Plant cells survive it:{" "}
+            {/*
+              The toolbar lives *inside* the highlighted span, which is what
+              makes it point at the right words. Anchored to the paragraph it
+              centred itself over the whole line and landed on top of the
+              sentence above — the real one is positioned from the selection's
+              own bounding box, and this is the static equivalent.
+
+              `inline-block` so the span is a predictable box to position
+              against; the phrase is short enough that not breaking inside it
+              costs nothing even on a phone.
+            */}
+            <span
+              className={
+                selection
+                  ? "relative inline-block bg-primary/25 text-foreground"
+                  : undefined
+              }
+            >
+              {selection ? <SelectionToolbar /> : null}
+              the cell wall holds the pressure
+            </span>{" "}
+            and the cell becomes turgid instead.
           </p>
           <div className="flex flex-wrap items-center gap-1 pt-0.5">
             <span className="text-[9.5px] text-foreground/35">From</span>
@@ -116,5 +186,53 @@ export function ChatMockup({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * The toolbar that floats over a highlighted answer.
+ *
+ * The three actions are the product's, in the product's order: keep it as a
+ * note, turn it into a task, or quote it back into the composer. The first two
+ * are icon-only because they open a modal that names itself; "Reply" carries
+ * its label because it is the one that acts immediately, with no confirmation
+ * step to explain it afterwards.
+ *
+ * The icons are deliberately the same marks, in the same colours, as the tabs
+ * on the rail beside this panel — a yellow sticky note, a red ring — so the
+ * toolbar reads as "send this *there*" rather than as three new symbols.
+ *
+ * It arrives late and rises the last few pixels into place, which is the shape
+ * of the real thing: it is `position: fixed` over the live selection and
+ * animates in with the app's `fastTransition` once the range settles.
+ */
+function SelectionToolbar() {
+  return (
+    // Every element here is a `span`, deliberately. The toolbar is rendered
+    // inside the highlighted phrase so it can be positioned against it, and
+    // that phrase lives in a `<p>` — a `<div>` in there is invalid HTML, which
+    // React resolves by reparenting the node and then failing to match it on
+    // hydration. Absolute positioning and `flex` make these spans lay out as
+    // blocks anyway, so nothing is lost by using the legal tag.
+    <motion.span
+      initial={{ opacity: 0, y: 4, scale: 0.97 }}
+      whileInView={{ opacity: 1, y: 0, scale: 1 }}
+      viewport={{ once: true }}
+      transition={{ duration: DURATION.fast, ease: EASE_OUT, delay: 1.1 }}
+      // Above the words it belongs to, the way the real one floats ten pixels
+      // clear of the selection rather than pushing the text down.
+      className="absolute bottom-full left-1/2 z-10 mb-1.5 flex -translate-x-1/2 items-stretch divide-x divide-border rounded-none border border-border bg-popover shadow-md"
+    >
+      <span className="grid h-6 w-7 place-items-center">
+        <StickyNote className="size-3 fill-yellow-400 stroke-yellow-200" />
+      </span>
+      <span className="grid h-6 w-7 place-items-center">
+        <CircleDashed className="size-3 stroke-red-500 stroke-[2.5]" />
+      </span>
+      <span className="flex h-6 items-center gap-1 px-2 text-[9.5px] font-medium whitespace-nowrap text-foreground/75">
+        <Reply className="size-3" />
+        Reply
+      </span>
+    </motion.span>
   );
 }

@@ -1,4 +1,6 @@
+import { Show } from "@clerk/nextjs";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import {
   INK,
@@ -22,7 +24,14 @@ import { cn } from "@/lib/utils";
  * been animating for twelve sections should stop before its last one. The
  * product routes are imported from each feature's `types` module rather than
  * written as strings, so a route that gets renamed takes this with it.
+ *
+ * Being a server component already is what lets the last column use `Show`
+ * directly. The nav, the hero and the closing band all have to be *handed*
+ * their auth-dependent buttons because they are client components; nothing
+ * here runs in the browser, so this one can simply ask.
  */
+
+/** The two columns that read the same to everybody. */
 const COLUMNS = [
   {
     heading: "Workspace",
@@ -43,14 +52,64 @@ const COLUMNS = [
       { label: "Everything in it", href: "#everything" },
     ],
   },
-  {
-    heading: "Get started",
-    links: [
-      { label: "Create an account", href: SIGN_UP_PATH },
-      { label: "Sign in", href: SIGN_IN_PATH },
-    ],
-  },
 ] as const;
+
+/**
+ * The last column, which is a different column depending on who is reading.
+ *
+ * The heading swaps along with the links rather than staying put: "Get
+ * started" over a link to your own dashboard is the same mismatch as "Start
+ * for free" in the nav, just quieter. Signed in there is only one honest link
+ * to put here — the app has no settings or support route of its own to point
+ * at — and one link is a perfectly ordinary size for a footer column.
+ */
+function AccountColumn() {
+  return (
+    <Show
+      when="signed-in"
+      fallback={
+        <FooterColumn heading="Get started">
+          <FooterLink href={SIGN_UP_PATH}>Create an account</FooterLink>
+          <FooterLink href={SIGN_IN_PATH}>Sign in</FooterLink>
+        </FooterColumn>
+      }
+    >
+      <FooterColumn heading="Your account">
+        <FooterLink href={DRIVE_PATH}>Dashboard</FooterLink>
+      </FooterColumn>
+    </Show>
+  );
+}
+
+function FooterColumn({
+  heading,
+  children,
+}: {
+  heading: string;
+  children: ReactNode;
+}) {
+  return (
+    <div>
+      <p className="font-mono text-[10.5px] tracking-[0.12em] text-[oklch(1_0_0_/_0.35)] uppercase">
+        {heading}
+      </p>
+      <ul className="mt-4 space-y-2.5">{children}</ul>
+    </div>
+  );
+}
+
+function FooterLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <li>
+      <Link
+        href={href}
+        className="text-[13px] text-[oklch(1_0_0_/_0.6)] transition-colors hover:text-[oklch(0.99_0_0)]"
+      >
+        {children}
+      </Link>
+    </li>
+  );
+}
 
 export function HomepageFooter() {
   return (
@@ -68,24 +127,16 @@ export function HomepageFooter() {
           </div>
 
           {COLUMNS.map((column) => (
-            <div key={column.heading}>
-              <p className="font-mono text-[10.5px] tracking-[0.12em] text-[oklch(1_0_0_/_0.35)] uppercase">
-                {column.heading}
-              </p>
-              <ul className="mt-4 space-y-2.5">
-                {column.links.map((link) => (
-                  <li key={link.label}>
-                    <Link
-                      href={link.href}
-                      className="text-[13px] text-[oklch(1_0_0_/_0.6)] transition-colors hover:text-[oklch(0.99_0_0)]"
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <FooterColumn key={column.heading} heading={column.heading}>
+              {column.links.map((link) => (
+                <FooterLink key={link.label} href={link.href}>
+                  {link.label}
+                </FooterLink>
+              ))}
+            </FooterColumn>
           ))}
+
+          <AccountColumn />
         </div>
 
         <div

@@ -104,9 +104,10 @@ const SURFACES = [
     points: [
       "Ask one document, or everything you have ever uploaded",
       "Every claim carries the page it came from",
+      "Highlight any answer to keep it as a note, a task, or a reply",
       "Three models behind it — pick one, or let it pick",
     ],
-    render: () => <ChatMockup className="h-[400px]" />,
+    render: () => <ChatMockup className="h-[400px]" selection />,
   },
 ] as const;
 
@@ -129,7 +130,18 @@ export function WorkspaceSection() {
           </Reveal>
         </div>
 
-        <div className="grid border-t border-border lg:grid-cols-[260px_1fr]">
+        {/*
+          `minmax(0, 1fr)` rather than a bare column on both axes.
+
+          A grid column defaults to `auto`, which sizes to its widest item's
+          *max-content* — and the rail below is a row of five `shrink-0`
+          buttons that comes to 485px. On a 390px phone that widened the column
+          past the viewport and set the whole page scrolling sideways, with the
+          rail's own `overflow-x-auto` never getting a chance to do its job.
+          Flooring the minimum at zero is what lets the rail scroll inside a
+          column that fits.
+        */}
+        <div className="grid grid-cols-[minmax(0,1fr)] border-t border-border lg:grid-cols-[260px_minmax(0,1fr)]">
           {/* ---- The rail ---- */}
           <div className="border-b border-border lg:border-r lg:border-b-0">
             <div
