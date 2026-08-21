@@ -18,6 +18,8 @@ import { ChatComposer } from "@/features/chat/components/chat-composer";
 import { ChatGreeting } from "@/features/chat/components/chat-greeting";
 import ChatSuggestions from "@/features/chat/components/chat-suggestions";
 import { ChatThread } from "@/features/chat/components/chat-thread";
+import { CitationToggle } from "@/features/chat/components/citation-toggle";
+import { useChatCitations } from "@/features/chat/hooks/use-chat-citations";
 import { useChatProvider } from "@/features/chat/hooks/use-chat-provider";
 import {
   providersById,
@@ -54,6 +56,7 @@ export function ChatConversation({ chatId }: { chatId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [provider, setProvider] = useChatProvider();
+  const [citations] = useChatCitations();
 
   const { data: chat } = useSuspenseQuery(
     trpc.chat.get.queryOptions({ id: chatId }),
@@ -124,7 +127,10 @@ export function ChatConversation({ chatId }: { chatId: string }) {
    * up to date through `setClientData`, so changing model mid-conversation
    * cannot orphan a stream in flight.
    */
-  const clientData = useMemo(() => ({ provider }), [provider]);
+  const clientData = useMemo(
+    () => ({ provider, cite: citations }),
+    [provider, citations],
+  );
 
   const transport = useTriggerChatTransport<typeof studyChat>({
     task: "study-chat",
@@ -234,6 +240,13 @@ export function ChatConversation({ chatId }: { chatId: string }) {
           </TooltipTrigger>
           <TooltipContent>{title}</TooltipContent>
         </Tooltip>
+
+        {/*
+          Pushed to the far end, away from the title it is not describing. The
+          toggle is about how the *next* answer will be written, so it belongs
+          with the conversation rather than with any one message in it.
+        */}
+        <CitationToggle className="ml-auto" />
       </div>
 
       {messages.length === 0 ? (

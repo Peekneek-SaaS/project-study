@@ -63,6 +63,18 @@ model Document {
   /// notes as it earns.
   stickyNotes StickyNote[]
 
+  /// Notes written *into* the document — pinned to a page and a place on it.
+  ///
+  /// Separate from `stickyNotes` rather than a flag on them, because the two
+  /// are different objects that happen to hold similar text. A sticky note is
+  /// loose paper: it belongs to the document but not to any part of it, and it
+  /// is read on the notes wall. An annotation cannot exist without a page and a
+  /// rectangle on that page — it is a mark *on* a sentence, and it is read by
+  /// clicking the dot sitting over that sentence. Folding them together would
+  /// mean every notes query filtering out the anchored ones and every
+  /// annotation carrying four columns the notes never use.
+  annotations DocumentAnnotation[]
+
   /// What the AI has read out of this document, once it has been through
   /// `process-document-content`. Singular and optional: a document has one
   /// reading of itself, and does not have it until the job has run.
@@ -423,6 +435,83 @@ model StickyNote {
   @@index([userId, documentId, createdAt])
 }
 
+/// One note written onto a place in a document.
+///
+/// Created by selecting text in the PDF and choosing to comment on it, and read
+/// by clicking the dot left behind over that text.
+model DocumentAnnotation {
+  id         String   @id @default(cuid())
+  userId     String
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  /// Which page the selection was on, 1-based, as the reader counts them.
+  pageNumber Int
+
+  /// Where on that page, as fractions of the page box between 0 and 1.
+  ///
+  /// Fractions rather than pixels, and that is the whole reason annotations
+  /// survive being looked at. The viewer draws a page at whatever size the
+  /// panel, the zoom and the device pixel ratio work out to, and none of those
+  /// are stable: dragging the divider, pressing zoom, or opening the same
+  /// document on a phone all produce a different pixel box for the same page.
+  /// A fraction of the box is the same fraction in every one of them, so the
+  /// dot lands on the same sentence whatever size that sentence is drawn at.
+  ///
+  /// The selection's *bounding* box — every line it touches, as one rectangle.
+  ///
+  /// Kept alongside `rects` rather than replaced by it, because the two answer
+  /// different questions. This one is "roughly where on the page is this",
+  /// which is what an index, a sort or a fallback wants, and it is four plain
+  /// columns a query can compare. `rects` is what actually gets painted.
+  x      Float
+  y      Float
+  width  Float
+  height Float
+
+  /// One rectangle per line the selection covers, as `{x,y,width,height}[]`.
+  ///
+  /// A range that runs over three lines has three of these, and painting them
+  /// is the difference between marking the words and marking the paragraph:
+  /// the bounding box above spans from the start of the first line to the end
+  /// of the last, which on a wrapped selection is a block covering text that
+  /// was never selected.
+  ///
+  /// Json rather than a table: they are read whole, written once, never queried
+  /// into, and there are two or three of them. Nullable so rows written before
+  /// this existed still render — the reader falls back to the bounding box,
+  /// which is what they were drawn as anyway.
+  rects Json?
+
+  /// The words that were selected, kept as written.
+  ///
+  /// Not used to find the anchor — the fractions above do that — but a note
+  /// that says only "this is wrong" is useless three weeks later without the
+  /// sentence it was pointing at, and the page underneath may by then be
+  /// scrolled somewhere else. Shown at the head of the note and on the marker's
+  /// tooltip.
+  quote String @default("")
+
+  /// The note itself, in the same HTML the sticky notes store, so the same
+  /// editor and the same modal can read and write it.
+  content String @default("")
+
+  /// Appearance, matching `StickyNote` field for field — see the notes there.
+  /// The colour is also what the dot on the page is painted.
+  color      String  @default("amber")
+  textColor  String  @default("ink")
+  fontFamily String  @default("sans")
+  fontSize   Int     @default(14)
+  showGrid   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Every read is "the annotations on this document", and the viewer asks page
+  /// by page as it renders them.
+  @@index([userId, documentId, pageNumber])
+}
+
 /// How much a todo is shouting.
 ///
 /// `NONE` is a real member rather than a null, because "no priority" is a thing
@@ -522,4 +611,166 @@ model Todo {
   /// them. Its own index rather than a filter on the one above, which leads
   /// with a column this query does not constrain.
   @@index([userId, documentId, dueDate])
+}
+
+/// Which plan an account is on.
+///
+/// A tier and not a set of booleans, because every gate in the app asks the
+/// same question — "is this account at least X" — and an ordered enum answers
+/// it with a comparison rather than with a table of capabilities that has to
+/// be kept in step. What each tier actually grants lives in `billing/lib/plans`
+/// so the marketing page and the server read the same numbers.
+enum PlanTier {
+  FREE
+  STUDY
+  PRO
+}
+
+/// How often the subscription renews. Mirrors Polar's `recurring_interval`.
+enum BillingPeriod {
+  MONTHLY
+  YEARLY
+}
+
+/// Where a subscription is in its life, as Polar tells us.
+///
+/// Deliberately fewer states than Polar has: `incomplete`, `incomplete_expired`
+/// and `unpaid` all mean the same thing to this app — the account is not
+/// entitled — so they collapse into `INACTIVE` rather than spreading three more
+/// cases through every check. `PAST_DUE` is kept apart because it is the one
+/// state where access continues while the payment is retried, and the UI has
+/// something to say about it.
+enum SubscriptionState {
+  INACTIVE
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+/// What an account is allowed to spend, and what it has spent.
+///
+/// One row per user, holding both halves of billing: the mirror of the Polar
+/// subscription, written by the webhook, and the credit wallet, written by the
+/// app. They are together rather than in two tables because of who reads them
+/// and how often — every chat turn and every upload asks "what tier, how many
+/// credits" in the same breath, and that should be one indexed read rather than
+/// a join or two round trips.
+///
+/// The row is created lazily on first read, so signing up touches nothing here
+/// and an account that never opens the app never gets a row.
+///
+/// Polar is the source of truth for *what was paid*; this table is the source
+/// of truth for *what was used*. Nothing here is ever trusted from the client:
+/// the webhook writes the subscription half and the server writes the wallet
+/// half, and both are keyed by the Clerk user id that Polar carries back as
+/// `external_customer_id`.
+model BillingAccount {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  tier   PlanTier          @default(FREE)
+  state  SubscriptionState @default(INACTIVE)
+  period BillingPeriod?
+
+  /// Polar's own ids, kept so a support question can be answered without
+  /// guessing which customer is which. Nullable because a free account has
+  /// never been to a checkout.
+  polarCustomerId     String?
+  polarSubscriptionId String? @unique
+  polarProductId      String?
+
+  /// When the paid period ends — renewal for an active subscription, and the
+  /// date access actually stops for a cancelled one. Access is granted up to
+  /// this instant regardless of `state`, which is what makes "cancel" mean
+  /// "do not renew" rather than "cut me off now".
+  currentPeriodEnd DateTime?
+
+  /// Whether the customer has asked not to renew. Kept separate from `state`
+  /// because Polar keeps a cancelled-but-not-yet-expired subscription `active`,
+  /// and the banner the user sees depends on this rather than on the status.
+  cancelAtPeriodEnd Boolean @default(false)
+
+  /// What is left to spend in this cycle. Decremented atomically — see
+  /// `spendCredits`, which guards on this column rather than reading it first.
+  creditsRemaining Int @default(0)
+
+  /// What this cycle started with, so the UI can draw a meter rather than a
+  /// bare number, and so a support question can tell a grant from a top-up.
+  creditsGranted Int @default(0)
+
+  /// The window the grant belongs to. A cycle whose end has passed is refilled
+  /// on the next read — see `ensureCycle` — which is what makes the monthly
+  /// free allowance work with no cron job to forget to run.
+  cycleStart DateTime @default(now())
+  cycleEnd   DateTime
+
+  /// Whether the one-time joining credits have been handed out. A boolean and
+  /// not a date, because the only question ever asked of it is whether it has
+  /// happened, and a nullable date invites a second meaning nobody defined.
+  welcomeGranted Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  usage UsageEvent[]
+}
+
+/// What a credit was spent on.
+///
+/// The names are the *priced* actions rather than the technical ones: the app
+/// has one chat path and one document path, but a frontier answer costs five
+/// times a fast one and a scanned page costs many times a digital one, so the
+/// meter has to be able to tell them apart. Anything not listed here is free
+/// and is not written down — notes, boards, todos and annotations cost nothing
+/// to serve and are unmetered on every plan, including free.
+enum UsageKind {
+  CHAT_FAST
+  CHAT_FRONTIER
+  DOCUMENT
+  OCR
+}
+
+/// One priced action, as it happened.
+///
+/// The audit trail, and the thing the app has never had: until this table
+/// existed there was no way to answer "what did this account cost us" or "is
+/// the credit price of a message anywhere near its real price". Tokens are
+/// recorded beside the credits precisely so those two can be compared — the
+/// credit table is a guess until a few weeks of these rows turn it into a
+/// measurement.
+///
+/// Written after the work, never before, and never in the same statement as the
+/// debit. A debit that succeeded and a run that then failed is a user who paid
+/// for nothing, which is why `spendCredits` takes a refund path — see there.
+model UsageEvent {
+  id      String         @id @default(cuid())
+  userId  String
+  account BillingAccount @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  kind    UsageKind
+  credits Int
+
+  /// Which model actually answered, as opposed to which one was asked for.
+  /// The fallback chain can change this without the user doing anything, and a
+  /// bill that blames the wrong provider is a bill nobody can reconcile.
+  provider String?
+  model    String?
+
+  inputTokens  Int?
+  outputTokens Int?
+
+  /// What it was about, when there is something to point at. Plain columns
+  /// rather than relations: a usage row must survive the document or chat it
+  /// describes being deleted, or the ledger develops holes exactly where
+  /// somebody is most likely to be querying it.
+  documentId String?
+  chatId     String?
+
+  createdAt DateTime @default(now())
+
+  /// The two questions this table is asked: what has this account spent
+  /// lately, and what did the whole product spend on a given day.
+  @@index([userId, createdAt])
+  @@index([createdAt])
 }

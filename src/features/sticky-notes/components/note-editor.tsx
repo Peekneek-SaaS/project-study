@@ -66,6 +66,7 @@ export function NoteEditor({
    */
   onAppearanceChange,
   readOnly = false,
+  titleField = true,
   /**
    * Whether the formatting row is offered.
    *
@@ -97,6 +98,21 @@ export function NoteEditor({
   onAppearanceChange?: (patch: NoteAppearancePatch) => void;
   readOnly?: boolean;
   formatting?: boolean;
+  /**
+   * Whether the note's name is offered as a field of its own.
+   *
+   * On everywhere a sticky note is written, where the first line *is* the name
+   * and the wall is scanned by it. Off for a page annotation, which is already
+   * named by the sentence it was written against — that quote sits above this
+   * editor in the modal, so a second "Name this note…" field asks the reader to
+   * title a thing that has a title, and the notes it produces are called
+   * "Untitled note" because nobody ever fills it in.
+   *
+   * The title *line* still exists in the content either way; this only decides
+   * whether there is a box for it. A note written without one keeps an empty
+   * first line, which `joinNote` handles and every reader already tolerates.
+   */
+  titleField?: boolean;
   spacing?: "tight" | "roomy";
   className?: string;
 }) {
@@ -181,30 +197,31 @@ export function NoteEditor({
 
   return (
     <div className={cn("flex min-h-0 flex-1 flex-col", className)}>
-      <Input
-        value={noteTitleLine(content)}
-        onChange={(event) =>
-          onChange(joinNote(event.target.value, noteBody(content)))
-        }
-        onKeyDown={(event) => {
-          // Enter would submit nothing and do nothing here; carrying on into
-          // the note is what the key means on a sheet of paper.
-          if (event.key !== "Enter") return;
-          event.preventDefault();
-          bodyRef.current?.focus();
-        }}
-        placeholder={readOnly ? "" : "Name this note…"}
-        aria-label="Note name"
-        spellCheck={false}
-        readOnly={readOnly}
-        data-note-field="title"
-        style={fieldStyle}
-        className={cn(
-          // `md:` named alongside the base size, always: `Input` ships
-          // `md:text-xs/relaxed`, and an unprefixed size neither merges it away
-          // nor outranks it — see the heading below.
-          "shrink-0 truncate border-none px-3 text-lg font-semibold outline-none placeholder:font-normal placeholder:opacity-50 md:text-lg",
-          /*
+      {titleField ? (
+        <Input
+          value={noteTitleLine(content)}
+          onChange={(event) =>
+            onChange(joinNote(event.target.value, noteBody(content)))
+          }
+          onKeyDown={(event) => {
+            // Enter would submit nothing and do nothing here; carrying on into
+            // the note is what the key means on a sheet of paper.
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            bodyRef.current?.focus();
+          }}
+          placeholder={readOnly ? "" : "Name this note…"}
+          aria-label="Note name"
+          spellCheck={false}
+          readOnly={readOnly}
+          data-note-field="title"
+          style={fieldStyle}
+          className={cn(
+            // `md:` named alongside the base size, always: `Input` ships
+            // `md:text-xs/relaxed`, and an unprefixed size neither merges it away
+            // nor outranks it — see the heading below.
+            "shrink-0 truncate border-none px-3 text-lg font-semibold outline-none placeholder:font-normal placeholder:opacity-50 md:text-lg",
+            /*
             24px, and fixed: the name is the note's heading here, and it is
             deliberately not derived from `--note-font-size` — that one sizes
             the *writing*, and a heading that grew with it turned the dialog
@@ -218,18 +235,19 @@ export function NoteEditor({
             same breakpoint puts the two in one group, where `cn` keeps the
             later of them and the media rule disappears entirely.
           */
-          isRoomy && "h-auto px-5 pt-4 pb-3 text-2xl md:text-2xl",
-          // `focus-visible:`, not `focus:` — the ring the note is turning off
-          // is written under that variant, and browsers treat a focused text
-          // field as always matching it. A ring drawn inside a note's own edge
-          // reads as damage rather than as focus; the caret is the indicator.
-          "focus-visible:border-transparent focus-visible:ring-0",
-          // A read-only card is something to click, not something to select
-          // into — without this a double-click highlights a word on its way to
-          // opening the editor.
-          readOnly && "cursor-pointer select-none",
-        )}
-      />
+            isRoomy && "h-auto px-5 pt-4 pb-3 text-2xl md:text-2xl",
+            // `focus-visible:`, not `focus:` — the ring the note is turning off
+            // is written under that variant, and browsers treat a focused text
+            // field as always matching it. A ring drawn inside a note's own edge
+            // reads as damage rather than as focus; the caret is the indicator.
+            "focus-visible:border-transparent focus-visible:ring-0",
+            // A read-only card is something to click, not something to select
+            // into — without this a double-click highlights a word on its way to
+            // opening the editor.
+            readOnly && "cursor-pointer select-none",
+          )}
+        />
+      ) : null}
 
       {formatting && !readOnly && (
         /*

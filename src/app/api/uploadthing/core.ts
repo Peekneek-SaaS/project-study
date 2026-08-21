@@ -3,6 +3,7 @@ import { createUploadthing, type FileRouter } from "uploadthing/next";
 import { UploadThingError } from "uploadthing/server";
 import z from "zod";
 
+import { getEntitlements } from "@/features/billing/server/entitlements";
 import {
   DOCUMENT_MAX_FILE_COUNT,
   DOCUMENT_MAX_FILE_SIZE,
@@ -48,6 +49,32 @@ export const ourFileRouter = {
       if (files.length > DOCUMENT_MAX_FILE_COUNT) {
         throw new UploadThingError(
           `Only ${DOCUMENT_MAX_FILE_COUNT} files can go up at once.`,
+        );
+      }
+
+      /*
+        The plan's shelf space, checked before a byte moves.
+
+        Here rather than in `onUploadComplete`, and that is the whole reason
+        this check is worth writing: refusing after the upload means the file is
+        already stored and paid for, and the user has watched a progress bar
+        finish before being told no. Counting the batch in as well as what is
+        already there is what stops ten files at once walking past a limit of
+        three.
+
+        Documents are counted, not pages — the page count is not known until the
+        file has been read, and that check lives where it becomes knowable, in
+        the processing task.
+      */
+      const entitlements = await getEntitlements(userId);
+      const owned = await prisma.document.count({ where: { userId } });
+
+      if (owned + files.length > entitlements.plan.documentLimit) {
+        const room = Math.max(0, entitlements.plan.documentLimit - owned);
+        throw new UploadThingError(
+          room === 0
+            ? `${entitlements.plan.name} holds ${entitlements.plan.documentLimit} documents and yours is full. Remove one, or move to a larger plan.`
+            : `${entitlements.plan.name} holds ${entitlements.plan.documentLimit} documents — there is room for ${room} more.`,
         );
       }
 

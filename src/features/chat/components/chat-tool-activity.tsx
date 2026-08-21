@@ -2,7 +2,13 @@
 
 import { getToolName, type ToolUIPart } from "ai";
 import { AnimatePresence, motion } from "motion/react";
-import { BookOpen, ChevronRight, Loader2, Search } from "lucide-react";
+import {
+  BookOpen,
+  ChevronRight,
+  Loader2,
+  PencilLine,
+  Search,
+} from "lucide-react";
 import { useState } from "react";
 
 import { DURATION, EASE_OUT, fastTransition } from "@/lib/motion";
@@ -30,9 +36,42 @@ interface Passage {
   text?: string;
 }
 
+/** One thing the user wrote, as `readWorkspace` hands it back. */
+interface WorkspaceResult {
+  kind?: string;
+  title?: string;
+  document?: string;
+  page?: number;
+  quote?: string;
+  text?: string;
+  due?: string;
+  done?: boolean;
+}
+
 interface ToolOutput {
   found?: number;
   passages?: Passage[];
+  items?: WorkspaceResult[];
+}
+
+/**
+ * Which of the three tools this is.
+ *
+ * Named rather than tested inline, because every branch below asks the same
+ * question and a fourth tool should be one line here rather than five string
+ * comparisons scattered through the file.
+ */
+type Step = "search" | "read" | "workspace";
+
+function stepOf(part: ToolUIPart): Step {
+  switch (getToolName(part)) {
+    case "readDocumentPages":
+      return "read";
+    case "readWorkspace":
+      return "workspace";
+    default:
+      return "search";
+  }
 }
 
 /** "page 5", or "pages 4–5". The em dash is the range, not a hyphen. */
@@ -45,34 +84,73 @@ function pageLabel(passage: Passage): string | null {
   return `pages ${pageStart}–${pageEnd}`;
 }
 
+/** English, for a count that is usually not one. */
+const plural = (count: number, word: string) =>
+  `${count} ${word}${count === 1 ? "" : "s"}`;
+
 /**
  * The one-line summary of a step, written in the tense it is in.
  *
  * Present continuous while it runs and past once it is done, because that is
  * the difference between "this is happening" and "this happened" — and a list
  * of finished steps all saying "Searching…" reads as a stuck chat.
+ *
+ * The workspace line says "you wrote" on purpose. It is the same distinction
+ * the prompt spends a paragraph on — the user's own work is not the document's
+ * — and a reader watching the assistant work should be able to see which of the
+ * two it just went and looked at.
  */
 function summarise(part: ToolUIPart): string {
-  const name = getToolName(part);
-  const isReading = name === "readDocumentPages";
-  const running = part.state !== "output-available" && part.state !== "output-error";
+  const step = stepOf(part);
+  const running =
+    part.state !== "output-available" && part.state !== "output-error";
 
   if (running) {
     const query = (part.input as { query?: string } | undefined)?.query;
-    if (isReading) return "Reading pages…";
+    if (step === "read") return "Reading pages…";
+    if (step === "workspace") {
+      return query
+        ? `Looking through your notes for “${query}”…`
+        : "Looking through your notes and todos…";
+    }
     return query ? `Searching for “${query}”…` : "Searching your documents…";
   }
 
   if (part.state === "output-error") {
-    return isReading ? "Could not read those pages" : "That search failed";
+    if (step === "read") return "Could not read those pages";
+    if (step === "workspace") return "Could not read your notes";
+    return "That search failed";
   }
 
   const output = part.output as ToolOutput | undefined;
-  const found = output?.found ?? output?.passages?.length ?? 0;
+  const found =
+    output?.found ?? output?.passages?.length ?? output?.items?.length ?? 0;
 
-  if (isReading) return `Read ${found} passage${found === 1 ? "" : "s"}`;
+  if (step === "read") return `Read ${plural(found, "passage")}`;
+  if (step === "workspace") {
+    return found === 0
+      ? "Found nothing you had written about that"
+      : `Read ${plural(found, "thing")} you wrote`;
+  }
   if (found === 0) return "Found nothing for that search";
-  return `Found ${found} passage${found === 1 ? "" : "s"}`;
+  return `Found ${plural(found, "passage")}`;
+}
+
+/**
+ * A workspace item as two lines: what it is, and what it says.
+ *
+ * The heading carries whatever locates it — the document, the page, the day it
+ * is due — because "Osmosis recap" on its own is not enough to recognise a note
+ * by three weeks later, which is the same reason the annotation keeps its
+ * quote.
+ */
+function workspaceLabel(item: WorkspaceResult): string {
+  const parts = [item.document];
+
+  if (typeof item.page === "number") parts.push(`page ${item.page}`);
+  if (item.due) parts.push(item.done ? `done · ${item.due}` : `due ${item.due}`);
+
+  return [item.title, ...parts.filter(Boolean)].join(" · ");
 }
 
 export function ChatToolActivity({ part }: { part: ToolUIPart }) {
@@ -80,10 +158,15 @@ export function ChatToolActivity({ part }: { part: ToolUIPart }) {
 
   const isRunning =
     part.state !== "output-available" && part.state !== "output-error";
-  const passages = (part.output as ToolOutput | undefined)?.passages ?? [];
-  const canExpand = passages.length > 0;
 
-  const Icon = getToolName(part) === "readDocumentPages" ? BookOpen : Search;
+  const output = part.output as ToolOutput | undefined;
+  const passages = output?.passages ?? [];
+  const items = output?.items ?? [];
+  const canExpand = passages.length > 0 || items.length > 0;
+
+  const step = stepOf(part);
+  const Icon =
+    step === "read" ? BookOpen : step === "workspace" ? PencilLine : Search;
 
   return (
     <motion.div
@@ -133,6 +216,10 @@ export function ChatToolActivity({ part }: { part: ToolUIPart }) {
             transition={{ duration: DURATION.fast, ease: EASE_OUT }}
             className="overflow-hidden"
           >
+            {/* One list, whichever kind of result filled it. The two shapes
+                are laid out identically — a heading that locates the thing and
+                two lines of what it says — so a chat that searched a document
+                and then read a note does not change format between the two. */}
             <ul className="mt-1 flex flex-col gap-1.5 border-s ps-3">
               {passages.map((passage, index) => (
                 <li key={index} className="flex flex-col gap-0.5">
@@ -144,6 +231,19 @@ export function ChatToolActivity({ part }: { part: ToolUIPart }) {
                   {passage.text && (
                     <span className="line-clamp-2 text-xs text-muted-foreground">
                       {passage.text}
+                    </span>
+                  )}
+                </li>
+              ))}
+
+              {items.map((item, index) => (
+                <li key={index} className="flex flex-col gap-0.5">
+                  <span className="text-xs font-medium text-foreground">
+                    {workspaceLabel(item)}
+                  </span>
+                  {(item.quote ?? item.text) && (
+                    <span className="line-clamp-2 text-xs text-muted-foreground">
+                      {item.quote ? `“${item.quote}”` : item.text}
                     </span>
                   )}
                 </li>

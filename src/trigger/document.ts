@@ -2,7 +2,7 @@ import { AbortTaskRunError, logger, schemaTask } from "@trigger.dev/sdk";
 import z from "zod";
 
 import type { Prisma } from "@/generated/prisma/client";
-import { processDocument } from "@/lib/ai/document-processing";
+import { MAX_SCANNED_PAGES, processDocument } from "@/lib/ai/document-processing";
 import { UnsupportedDocumentError } from "@/lib/ai/extraction";
 import { EMPTY_SNAPSHOT } from "@/features/board/lib/scene";
 import {
@@ -10,6 +10,16 @@ import {
   randomNoteColor,
 } from "@/features/sticky-notes/lib/note-appearance";
 import { stripExtension } from "@/lib/document-file-types";
+import {
+  documentCredits,
+  getEntitlements,
+  InsufficientCreditsError,
+  ocrCredits,
+  PlanLimitError,
+  recordUsage,
+  refundCredits,
+  spendCredits,
+} from "@/features/billing/server/entitlements";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -215,6 +225,27 @@ export const processDocumentContent = schemaTask({
       select: { id: true },
     });
 
+    /*
+      What this document has been charged, so the catch below can give it back.
+
+      Declared outside the `try` because that is the only scope both halves can
+      see. It stays at zero until the debit has actually succeeded, so a refund
+      on a path that failed earlier is a no-op rather than free credits.
+    */
+    let charged = 0;
+
+    /*
+      The OCR half of that charge, kept separately so it can be given back on
+      its own.
+
+      A transcription that was allowed, paid for and then came back empty — a
+      model that refused, a PDF it could not open — leaves the document readable
+      from whatever the extractor found and the user out of pocket for a pass
+      that produced nothing. Only this part is refunded; the reading itself did
+      happen.
+    */
+    let ocrCharge = 0;
+
     try {
       const response = await fetch(document.pdfUrl);
       if (!response.ok) {
@@ -224,10 +255,61 @@ export const processDocumentContent = schemaTask({
       }
       const bytes = new Uint8Array(await response.arrayBuffer());
 
+      /*
+        What this document costs, decided the moment its size is known.
+
+        Charged before the model is called and refunded if the run then fails —
+        the alternative, billing on success, means a document that fails on its
+        third retry has had three digest calls paid for by nobody. The page
+        count comes from local extraction, so a refusal here has cost a fetch
+        and some CPU rather than a provider call.
+      */
       const processed = await processDocument({
         bytes,
         fileName: document.name,
         preferredProvider: provider ?? null,
+        onExtracted: async ({ pageCount, looksScanned }) => {
+          const entitlements = await getEntitlements(document.userId);
+          const { plan } = entitlements;
+
+          if (pageCount > plan.pageLimit) {
+            throw new PlanLimitError(
+              "pages",
+              `This document is ${pageCount} pages and ${plan.name} reads up ` +
+                `to ${plan.pageLimit.toLocaleString()}. A larger plan will ` +
+                `read it in full.`,
+            );
+          }
+
+          /*
+            OCR is the most expensive thing here, so it is plan-gated and priced
+            on top rather than folded into the page rate.
+
+            The page ceiling is part of the *price*, not just the transcriber's
+            own limit: `transcribeScanned` refuses anything over
+            `MAX_SCANNED_PAGES` and returns null, so charging for a 200-page
+            scan would be charging for work that was never going to happen. The
+            document still gets read — whatever text the extractor found is kept
+            — it simply is not transcribed, and is not billed as if it were.
+          */
+          const allowOcr =
+            looksScanned && plan.ocr && pageCount <= MAX_SCANNED_PAGES;
+
+          ocrCharge = allowOcr ? ocrCredits(pageCount) : 0;
+          const cost = documentCredits(pageCount) + ocrCharge;
+
+          await spendCredits({ userId: document.userId, credits: cost });
+          charged = cost;
+
+          logger.log("Charged for reading a document", {
+            documentId,
+            pageCount,
+            credits: cost,
+            ocr: allowOcr,
+          });
+
+          return { allowOcr };
+        },
       });
 
       logger.log("Read document", {
@@ -281,12 +363,76 @@ export const processDocumentContent = schemaTask({
         }
       });
 
+      // Paid for a transcription that did not happen — see `ocrCharge`.
+      if (ocrCharge > 0 && !processed.transcribed) {
+        await refundCredits({ userId: document.userId, credits: ocrCharge });
+        charged -= ocrCharge;
+        logger.log("Refunded an OCR pass that produced nothing", {
+          documentId,
+          credits: ocrCharge,
+        });
+      }
+
+      await recordUsage({
+        userId: document.userId,
+        kind: processed.transcribed ? "OCR" : "DOCUMENT",
+        credits: charged,
+        provider: processed.provider,
+        model: processed.model,
+        documentId,
+      });
+
       return {
         documentId,
         pageCount: processed.pageCount,
         chunkCount: processed.chunks.length,
+        credits: charged,
       };
     } catch (error) {
+      /*
+        Whatever went wrong, the user does not pay for it.
+
+        First thing in the handler, before any branch decides what kind of
+        failure this was, because every one of them ends with the work not
+        having been done. `charged` is zero until the moment the debit
+        succeeded, so this is safe on the paths that failed before it.
+      */
+      if (charged > 0) {
+        await refundCredits({ userId: document.userId, credits: charged });
+        logger.log("Refunded credits for a failed reading", {
+          documentId,
+          credits: charged,
+        });
+        charged = 0;
+      }
+
+      /*
+        Out of credits, or past a plan's limits.
+
+        Both are finished answers rather than failures to retry — a 400-page
+        document will still be 400 pages on the third attempt, and an empty
+        balance will still be empty a second later. The message is written to
+        be read by the person who uploaded the file, and it is what the drive
+        shows against the document.
+      */
+      if (
+        error instanceof InsufficientCreditsError ||
+        error instanceof PlanLimitError
+      ) {
+        await prisma.documentContent.update({
+          where: { id: content.id },
+          data: { status: "FAILED", error: error.message },
+        });
+
+        logger.warn("Document refused by plan limits", {
+          documentId,
+          userId: document.userId,
+          reason: error.name,
+        });
+
+        return { documentId, pageCount: 0, chunkCount: 0, credits: 0 };
+      }
+
       // A format nothing here can read is a finished answer, not a failure to
       // retry: a .doc will still be a .doc on the third attempt. The row is
       // marked with something the user can act on and the run ends cleanly.
@@ -301,7 +447,7 @@ export const processDocumentContent = schemaTask({
           name: document.name,
         });
 
-        return { documentId, pageCount: 0, chunkCount: 0 };
+        return { documentId, pageCount: 0, chunkCount: 0, credits: 0 };
       }
 
       throw error;

@@ -15,6 +15,7 @@ import { HomepageFooter } from "@/features/homepage/components/homepage-footer";
 import { HomepageNav } from "@/features/homepage/components/homepage-nav";
 import { ModelsSection } from "@/features/homepage/components/models-section";
 import { PipelineSection } from "@/features/homepage/components/pipeline-section";
+import { PricingSection } from "@/features/homepage/components/pricing-section";
 import { WorkspaceSection } from "@/features/homepage/components/workspace-section";
 
 /**
@@ -41,6 +42,11 @@ import { WorkspaceSection } from "@/features/homepage/components/workspace-secti
  * ink bands fall on `comprehension` and the closing call to action, which are
  * the two moments the page changes what it is talking about. A reader
  * scrolling fast still feels the page turn.
+ *
+ * Pricing goes last, after "everything else" and before the ask. Deliberately
+ * not near the top: the reader has to want the thing before the cost of it
+ * means anything, and a price quoted to somebody who does not yet know what
+ * they are buying is only ever too much.
  */
 export function HomepageView() {
   return (
@@ -57,6 +63,7 @@ export function HomepageView() {
         <AnswersSection />
         <ModelsSection />
         <EverythingSection />
+        <PricingSection />
         <FinalCtaSection cta={<FinalCtaAuthCta />} />
       </main>
 

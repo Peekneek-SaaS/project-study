@@ -18,6 +18,8 @@ import { ChatComposer } from "@/features/chat/components/chat-composer";
 import { ChatGreeting } from "@/features/chat/components/chat-greeting";
 import ChatSuggestions from "@/features/chat/components/chat-suggestions";
 import { ChatThread } from "@/features/chat/components/chat-thread";
+import { CitationToggle } from "@/features/chat/components/citation-toggle";
+import { useChatCitations } from "@/features/chat/hooks/use-chat-citations";
 import { useChatProvider } from "@/features/chat/hooks/use-chat-provider";
 import {
   providersById,
@@ -100,6 +102,7 @@ export function DocumentChatPanel({ documentId }: { documentId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [provider, setProvider] = useChatProvider();
+  const [citations] = useChatCitations();
 
   const { data } = useSuspenseQuery({
     ...trpc.chat.forDocument.queryOptions({ documentId }),
@@ -194,7 +197,18 @@ export function DocumentChatPanel({ documentId }: { documentId: string }) {
    * up to date through `setClientData`, so changing model mid-conversation
    * cannot orphan a stream in flight.
    */
-  const clientData = useMemo(() => ({ provider }), [provider]);
+  /*
+    The same preference the main chat's bar sets.
+
+    This panel has no bar of its own to put the toggle in — it is a tab inside
+    the work page, and its only chrome is the composer — but it reads the value
+    all the same. Someone who turned citations off in the chat page and then
+    opened a document would otherwise find them back on with no way to see why.
+  */
+  const clientData = useMemo(
+    () => ({ provider, cite: citations }),
+    [provider, citations],
+  );
 
   const transport = useTriggerChatTransport<typeof studyChat>({
     task: "study-chat",
@@ -357,9 +371,33 @@ export function DocumentChatPanel({ documentId }: { documentId: string }) {
           attachment={
             <>
               <FileText className="size-3.5 shrink-0 fill-orange-400 stroke-orange-200" />
-              <span className="truncate" title={documentName}>
+              {/*
+                `min-w-0` alongside the truncation, which without it does
+                nothing: a flex item defaults to `min-width: auto`, so a
+                `whitespace-nowrap` span refuses to shrink below the full width
+                of its text and overflows the strip instead of ellipsising. It
+                mattered less when the name was the only thing on this row; now
+                that it has a button to share the space with, a long title would
+                push the toggle out of the panel.
+              */}
+              <span className="min-w-0 truncate" title={documentName}>
                 {documentName}
               </span>
+              {/*
+                Citations, at the far end of the strip naming the file.
+
+                This panel has no bar of its own to put it in, and this is the
+                right row for it: the strip already says what the chat is
+                reading, and whether the answers link back into that file is the
+                same kind of fact about this conversation.
+
+                `ml-auto` rather than sitting flush against the name, so it
+                cannot end up wherever a short filename happens to stop —
+                anchored to the right edge it is in the same place on every
+                document, and it is the same gesture the composer already makes
+                with its picker and send button one row below.
+              */}
+              <CitationToggle labelled={false} className="ml-auto shrink-0" />
             </>
           }
         />

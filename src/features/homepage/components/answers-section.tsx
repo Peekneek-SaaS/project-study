@@ -23,8 +23,12 @@ import { cn } from "@/lib/utils";
  * shows the round trip. A claim, the pages behind it, and the click that opens
  * the document at the page so you can read the sentence yourself.
  *
- * The diagram is the argument. Nothing else on this page needs to be believed
- * on trust if this one lands.
+ * The two halves are deliberately not the same promise, because in the product
+ * they are not the same thing. Citations are a preference and ship off — a link
+ * hanging off every clause is a lot of furniture in a paragraph you are only
+ * reading. The *retrieval* is not a preference and cannot be turned off: an
+ * uncited answer is searched and read exactly as hard as a cited one. The left
+ * panel sells the switch; the right panel says what happens regardless.
  */
 export function AnswersSection() {
   return (
@@ -35,8 +39,8 @@ export function AnswersSection() {
             <Eyebrow>Answers</Eyebrow>
             <SectionHeading
               className="mt-6"
-              lead="Every answer shows its work."
-              rest="Each claim carries the pages it was read from, and every page is a link straight back into the document."
+              lead="It never answers from memory."
+              rest="Every reply is searched out of your pages first. The receipts are a switch — off while you read, on when you check."
             />
           </Reveal>
         </div>
@@ -46,8 +50,8 @@ export function AnswersSection() {
           <div className="border-b border-border p-5 sm:p-8 lg:border-r lg:border-b-0">
             <Reveal>
               <VisualCaption
-                lead="Click the page, land on the page."
-                rest="The citation opens the document panel at exactly the passage the answer came from — same tab, same scroll position, no hunting."
+                lead="Turn citations on and every claim is a link."
+                rest="It opens the document panel at exactly the passage the answer came from — same tab, same scroll position, no hunting for it."
               />
             </Reveal>
             <Reveal className="mt-8" delay={0.1}>
@@ -59,8 +63,8 @@ export function AnswersSection() {
           <div className="p-5 sm:p-8">
             <Reveal>
               <VisualCaption
-                lead="It looks things up before it speaks."
-                rest="Search the passages, read the pages around the hit, search again with different wording if the first pass came back thin. The transcript shows each step."
+                lead="This part never switches off."
+                rest="Search the passages, read the pages around the hit, search again if the first came back thin. It happens on every answer, cited or not — the citations are the display, never the grounding."
               />
             </Reveal>
             <Reveal className="mt-8" delay={0.1}>
@@ -150,12 +154,20 @@ function CitationRoundTrip() {
   );
 }
 
-/** The steps a question actually goes through, as the transcript records them. */
+/**
+ * The steps a question actually goes through, as the transcript records them.
+ *
+ * The last row deliberately does not mention citations. It used to read "with 2
+ * citations", which was fine when they were always on and is a contradiction
+ * now: it sits under a heading promising this happens *whether or not* you
+ * asked for them. What the row has to say is that the answer came out of the
+ * three steps above it, and that is true in both modes.
+ */
 const TRACE = [
   { step: "Searched", detail: "“osmosis semipermeable membrane”", meta: "8 passages" },
   { step: "Read pages", detail: "11–13, in order", meta: "~2,400 words" },
   { step: "Searched again", detail: "“lysis turgor cell wall”", meta: "5 passages" },
-  { step: "Answered", detail: "with 2 citations", meta: "p. 12, p. 13", accent: true },
+  { step: "Answered", detail: "only from what it read", meta: "nothing invented", accent: true },
 ] as const;
 
 function ToolTrace() {

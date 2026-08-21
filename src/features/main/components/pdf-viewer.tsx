@@ -15,6 +15,8 @@ import "react-pdf/dist/Page/TextLayer.css";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { AnnotationLayer } from "@/features/annotations/components/annotation-layer";
+import { useAnnotationSurface } from "@/features/annotations/hooks/use-annotation-surface";
 import {
   ViewerControlButton,
   ViewerControlReadout,
@@ -88,9 +90,20 @@ export function PdfViewer({
   url,
   layout = "vertical",
   page,
+  pageRequestId,
+  documentId = null,
 }: {
   url: string;
   layout?: PdfLayout;
+  /**
+   * The document these pages belong to, when notes may be written on them.
+   *
+   * Null for a viewer with nowhere to file a note — the preview of a file that
+   * is not the reader's, say. Everything annotation-shaped is gated on this
+   * rather than on a separate flag, because "which document" and "may I
+   * annotate" have the same answer and two switches could disagree.
+   */
+  documentId?: string | null;
   /**
    * A page to jump to, 1-based — how a chat citation lands on the passage it
    * cites. Null or absent leaves the reader wherever they were.
@@ -100,6 +113,14 @@ export function PdfViewer({
    * request to go somewhere, honoured once per distinct value.
    */
   page?: number | null;
+  /**
+   * Bumped by the caller to ask for the same page a second time.
+   *
+   * Without it the check below dedupes on the page number alone, so scrolling
+   * away from a cited page and clicking the same citation again did nothing at
+   * all — the number had not changed, so there was nothing for this to notice.
+   */
+  pageRequestId?: number;
 }) {
   const [pageCount, setPageCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
@@ -139,6 +160,11 @@ export function PdfViewer({
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const isHorizontal = layout === "horizontal";
+
+  // Notes written onto the pages. Scoped to this scroller, so two viewers open
+  // on the same document — the panel and the floating window — cannot answer
+  // for each other's selections.
+  const annotations = useAnnotationSurface(documentId, scrollRef);
 
   // Pages are rendered to a fixed pixel size, so the container has to be
   // measured rather than handed a percentage.
@@ -284,17 +310,21 @@ export function PdfViewer({
    * the ref is what makes this a one-shot per value: without it, every re-render
    * while the reader scrolls away would drag them back to the cited page.
    */
-  const honoured = useRef<number | null>(null);
+  const honoured = useRef<string | null>(null);
   useEffect(() => {
     if (!page || pageCount === 0) return;
-    if (honoured.current === page) return;
 
-    honoured.current = page;
+    // The id and the page together, so a repeat of the same page is a request
+    // this has not seen while a re-render with both unchanged still is not.
+    const request = `${pageRequestId ?? 0}:${page}`;
+    if (honoured.current === request) return;
+
+    honoured.current = request;
     goToPage(page);
     // `goToPage` is redeclared every render and is deliberately not a
     // dependency; the ref above is what controls when this runs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageCount]);
+  }, [page, pageCount, pageRequestId]);
 
   const zoomBy = (factor: number) =>
     setScale((current) =>
@@ -374,10 +404,21 @@ export function PdfViewer({
           {hasRoom &&
             Array.from({ length: pageCount }, (_, index) => {
               const pageNumber = index + 1;
-              const isNear =
-                Math.abs(pageNumber - currentPage) <= renderWindow;
+              const isNear = Math.abs(pageNumber - currentPage) <= renderWindow;
 
               return (
+                /*
+                  Two boxes where there used to be one, and the split is what
+                  lets a note be read.
+
+                  This outer one is the page as laid out — it carries the size,
+                  the `data-page` the selection and the scroll observer both
+                  look for, and nothing that clips. The inner one keeps the
+                  `overflow-hidden` that the rounded corners and the canvas
+                  need. With the two folded together, a popover opening off a
+                  marker was cut off at the page edge, and the anchor maths had
+                  to measure against a box that was also doing the clipping.
+                */
                 <div
                   key={pageNumber}
                   data-page={pageNumber}
@@ -391,43 +432,58 @@ export function PdfViewer({
                       ? { width: boxWidth, height: boxHeight }
                       : { width: boxWidth, minHeight: boxWidth / aspect }
                   }
-                  className={cn(
-                    "shrink-0 overflow-hidden rounded shadow-lg",
-                    !isNear && "animate-pulse bg-muted",
-                  )}
+                  className="relative shrink-0"
                 >
-                  {isNear && (
-                    /*
+                  <div
+                    className={cn(
+                      "size-full overflow-hidden rounded shadow-lg",
+                      !isNear && "animate-pulse bg-muted",
+                    )}
+                  >
+                    {isNear && (
+                      /*
                       The canvas is drawn at `renderSize` and stretched the rest
                       of the way. `origin-top-left` so the growth pushes down
                       and to the right into the box measured above, rather than
                       spreading from the middle and out of both sides of it.
                     */
-                    <div
-                      style={{
-                        transform: `scale(${cssScale})`,
-                        transformOrigin: "top left",
-                        // Sized so the transform has the render's own box to
-                        // scale from, not the zoomed one it is producing.
-                        ...(isHorizontal
-                          ? { height: renderSize }
-                          : { width: renderSize }),
-                      }}
-                    >
-                      <Page
-                        pageNumber={pageNumber}
-                        // Only ever one of the two — see `boxWidth` above.
-                        {...(isHorizontal
-                          ? { height: renderSize }
-                          : { width: renderSize })}
-                        onLoadSuccess={(page) => {
-                          if (pageNumber === 1)
-                            setAspect(page.width / page.height);
+                      <div
+                        style={{
+                          transform: `scale(${cssScale})`,
+                          transformOrigin: "top left",
+                          // Sized so the transform has the render's own box to
+                          // scale from, not the zoomed one it is producing.
+                          ...(isHorizontal
+                            ? { height: renderSize }
+                            : { width: renderSize }),
                         }}
-                        loading={null}
-                      />
-                    </div>
-                  )}
+                      >
+                        <Page
+                          pageNumber={pageNumber}
+                          // Only ever one of the two — see `boxWidth` above.
+                          {...(isHorizontal
+                            ? { height: renderSize }
+                            : { width: renderSize })}
+                          onLoadSuccess={(page) => {
+                            if (pageNumber === 1)
+                              setAspect(page.width / page.height);
+                          }}
+                          loading={null}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/*
+                  Only for pages that are actually drawn. An unrendered page has
+                  no text under the dots and is a grey placeholder the reader is
+                  scrolling past, so markers on it would be pins in a blank
+                  card — and the composer cannot appear on one at all, since
+                  there is nothing there to have selected.
+                */}
+                  {annotations.enabled && isNear ? (
+                    <AnnotationLayer {...annotations.layerProps(pageNumber)} />
+                  ) : null}
                 </div>
               );
             })}

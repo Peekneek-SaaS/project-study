@@ -1,3 +1,5 @@
+import { AnnotationRouter } from "@/features/annotations/server/routers/annotation";
+import { BillingRouter } from "@/features/billing/server/routers/billing";
 import { BoardRouter } from "@/features/board/server/routers/board";
 import { ChatRouter } from "@/features/chat/server/routers/chat";
 import { DocumentRouter } from "@/features/main/server/routers/document";
@@ -11,6 +13,8 @@ export const appRouter = createTRPCRouter({
   folder: FolderRouter,
   document: DocumentRouter,
   board: BoardRouter,
+  annotation: AnnotationRouter,
+  billing: BillingRouter,
   stickyNote: StickyNoteRouter,
   chat: ChatRouter,
   todo: TodoRouter,

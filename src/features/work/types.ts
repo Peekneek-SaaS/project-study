@@ -35,6 +35,28 @@ export function isWorkTab(value: unknown): value is WorkTab {
 }
 
 /**
+ * The two lists inside the notes panel.
+ *
+ * Persisted beside the outer tab — see `use-work-layout` — so it is a closed
+ * union for the same reason that one is: a name read back out of storage has to
+ * be checked before it is handed to `Tabs`, or an old key selects a
+ * `TabsContent` that does not exist and the panel renders empty with nothing to
+ * say why.
+ */
+export const NOTES_TABS = ["notes", "annotations"] as const;
+
+export type NotesTab = (typeof NOTES_TABS)[number];
+
+export const DEFAULT_NOTES_TAB: NotesTab = "notes";
+
+export function isNotesTab(value: unknown): value is NotesTab {
+  return (
+    typeof value === "string" &&
+    (NOTES_TABS as readonly string[]).includes(value)
+  );
+}
+
+/**
  * Which corner the minimised document is parked in.
  *
  * Corners rather than free coordinates: the picture-in-picture is meant to stay

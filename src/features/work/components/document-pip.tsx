@@ -41,6 +41,7 @@ export function DocumentPip({
   onRestore,
   onClose,
   page,
+  pageRequestId,
 }: {
   documentId: string;
   name: string;
@@ -61,6 +62,8 @@ export function DocumentPip({
    * land either way.
    */
   page?: number | null;
+  /** Lets the same page be asked for twice — see `PdfViewer`. */
+  pageRequestId?: number;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -298,7 +301,12 @@ export function DocumentPip({
 
       <div className="min-h-0 flex-1">
         <WorkDocumentPanel
-          page={page} documentId={documentId} name={name} compact />
+          page={page}
+          pageRequestId={pageRequestId}
+          documentId={documentId}
+          name={name}
+          compact
+        />
       </div>
 
       {/*

@@ -348,15 +348,24 @@ export function NoteRichText({
       data-placeholder={placeholder}
       spellCheck={false}
       onInput={emit}
-      // A paste carries the source's markup with it — fonts, colours, whole
-      // layouts. Taking the plain text and letting the browser insert it means
-      // a paste from a web page arrives as words rather than as a fragment of
-      // that page, and the note keeps its own type.
+      /*
+        A paste carries the source's markup with it — fonts, colours, whole
+        layouts. Taking the plain text and putting it in ourselves means a paste
+        from a web page arrives as words rather than as a fragment of that page,
+        and the note keeps its own type.
+
+        `emit` by hand, and that is the part that would be missed. A paste the
+        browser performs raises `input` and the handler above catches it; text
+        written into the DOM by script raises nothing, so without this call the
+        pasted words would sit on screen and never reach the database.
+      */
       onPaste={(event) => {
-        if (readOnly) return;
+        const field = fieldRef.current;
+        if (readOnly || !field) return;
+
         event.preventDefault();
-        const text = event.clipboardData.getData("text/plain");
-        document.execCommand("insertText", false, text);
+        insertPlainText(field, event.clipboardData.getData("text/plain"));
+        emit();
       }}
       /*
         Links open on ⌘/ctrl-click, and only then.
@@ -398,7 +407,16 @@ export function NoteRichText({
         lineHeight: "var(--note-line-height)",
       }}
       className={cn(
-        "min-h-0 flex-1 overflow-y-auto px-3 pb-3 outline-none",
+        /*
+          Kept light on purpose, and overridable.
+
+          `cn` runs through tailwind-merge, so a caller passing its own `px-*`
+          or `p-*` replaces these rather than fighting them — which is what the
+          annotation composer needs, being a 280px popover rather than a sheet
+          of paper. Anything wrapping this in a padded box is doubling up: the
+          field already holds its own margin off the edge.
+        */
+        "min-h-0 flex-1 overflow-y-auto px-2 pb-2 outline-none",
         /*
           `whitespace-pre-wrap` is what lets the spaces be ordinary spaces.
 
@@ -427,4 +445,59 @@ export function NoteRichText({
       )}
     />
   );
+}
+
+/**
+ * Puts plain text in at the caret, the way a paste does.
+ *
+ * The one command this component had a real replacement for. Bold, the lists
+ * and the rest are `execCommand` because nothing else knows how to split and
+ * re-wrap the nodes under an arbitrary selection; inserting text is a `Range`
+ * operation, and `Range` is not deprecated and not going anywhere.
+ *
+ * What it costs is the browser's undo stack: a DOM change made by script is not
+ * recorded there, so ⌘Z no longer takes a paste back out the way it takes back
+ * typing. That is the trade for the deprecated call being gone — the formatting
+ * commands still go through `execCommand` and are still undoable.
+ */
+function insertPlainText(field: HTMLElement, text: string): void {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return;
+
+  const range = selection.getRangeAt(0);
+  if (!field.contains(range.commonAncestorContainer)) return;
+
+  // A paste over a selection replaces it, rather than landing beside it.
+  range.deleteContents();
+
+  /*
+    Newlines become `<br>`, and this is the detail that has to be right.
+
+    The field is `whitespace-pre-wrap`, so a literal `\n` in a text node would
+    look like a line break on screen — and then `normaliseHtml` turns every
+    newline into a space on the way to the database, because the note's name is
+    everything before the first one. A multi-line paste would read correctly
+    until the note was reopened as a single run-on line. `<br>` says the same
+    thing in a form that survives the trip.
+  */
+  const fragment = document.createDocumentFragment();
+  for (const [index, line] of text.split(/\r\n|\r|\n/).entries()) {
+    if (index > 0) fragment.appendChild(document.createElement("br"));
+    if (line.length > 0) fragment.appendChild(document.createTextNode(line));
+  }
+
+  // Read before the insert, not after: a fragment is emptied into the document
+  // by `insertNode`, and by then it has no last child to put the caret behind.
+  const last = fragment.lastChild;
+  if (!last) return;
+
+  range.insertNode(fragment);
+
+  // The caret goes after what arrived, so typing continues from the end of the
+  // paste rather than in front of it.
+  const caret = document.createRange();
+  caret.setStartAfter(last);
+  caret.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(caret);
 }

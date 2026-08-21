@@ -7,11 +7,22 @@ import { saveMessage, titleFromMessage } from "@/features/chat/server/chats";
 import {
   documentSystemPrompt,
   universalSystemPrompt,
+  type PromptOptions,
 } from "@/features/chat/server/prompt";
 import { chatTools } from "@/features/chat/server/tools";
+import {
+  chatCredits,
+  getEntitlements,
+  InsufficientCreditsError,
+  modelTierFor,
+  recordUsage,
+  refundCredits,
+  spendCredits,
+} from "@/features/billing/server/entitlements";
 import { createFallbackModel } from "@/lib/ai/providers";
 import { listReadableDocuments, readDocumentDigest } from "@/lib/ai/retrieval";
-import { AI_PROVIDERS, type AiProvider } from "@/lib/ai/types";
+import { readWorkspaceSnapshot } from "@/lib/ai/workspace";
+import { AI_PROVIDERS, DEFAULT_CITATIONS, type AiProvider } from "@/lib/ai/types";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -34,10 +45,19 @@ import { prisma } from "@/lib/prisma";
  *
  *   - `provider` comes from the request. It only selects which model answers,
  *     so the worst a forged value can do is pick a different voice.
+ *   - `cite` comes from the request too, and is just as harmless: it chooses
+ *     between two sets of writing rules. Neither set relaxes the requirement to
+ *     search before answering, so a forged value cannot talk the model out of
+ *     using the documents — only out of linking to them.
  *   - *Which documents may be read* never comes from the request. It is looked
  *     up here from the `Chat` row, which was written server-side by an
  *     authenticated action. A client cannot widen its own scope by asking,
  *     because there is nothing in the payload to widen.
+ *   - *What the account may spend* never comes from the request either. The
+ *     plan, the balance and the model tier are read from `BillingAccount` at
+ *     the start of every turn. A forged `provider` on a free plan is dropped
+ *     rather than honoured, which is what stops the picker being a way to buy
+ *     the expensive models for nothing.
  */
 
 /**
@@ -46,12 +66,27 @@ import { prisma } from "@/lib/prisma";
  * Each step is one round trip: a search, a page read, or the answer itself.
  * Eight covers the compound questions this exists for — find the chapter, read
  * it, check a second document, answer — and stops a model looping fruitlessly.
+ *
+ * It is also the single biggest lever on what one answer costs, because every
+ * step re-sends everything before it: the eighth step of a turn carries seven
+ * steps of tool results with it. So the ceiling is per plan — see
+ * `plan.maxSteps` — and eight is what the plan that pays for it gets.
  */
-const MAX_STEPS = 8;
+const MAX_STEPS_CEILING = 8;
 
 /** Everything the browser is allowed to say about a turn. */
 const clientDataSchema = z.object({
   provider: z.enum(AI_PROVIDERS).nullish(),
+  /**
+   * Whether this turn should cite its sources. Absent means `DEFAULT_CITATIONS`.
+   *
+   * Sent per turn rather than stored on the chat, because it is a preference
+   * about the reader rather than a property of the conversation: the same
+   * transcript can hold cited answers from before it was switched off and
+   * plain ones from after, which is exactly what the user asked for when they
+   * flipped it mid-chat.
+   */
+  cite: z.boolean().nullish(),
 });
 
 /**
@@ -83,6 +118,26 @@ const scopeCache = new Map<string, ChatScope>();
  */
 const answeredBy = new Map<string, () => AiProvider | null>();
 
+/**
+ * What this turn was charged, and what it actually used.
+ *
+ * Keyed by chat for the same reason `answeredBy` is: `run` knows what was
+ * debited, `onTurnComplete` knows whether the answer arrived and what it cost
+ * in tokens, and the two hooks cannot pass anything to each other directly.
+ *
+ * The token counts are the reason this exists at all. Credits are a guess about
+ * what an answer costs until there are a few thousand of these rows to compare
+ * them against; recording usage alongside the charge is what turns the pricing
+ * table from an assumption into something measured.
+ */
+interface TurnCharge {
+  credits: number;
+  kind: "CHAT_FAST" | "CHAT_FRONTIER";
+  usage: () => { inputTokens?: number; outputTokens?: number } | null;
+}
+
+const turnCharges = new Map<string, TurnCharge>();
+
 async function scopeFor(chatId: string): Promise<ChatScope> {
   const cached = scopeCache.get(chatId);
   if (cached) return cached;
@@ -104,15 +159,33 @@ async function scopeFor(chatId: string): Promise<ChatScope> {
 }
 
 /**
- * What this turn's model is told about the documents it can see.
+ * What this turn's model is told about the documents it can see, and about the
+ * work the user has done on them.
  *
  * Rebuilt per turn rather than once per chat, deliberately: a document finishes
  * processing while a conversation is open often enough to matter, and a chat
- * that could not see the upload you just made would look broken.
+ * that could not see the upload you just made would look broken. The same
+ * argument applies twice over to the workspace — notes and todos are written
+ * *during* a conversation, and often because of one. Ask the assistant what to
+ * revise, file the todo it suggests, ask it what is left: the second answer has
+ * to know about the todo the first one caused.
+ *
+ * Two reads rather than one, run together. They touch different tables and
+ * neither depends on the other, so the turn waits for the slower rather than
+ * for the sum.
  */
-async function systemPromptFor(scope: ChatScope): Promise<string> {
+async function systemPromptFor(
+  scope: ChatScope,
+  options: PromptOptions,
+): Promise<string> {
   if (scope.documentId) {
-    const digest = await readDocumentDigest(scope.userId, scope.documentId);
+    const [digest, workspace] = await Promise.all([
+      readDocumentDigest(scope.userId, scope.documentId),
+      readWorkspaceSnapshot({
+        userId: scope.userId,
+        documentId: scope.documentId,
+      }),
+    ]);
 
     // Processing has not finished, or failed. The panel guards this too, but a
     // session already open when the document was still being read would arrive
@@ -126,10 +199,17 @@ async function systemPromptFor(scope: ChatScope): Promise<string> {
       );
     }
 
-    return documentSystemPrompt(digest);
+    return documentSystemPrompt(digest, workspace, options);
   }
 
-  return universalSystemPrompt(await listReadableDocuments(scope.userId));
+  const [digests, workspace] = await Promise.all([
+    listReadableDocuments(scope.userId),
+    // No `documentId`, so this is every board, note, annotation and todo the
+    // user owns — the ones filed against a document and the loose ones alike.
+    readWorkspaceSnapshot({ userId: scope.userId }),
+  ]);
+
+  return universalSystemPrompt(digests, workspace, options);
 }
 
 /**
@@ -223,12 +303,80 @@ export const studyChat = chat
 
     run: async ({ messages, tools, signal, chatId, clientData }) => {
       const scope = await scopeFor(chatId);
-      const system = await systemPromptFor(scope);
+
+      /*
+        What this account may do, read fresh on every turn.
+
+        Not cached beside the scope: the scope is fixed for the life of a chat,
+        whereas the balance changes with every answer and the plan can change
+        mid-conversation — somebody who runs out, upgrades in another tab and
+        comes back should not have to start a new chat to be believed.
+      */
+      const entitlements = await getEntitlements(scope.userId);
+
+      /*
+        The picker is a paid feature, and this is where that is enforced.
+
+        A free client can still send `provider` — it is user input, and the
+        component is only hidden rather than made impossible — so the value is
+        dropped here rather than trusted. Dropping it also drops the frontier
+        tier, because on plans without the picker the two are the same thing.
+      */
+      const requested = entitlements.plan.providerPicker
+        ? (clientData?.provider ?? null)
+        : null;
+
+      const modelTier = modelTierFor(entitlements, requested);
+      const credits = chatCredits(modelTier);
+
+      /*
+        Charged before a token is generated, refunded if nothing arrives.
+
+        The order matters. Charging afterwards means an account can be taken to
+        minus fifty by fifty questions asked in parallel, because each of them
+        checks a balance that none of them has yet spent. Charging first makes
+        the balance the queue.
+
+        An empty balance is a finished answer, not a failure to retry — it will
+        still be empty a second later, and the default policy would otherwise
+        spend three attempts discovering that. `AbortTaskRunError` ends the run
+        without retrying and carries the message through to the browser, so the
+        user reads why their answer did not arrive rather than watching a chat
+        that silently does nothing.
+      */
+      try {
+        await spendCredits({ userId: scope.userId, credits });
+      } catch (error) {
+        if (error instanceof InsufficientCreditsError) {
+          logger.warn("Turn refused: out of credits", {
+            chatId,
+            userId: scope.userId,
+            required: error.required,
+            remaining: error.remaining,
+          });
+          throw new AbortTaskRunError(error.message);
+        }
+        throw error;
+      }
+
+      // The shared default rather than a literal, so a turn that arrives with
+      // no flag on it — an older client, a session resumed from before the
+      // toggle existed — answers the way a fresh chat in the browser would.
+      const system = await systemPromptFor(scope, {
+        cite: clientData?.cite ?? DEFAULT_CITATIONS,
+      });
 
       const fallback = createFallbackModel(
-        "chat",
-        clientData?.provider ?? null,
+        modelTier === "frontier" ? "chat" : "chat-fast",
+        requested,
       );
+
+      let usage: { inputTokens?: number; outputTokens?: number } | null = null;
+      turnCharges.set(chatId, {
+        credits,
+        kind: modelTier === "frontier" ? "CHAT_FRONTIER" : "CHAT_FAST",
+        usage: () => usage,
+      });
 
       // Registered before the stream starts, read after it finishes — see
       // `answeredBy`. A getter rather than a value, because which provider
@@ -249,7 +397,20 @@ export const studyChat = chat
         // while the model carries on generating — and being a background job,
         // it would carry on to the end and bill for all of it.
         abortSignal: signal,
-        stopWhen: stepCountIs(MAX_STEPS),
+        // The plan's ceiling, never above the hard one. `Math.min` rather than
+        // trusting the catalogue, so a typo in a plan cannot buy an account a
+        // twenty-step answer.
+        stopWhen: stepCountIs(
+          Math.min(entitlements.plan.maxSteps, MAX_STEPS_CEILING),
+        ),
+        // What the turn actually cost, captured for the ledger. Totals across
+        // every step, which is the number worth comparing a credit against.
+        onFinish: ({ totalUsage }) => {
+          usage = {
+            inputTokens: totalUsage?.inputTokens,
+            outputTokens: totalUsage?.outputTokens,
+          };
+        },
         onError: ({ error }) => {
           // By the time this fires the fallback chain has been walked and every
           // provider has refused, so it is a real outage worth logging.
@@ -280,6 +441,50 @@ export const studyChat = chat
     }) => {
       const scope = await scopeFor(chatId);
       const provider = answeredBy.get(chatId)?.() ?? null;
+
+      /*
+        Settling the turn: either it produced an answer, or the money goes back.
+
+        An assistant message with no parts is the shape of a turn that produced
+        nothing — the user pressed stop before the first token, or every
+        provider in the chain refused. Both are turns nobody should pay for,
+        and both are common enough that not handling them would show up as
+        complaints rather than as a rounding error.
+
+        Read and cleared in one go, so a worker serving the same chat again
+        cannot settle this turn twice.
+      */
+      const charge = turnCharges.get(chatId);
+      turnCharges.delete(chatId);
+
+      const answered = newUIMessages.some(
+        (message) => message.role === "assistant" && message.parts.length > 0,
+      );
+
+      if (charge) {
+        if (answered) {
+          const usage = charge.usage();
+          await recordUsage({
+            userId: scope.userId,
+            kind: charge.kind,
+            credits: charge.credits,
+            provider,
+            model: null,
+            inputTokens: usage?.inputTokens ?? null,
+            outputTokens: usage?.outputTokens ?? null,
+            chatId,
+          });
+        } else {
+          await refundCredits({
+            userId: scope.userId,
+            credits: charge.credits,
+          });
+          logger.log("Refunded a turn that produced nothing", {
+            chatId,
+            credits: charge.credits,
+          });
+        }
+      }
 
       for (const message of newUIMessages) {
         // A stopped turn can leave an assistant message with nothing in it —
@@ -342,6 +547,7 @@ export const studyChat = chat
         userId: scope.userId,
         messages: newUIMessages.length,
         provider,
+        credits: charge?.credits ?? 0,
         stopped,
       });
     },

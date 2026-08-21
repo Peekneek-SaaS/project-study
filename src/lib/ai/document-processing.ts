@@ -77,7 +77,7 @@ const OUTLINE_MAX_CHARS = 120_000;
  * processed — whatever text pass one did find is indexed — it just does not get
  * an expensive full read.
  */
-const MAX_SCANNED_PAGES = 60;
+export const MAX_SCANNED_PAGES = 60;
 
 export interface DocumentChunkDraft {
   index: number;
@@ -94,6 +94,8 @@ export interface OutlineEntry {
 }
 
 export interface ProcessedDocument {
+  /** Whether a model was asked to read the pages as images. Priced separately. */
+  transcribed: boolean;
   title: string | null;
   subject: string | null;
   summary: string;
@@ -501,18 +503,45 @@ export async function processDocument({
   bytes,
   fileName,
   preferredProvider,
+  onExtracted,
 }: {
   bytes: Uint8Array;
   fileName: string;
   preferredProvider?: AiProvider | null;
+  /**
+   * Called once the pages are out and before anything is paid for.
+   *
+   * The seam billing hangs on, and the position is the whole point of it.
+   * Extraction is local — `unpdf` and `mammoth`, no network, no tokens — so by
+   * the time this runs the page count is known and nothing has cost anything
+   * yet. A caller that throws here has refused a document without having been
+   * billed for the privilege of looking at it.
+   *
+   * It also answers whether this document may be transcribed. A scanned PDF is
+   * the most expensive thing this pipeline can do, so "may I OCR" is a question
+   * asked with the real page count in hand rather than a flag guessed at from
+   * the file name.
+   */
+  onExtracted?: (info: {
+    pageCount: number;
+    looksScanned: boolean;
+  }) => Promise<{ allowOcr: boolean }> | { allowOcr: boolean };
 }): Promise<ProcessedDocument> {
   const extracted = await extractPages(bytes, fileName);
 
+  const permission = onExtracted
+    ? await onExtracted({
+        pageCount: extracted.pages.length,
+        looksScanned: extracted.looksScanned,
+      })
+    : { allowOcr: true };
+
   // Pages that are pictures of text. Whatever the extractor did find is kept as
   // the fallback, so a failed transcription still leaves the document better
-  // than nothing.
+  // than nothing — which is also what a plan that does not include OCR gets.
+  const needsOcr = extracted.looksScanned || extracted.pages.length === 0;
   const pages =
-    extracted.looksScanned || extracted.pages.length === 0
+    needsOcr && permission.allowOcr
       ? ((await transcribeScanned(
           bytes,
           fileName,
@@ -528,5 +557,9 @@ export async function processDocument({
     ...described,
     pageCount: pages.length,
     chunks,
+    // Reported so the task can bill for what actually happened rather than for
+    // what it expected: a document that looked scanned but whose transcription
+    // came back empty has not had an OCR pass worth charging for.
+    transcribed: needsOcr && permission.allowOcr && pages !== extracted.pages,
   };
 }

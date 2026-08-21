@@ -64,8 +64,16 @@ const API_KEY_ENV: Record<AiProvider, string> = {
  * strong model; reading a document is a few hundred pages of bulk work nobody
  * watches, so it goes to the cheap fast one. Splitting them here means the
  * choice is made once rather than at every call site.
+ *
+ * `chat-fast` is the third, and it is what most conversations actually run on.
+ * The fast models answer a grounded question from retrieved passages about as
+ * well as the frontier ones — the hard part was finding the passage, and that
+ * is search, not reasoning — at roughly a fifth of the price. So it is the
+ * default for every plan below Pro, and the frontier tier is what the picker
+ * buys. Which kind a turn gets is a billing decision and is made in
+ * `trigger/chat.ts`; this module only knows the three exist.
  */
-export type ModelKind = "chat" | "extraction";
+export type ModelKind = "chat" | "chat-fast" | "extraction";
 
 /**
  * The default model ids, per provider and kind.
@@ -75,15 +83,27 @@ export type ModelKind = "chat" | "extraction";
  * rather than a patch.
  */
 const DEFAULT_MODELS: Record<AiProvider, Record<ModelKind, string>> = {
-  openai: { chat: "gpt-5", extraction: "gpt-5-mini" },
-  anthropic: { chat: "claude-sonnet-5", extraction: "claude-haiku-4-5" },
-  google: { chat: "gemini-2.5-pro", extraction: "gemini-2.5-flash" },
+  openai: {
+    chat: "gpt-5",
+    "chat-fast": "gpt-5-mini",
+    extraction: "gpt-5-mini",
+  },
+  anthropic: {
+    chat: "claude-sonnet-5",
+    "chat-fast": "claude-haiku-4-5",
+    extraction: "claude-haiku-4-5",
+  },
+  google: {
+    chat: "gemini-2.5-pro",
+    "chat-fast": "gemini-2.5-flash",
+    extraction: "gemini-2.5-flash",
+  },
 };
 
-/** e.g. `AI_OPENAI_CHAT_MODEL`. */
+/** e.g. `AI_OPENAI_CHAT_MODEL`, or `AI_OPENAI_CHAT_FAST_MODEL`. */
 function modelId(provider: AiProvider, kind: ModelKind): string {
-  const override =
-    process.env[`AI_${provider.toUpperCase()}_${kind.toUpperCase()}_MODEL`];
+  const suffix = kind.toUpperCase().replace(/-/g, "_");
+  const override = process.env[`AI_${provider.toUpperCase()}_${suffix}_MODEL`];
   return override?.trim() || DEFAULT_MODELS[provider][kind];
 }
 

@@ -19,6 +19,11 @@ import {
   searchChunks,
   type RetrievedChunk,
 } from "@/lib/ai/retrieval";
+import {
+  readWorkspaceItems,
+  WORKSPACE_KINDS,
+  type WorkspaceItem,
+} from "@/lib/ai/workspace";
 
 /**
  * What the model can do besides talk.
@@ -34,6 +39,14 @@ import {
  * "compare how my two textbooks define osmosis" is two searches and a
  * comparison, and the model is allowed to make both. Search, read, search
  * again, then answer.
+ *
+ * The third tool reads the other corpus: the boards, notes, annotations and
+ * todos the user wrote themselves. The system prompt already carries a snapshot
+ * of those — see `prompt.ts` — so this is for going past it: the whole of a
+ * kind, one document's worth, or a search for the note somebody half remembers
+ * writing. Same reasoning as above, one level down: a snapshot is what fits on
+ * every turn, a tool is what scales to an account that has been used for a
+ * year.
  *
  * Every tool closes over `userId`. Not one of them accepts it as an argument —
  * that is the whole security model here. The model composes its own tool
@@ -55,6 +68,33 @@ function toCitation(chunk: RetrievedChunk) {
     pageStart: chunk.pageStart,
     pageEnd: chunk.pageEnd,
     text: chunk.text,
+  };
+}
+
+/**
+ * One piece of the user's own work, on its way to the model.
+ *
+ * The undefined fields are dropped rather than sent as nulls. A todo has no
+ * page and a board has no due date, and forty `"page": null` pairs in a tool
+ * result are tokens spent saying nothing — worse, they are an invitation to
+ * write "page null" into a sentence.
+ */
+function toWorkspaceResult(item: WorkspaceItem) {
+  return {
+    kind: item.kind,
+    title: item.title,
+    ...(item.document ? { document: item.document } : {}),
+    ...(item.documentId ? { documentId: item.documentId } : {}),
+    ...(item.page !== undefined ? { page: item.page } : {}),
+    ...(item.quote ? { quote: item.quote } : {}),
+    ...(item.text ? { text: item.text } : {}),
+    ...(item.due ? { due: item.due } : {}),
+    ...(item.priority && item.priority !== "NONE"
+      ? { priority: item.priority }
+      : {}),
+    ...(item.done !== undefined ? { done: item.done } : {}),
+    ...(item.elements !== undefined ? { elements: item.elements } : {}),
+    updated: item.updated,
   };
 }
 
@@ -182,7 +222,86 @@ export function chatTools({
     },
   });
 
-  return { searchDocuments, readDocumentPages };
+  /**
+   * The user's own material, as opposed to the publisher's.
+   *
+   * One tool over four kinds rather than four tools, and the reason is the
+   * budget: a turn gets `MAX_STEPS` round trips, and "what should I revise
+   * tonight" wants the notes and the todos together. As one call with a `kinds`
+   * filter that is a single step; as four tools it is two or three, spent
+   * before the model has read a document.
+   */
+  const readWorkspace = tool({
+    description:
+      (scoped
+        ? "Read the boards, sticky notes, annotations and todos the user has " +
+          "made on this document. "
+        : "Read the boards, sticky notes, annotations and todos the user has " +
+          "made — across every document, plus the ones that stand on their " +
+          "own. ") +
+      "This is the user's own work, not the document's contents: what they " +
+      "wrote down, marked up and planned to do. Use it when they ask about " +
+      "their notes, their highlights, their tasks or what they were working " +
+      "on, and to ground revision advice in what they have actually done. " +
+      "The system prompt already lists the most recent few of each; call this " +
+      "for the rest, or to search for a particular one.",
+    inputSchema: z.object({
+      kinds: z
+        .array(z.enum(WORKSPACE_KINDS))
+        .nullish()
+        .describe(
+          "Which kinds to read. Omit for all four. 'notes' are sticky notes, " +
+            "'annotations' are notes written onto a page of a document, " +
+            "'boards' are drawing canvases, 'todos' are tasks with due dates.",
+        ),
+      ...(scoped
+        ? {}
+        : {
+            documentId: z
+              .string()
+              .nullish()
+              .describe(
+                "Restrict to the work made on one document, by the id given " +
+                  "in the document list. Omit to read everything.",
+              ),
+          }),
+      query: z
+        .string()
+        .nullish()
+        .describe(
+          "Optional. Only return items whose text contains this. Matches on " +
+            "the words the user wrote, so use their phrasing rather than the " +
+            "document's.",
+        ),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(50)
+        .nullish()
+        .describe("How many items to return. Defaults to 20."),
+    }),
+    execute: async (input) => {
+      const requested = (input as { documentId?: string | null }).documentId;
+
+      const items = await readWorkspaceItems({
+        userId,
+        // The pin wins here exactly as it does in `searchDocuments`: a document
+        // chat cannot be talked into reading the notes on another document.
+        documentId: scoped ? documentId : (requested ?? null),
+        kinds: input.kinds,
+        query: input.query,
+        limit: input.limit ?? undefined,
+      });
+
+      return {
+        found: items.length,
+        items: items.map(toWorkspaceResult),
+      };
+    },
+  });
+
+  return { searchDocuments, readDocumentPages, readWorkspace };
 }
 
 export type ChatTools = ReturnType<typeof chatTools>;

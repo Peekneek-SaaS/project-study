@@ -20,6 +20,7 @@ import {
 import Link from "next/link";
 import { redirect, usePathname } from "next/navigation";
 
+import { CreditMeter } from "@/features/billing/components/paywall";
 import {
   Sidebar,
   SidebarContent,
@@ -151,6 +152,16 @@ const MainSidebar = () => {
       */}
       <SidebarFooter className="px-0">
         <NavItems groupLabel="Others" items={otherRoutes} pathName={pathName} />
+        {/*
+          The meter sits with the navigation rather than in settings, because a
+          number somebody has to go looking for is one they meet for the first
+          time when it reads zero. Hidden when the rail is collapsed: at 48px
+          there is room for an icon and nothing that would make the number mean
+          anything.
+        */}
+        <div className="px-2 group-data-[collapsible=icon]:hidden">
+          <CreditMeter />
+        </div>
       </SidebarFooter>
     </Sidebar>
   );

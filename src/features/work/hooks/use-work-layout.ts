@@ -10,10 +10,13 @@ import {
   type PipSize,
 } from "@/features/work/lib/pip-geometry";
 import {
+  DEFAULT_NOTES_TAB,
   DEFAULT_PIP_CORNER,
   DEFAULT_WORK_TAB,
+  isNotesTab,
   isPipCorner,
   isWorkTab,
+  type NotesTab,
   type PipCorner,
   type WorkTab,
 } from "@/features/work/types";
@@ -51,6 +54,16 @@ export interface WorkLayout {
    */
   pipSize: PipSize;
   tab: WorkTab;
+  /**
+   * Which of the notes panel's two lists was open last.
+   *
+   * Here rather than in the panel's own state, and for the reason the outer tab
+   * is here: a reader who works in annotations comes back to annotations. It
+   * rides in the same record because it is the same question one level down —
+   * which is also what gives it the cross-tab agreement and the checked read
+   * that a `useState` in the panel could not have.
+   */
+  notesTab: NotesTab;
 }
 
 const DEFAULT_LAYOUT: WorkLayout = {
@@ -60,6 +73,7 @@ const DEFAULT_LAYOUT: WorkLayout = {
   corner: DEFAULT_PIP_CORNER,
   pipSize: { width: PIP_DEFAULT_WIDTH, height: PIP_DEFAULT_HEIGHT },
   tab: DEFAULT_WORK_TAB,
+  notesTab: DEFAULT_NOTES_TAB,
 };
 
 /**
@@ -120,6 +134,9 @@ function parseLayout(raw: string | null): WorkLayout {
       corner: isPipCorner(stored.corner) ? stored.corner : DEFAULT_LAYOUT.corner,
       pipSize: parsePipSize(stored.pipSize),
       tab: isWorkTab(stored.tab) ? stored.tab : DEFAULT_LAYOUT.tab,
+      notesTab: isNotesTab(stored.notesTab)
+        ? stored.notesTab
+        : DEFAULT_LAYOUT.notesTab,
     };
   } catch {
     return DEFAULT_LAYOUT;
@@ -274,6 +291,10 @@ export function useWorkLayout() {
   return {
     ...layout,
     setTab: useCallback((tab: WorkTab) => patch({ tab }), [patch]),
+    setNotesTab: useCallback(
+      (notesTab: NotesTab) => patch({ notesTab }),
+      [patch],
+    ),
     showSections,
     setCorner: useCallback((corner: PipCorner) => patch({ corner }), [patch]),
     /**

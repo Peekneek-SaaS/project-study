@@ -11,6 +11,8 @@ import {
 import { init } from "pptx-preview";
 
 import { Button } from "@/components/ui/button";
+import { AnnotationLayer } from "@/features/annotations/components/annotation-layer";
+import { useAnnotationSurface } from "@/features/annotations/hooks/use-annotation-surface";
 import { Spinner } from "@/components/ui/spinner";
 import {
   ViewerControlButton,
@@ -56,7 +58,27 @@ const MAX_ZOOM = 4;
 /** What `pptx-preview` hands back from `init`, narrowed to what is used here. */
 type Previewer = ReturnType<typeof init>;
 
-export function PptxViewer({ url }: { url: string }) {
+export function PptxViewer({
+  url,
+  documentId = null,
+  page,
+  pageRequestId,
+}: {
+  url: string;
+  /** The deck these slides belong to, when notes may be written on them. */
+  documentId?: string | null;
+  /**
+   * A slide to open at, 1-based.
+   *
+   * Called `page` rather than `slide` because that is what every caller above
+   * has: the annotation rows, the citations and the notes tab all speak in page
+   * numbers, and a deck's slides are its pages. Renaming it here would mean
+   * translating at three call sites to say the same thing.
+   */
+  page?: number | null;
+  /** Lets the same slide be asked for twice — see `PdfViewer`. */
+  pageRequestId?: number;
+}) {
   const stageRef = useRef<HTMLDivElement>(null);
   const mountRef = useRef<HTMLDivElement>(null);
   const previewerRef = useRef<Previewer | null>(null);
@@ -89,6 +111,8 @@ export function PptxViewer({ url }: { url: string }) {
 
   /** The room there is right now. Only ever read when re-anchoring — see `base`. */
   const [available, setAvailable] = useState({ width: 0, height: 0 });
+
+  const annotations = useAnnotationSurface(documentId, stageRef);
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -198,6 +222,25 @@ export function PptxViewer({ url }: { url: string }) {
   }, []);
 
   /**
+   * Honours a requested slide, once the deck has loaded.
+   *
+   * The same one-shot-per-request rule as the other two viewers. `slideCount`
+   * gates it because `show` clamps against a count that is zero until the deck
+   * has parsed — arriving from a note would otherwise clamp to slide one and
+   * stay there.
+   */
+  const honoured = useRef<string | null>(null);
+  useEffect(() => {
+    if (!page || slideCount === 0) return;
+
+    const request = `${pageRequestId ?? 0}:${page}`;
+    if (honoured.current === request) return;
+    honoured.current = request;
+
+    show(page - 1);
+  }, [page, pageRequestId, slideCount, show]);
+
+  /**
    * The scale that lands the slide inside the panel, whichever way it ran out
    * of room first — a wide short panel is limited by height, a narrow tall one
    * by width. `zoom` multiplies it, so 100% always means "as it was fitted".
@@ -249,26 +292,45 @@ export function PptxViewer({ url }: { url: string }) {
           scroller has something honest to measure and centre; the inner one is
           full size and shrunk onto it from its top-left corner.
         */}
+        {/*
+          `data-page` and `relative` on the *outer* box, which is the slide at
+          the size it is actually drawn.
+
+          Deliberately not the inner stage: that one is full size and shrunk by
+          a transform, so percentages inside it would be scaled twice — once by
+          the layer and again by the transform. Measuring and positioning
+          against the box that already has the on-screen size means the
+          arithmetic is the same one the PDF viewer does, and the same fractions
+          mean the same thing in both.
+
+          One slide at a time, so this is the only page mounted and `slide + 1`
+          is the only page number a selection here can produce.
+        */}
         <div
+          data-page={slide + 1}
           style={
             scale > 0
               ? { width: RENDER_WIDTH * scale, height: renderedHeight * scale }
               : undefined
           }
           className={cn(
-            "shrink-0 overflow-hidden shadow-lg",
+            "relative shrink-0 shadow-lg",
             loading && "invisible",
           )}
         >
           <div
             ref={mountRef}
-            className="pptx-stage origin-top-left"
+            className="pptx-stage origin-top-left overflow-hidden"
             style={{
               width: RENDER_WIDTH,
               height: renderedHeight,
               transform: `scale(${scale})`,
             }}
           />
+
+          {annotations.enabled && !loading ? (
+            <AnnotationLayer {...annotations.layerProps(slide + 1)} />
+          ) : null}
         </div>
       </div>
 

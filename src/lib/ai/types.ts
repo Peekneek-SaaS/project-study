@@ -21,6 +21,23 @@ export type AiProvider = (typeof AI_PROVIDERS)[number];
 export const DEFAULT_AI_PROVIDER: AiProvider = "openai";
 
 /**
+ * Whether answers cite their sources when nobody has said otherwise.
+ *
+ * Here rather than in the hook that reads it, for the same reason the provider
+ * default is: the browser needs it to render the toggle, and the worker needs
+ * it to build the prompt when a turn arrives without the flag. Two constants
+ * that had to agree would eventually not, and the failure would be a chat that
+ * looked one way and answered the other.
+ *
+ * Off. Citations are what the retrieval is *for*, but a page link hanging off
+ * every clause is a lot of furniture in the middle of a paragraph, and someone
+ * who is reading rather than checking wants the prose. Turning them on is one
+ * click and the answer is still read out of the documents either way — see the
+ * uncited rules in `prompt.ts`, which keep every grounding requirement.
+ */
+export const DEFAULT_CITATIONS = false;
+
+/**
  * Whether a value names a provider.
  *
  * Needed on both sides: the server checks it against the request body, and the

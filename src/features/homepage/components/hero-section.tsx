@@ -56,7 +56,7 @@ export function HeroSection({ primaryCta }: { primaryCta: ReactNode }) {
               className="group inline-flex items-center gap-2 rounded-none border border-border bg-card px-3 py-1.5 text-[12px] font-medium text-foreground/70 transition-colors hover:border-foreground/20 hover:text-foreground"
             >
               <span className="size-1.5 rounded-none bg-primary" />
-              Every answer comes with the page it came from
+              Never answers from memory. Cites when you ask it to
               <ArrowUpRight className="size-3.5 text-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
             </Link>
           </motion.div>
@@ -76,7 +76,7 @@ export function HeroSection({ primaryCta }: { primaryCta: ReactNode }) {
             StudyAI turns a PDF, a lecture deck or a Word file into a workspace
             you can actually work in — the page open beside a canvas you can
             draw on, notes that stay with it, tasks that know their deadline,
-            and an AI that read the thing and cites where it read it.
+            and an AI that actually read the thing and can show you where.
           </motion.p>
 
           <motion.div

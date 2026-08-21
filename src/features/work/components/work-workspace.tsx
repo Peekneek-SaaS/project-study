@@ -1,12 +1,14 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   CircleDashed,
   FileText,
   ListTodo,
   MessageSquare,
+  PanelRightClose,
+  PanelRightOpen,
   Shapes,
   StickyNote,
   X,
@@ -92,23 +94,80 @@ export function WorkWorkspace({
    * reactively, so following a second citation to the same document scrolls the
    * viewer rather than doing nothing on an unchanged route.
    */
-  const [citedPage] = useQueryState("page", parseAsInteger);
+  const [citedPage, setCitedPage] = useQueryState("page", parseAsInteger);
 
   /**
-   * A citation has to be able to *show* the page it lands on.
+   * The page most recently asked for, held after the URL has been tidied up.
    *
-   * The layout is remembered across visits, so someone who reads with the
-   * document minimised — or closed altogether, working from the board — would
-   * follow a citation into a page where the document is not on screen at all.
-   * The link would appear to do nothing.
+   * `?page=` is an *instruction* — "take me to page 7" — and not a description
+   * of where the reader is. Left in the address bar it became one: closing the
+   * document panel and reloading put the page back, because the effect below
+   * cannot tell a fresh citation from a stale parameter that has been sitting
+   * there since the last one. Every refresh replayed the last citation and
+   * undid the reader's own layout.
    *
-   * So arriving with a page restores the document, once, and only when a page
-   * was actually asked for. A visit without one leaves the arrangement exactly
-   * as the user left it.
+   * So it is read once into state and struck from the URL. The `id` rides along
+   * because the viewer only honours a page it has not already honoured, and
+   * following the same citation twice — scroll away, click it again — is a
+   * perfectly ordinary thing to do that a bare page number cannot express.
    */
+  const [pageRequest, setPageRequest] = useState<{
+    page: number;
+    id: number;
+  } | null>(null);
+
+  /**
+   * Which cited page has already been turned into a request.
+   *
+   * Only ever compared against, never rendered. It is what stops the adjustment
+   * below from firing on every render while the parameter is still in the URL,
+   * and it is reset the moment the URL is cleared so that asking for the same
+   * page again is a new request rather than a repeat this would ignore.
+   */
+  const [takenCite, setTakenCite] = useState<number | null>(null);
+
+  /*
+    Derived during render, not in an effect.
+
+    This is the "a prop changed, adjust state from it" case React documents, and
+    it has to be that rather than the effect it started as: setting state inside
+    an effect schedules a second render pass for something that was already
+    knowable during the first, and the linter is right to refuse it.
+
+    The two guards are what make it terminate. The first fires once per new
+    cited page and then sees its own `takenCite` and stops; the second clears
+    that latch when the parameter goes, so the next citation — even to the same
+    page — is seen as new.
+  */
+  if (citedPage !== null && citedPage !== takenCite) {
+    setTakenCite(citedPage);
+    setPageRequest((current) => ({
+      page: citedPage,
+      // A new id every time, so asking for a page already visited still moves
+      // the viewer. Without it the second click on the same citation is a
+      // no-op, because nothing the viewer can see has changed.
+      id: (current?.id ?? 0) + 1,
+    }));
+  }
+
+  if (citedPage === null && takenCite !== null) {
+    setTakenCite(null);
+  }
+
+  /*
+    The two things that are genuinely effects: showing the panel, and tidying
+    the address bar. Neither is React state — one writes the layout store and
+    one writes the URL — so both belong here rather than in the adjustment
+    above.
+  */
   useEffect(() => {
     if (citedPage === null) return;
+
     layout.showDocument();
+    // `history: "replace"`, so tidying up does not leave a back-button step
+    // that goes nowhere visible.
+    void setCitedPage(null, { history: "replace" });
+
     // Only on a change of the *cited page*: depending on the layout would rerun
     // this every time the user then minimised the document, undoing them.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -391,7 +450,7 @@ export function WorkWorkspace({
           is *for* now, and a long file name would otherwise push them around as
           it truncated.
         */}
-        <div>
+        <div className="flex items-center gap-1">
           <TabsList variant="custom" className="mx-auto">
             {/*
             Brings the document back, however it left — minimised into the
@@ -459,6 +518,62 @@ export function WorkWorkspace({
               <span className="hidden lg:inline">Chat</span>
             </TabsTrigger>
           </TabsList>
+
+          {/*
+            The sections panel's own close, matching the one the document panel
+            carries.
+
+            A toggle rather than a close, because closing it is the only way it
+            ever goes away and there has to be a way back that does not depend
+            on knowing that pressing a tab reopens it. The icon says which way it
+            will go: an opening panel when it is shut, a closing one when it is
+            not.
+
+            Disabled rather than hidden when the document is not on screen. With
+            the document closed this panel is the whole page, and `setSectionsOpen`
+            already refuses to close the last one — but a button that silently
+            does nothing is worse than one that says it cannot, and hiding it
+            would make the toolbar shuffle every time the document came and went.
+          */}
+          <Tooltip>
+            {/*
+              The trigger is the span, not the button.
+
+              A disabled button fires no pointer events, so a tooltip hung
+              directly off one never opens — and the tooltip here exists
+              precisely to explain the disabled case. Wrapping it gives the
+              tooltip something that still receives the pointer while the
+              control underneath stays properly disabled for the keyboard and
+              for assistive technology.
+            */}
+            <TooltipTrigger asChild>
+              <span className="inline-flex">
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label={
+                    layout.sectionsOpen ? "Close the panel" : "Open the panel"
+                  }
+                  aria-pressed={layout.sectionsOpen}
+                  disabled={layout.sectionsOpen && !layout.documentOpen}
+                  onClick={() => layout.setSectionsOpen(!layout.sectionsOpen)}
+                >
+                  {layout.sectionsOpen ? (
+                    <PanelRightClose />
+                  ) : (
+                    <PanelRightOpen />
+                  )}
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              {!layout.documentOpen && layout.sectionsOpen
+                ? "The document is closed — this is the only panel left"
+                : layout.sectionsOpen
+                  ? "Close the panel"
+                  : "Open the panel"}
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
@@ -491,7 +606,8 @@ export function WorkWorkspace({
                   // rather than down, so a page fits its height instead of
                   // being cropped to a sliver of one.
                   pdfLayout={isMobile ? "horizontal" : "vertical"}
-                  page={citedPage}
+                  page={pageRequest?.page ?? null}
+                  pageRequestId={pageRequest?.id}
                   // Minimising and closing both need somewhere for the page to
                   // carry on being: with the sections closed this panel is all
                   // there is, so neither is offered.
@@ -528,7 +644,8 @@ export function WorkWorkspace({
           <DocumentPip
             documentId={documentId}
             name={workspace.name}
-            page={citedPage}
+            page={pageRequest?.page ?? null}
+            pageRequestId={pageRequest?.id}
             corner={layout.corner}
             size={layout.pipSize}
             onCornerChange={layout.setCorner}

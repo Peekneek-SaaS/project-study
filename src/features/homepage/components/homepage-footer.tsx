@@ -48,7 +48,7 @@ const COLUMNS = [
     links: [
       { label: "The workspace", href: "#workspace" },
       { label: "How it works", href: "#pipeline" },
-      { label: "Answers and citations", href: "#answers" },
+      { label: "How answers are grounded", href: "#answers" },
       { label: "Everything in it", href: "#everything" },
     ],
   },

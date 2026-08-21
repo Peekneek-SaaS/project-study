@@ -25,6 +25,7 @@ export function WorkDocumentPanel({
   onClose,
   pdfLayout = "vertical",
   page,
+  pageRequestId,
   className,
 }: {
   documentId: string;
@@ -41,6 +42,8 @@ export function WorkDocumentPanel({
   pdfLayout?: PdfLayout;
   /** A page to open at, when a chat citation asked for one. */
   page?: number | null;
+  /** Lets the same page be asked for twice — see `PdfViewer`. */
+  pageRequestId?: number;
   className?: string;
 }) {
   const url = documentFilePath(documentId);
@@ -129,6 +132,12 @@ export function WorkDocumentPanel({
           url={url}
           pdfLayout={pdfLayout}
           page={page}
+          pageRequestId={pageRequestId}
+          // The work page is where a document is *worked on*, so this is where
+          // notes may be written into it. The preview overlay deliberately does
+          // not pass it: that surface is for looking, and a reader skimming a
+          // file from the drive is not annotating it.
+          documentId={documentId}
           fallback={
             /*
               Only the pre-2007 binary formats reach this now — `.doc` and

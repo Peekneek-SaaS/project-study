@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Maximize, ZoomIn, ZoomOut } from "lucide-react";
 import { renderAsync } from "docx-preview";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { AnnotationLayer } from "@/features/annotations/components/annotation-layer";
+import { useAnnotationSurface } from "@/features/annotations/hooks/use-annotation-surface";
 import {
   ViewerControlButton,
   ViewerControls,
@@ -23,13 +26,32 @@ import { cn } from "@/lib/utils";
  *
  * The text stays text, so it is selectable and searchable with the browser's
  * own find, which a rasterised page would not be.
+ *
+ * And because those pages are real boxes at a fixed size — the stage is *scaled*
+ * by a transform rather than reflowed — notes can be anchored to them exactly
+ * as they are on a PDF. The sections are built by `docx-preview` rather than by
+ * React, so they are tagged and collected after the render and each one has its
+ * annotation layer portalled into it; see `pages` below.
  */
 
 const ZOOM_FACTOR = 1.25;
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 4;
 
-export function DocxViewer({ url }: { url: string }) {
+export function DocxViewer({
+  url,
+  documentId = null,
+  page,
+  pageRequestId,
+}: {
+  url: string;
+  /** The document these pages belong to, when notes may be written on them. */
+  documentId?: string | null;
+  /** A page to open at, 1-based, for a citation or a note. */
+  page?: number | null;
+  /** Lets the same page be asked for twice — see `PdfViewer`. */
+  pageRequestId?: number;
+}) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const mountRef = useRef<HTMLDivElement>(null);
   const styleRef = useRef<HTMLDivElement>(null);
@@ -49,6 +71,18 @@ export function DocxViewer({ url }: { url: string }) {
 
   /** The rendered height of the whole document, for the scroller to reserve. */
   const [contentHeight, setContentHeight] = useState(0);
+
+  /**
+   * The page elements `docx-preview` built, once it has built them.
+   *
+   * Held in state rather than read from a ref at render time because that is
+   * what makes them portal targets: React has to re-render when they appear,
+   * and a ref changing does not cause one. Reset to empty on every reload, so a
+   * new document cannot portal its layers into the last one's detached nodes.
+   */
+  const [pages, setPages] = useState<HTMLElement[]>([]);
+
+  const annotations = useAnnotationSurface(documentId, scrollRef);
 
   /**
    * The width the page is fitted to — captured, not tracked, as in the PDF
@@ -124,9 +158,23 @@ export function DocxViewer({ url }: { url: string }) {
 
         // Read before any transform is applied, so these are the document's
         // own dimensions rather than scaled ones.
-        const page = mount.querySelector<HTMLElement>("section");
-        setPageWidth(page?.offsetWidth ?? 0);
+        const sections = [...mount.querySelectorAll<HTMLElement>("section")];
+        setPageWidth(sections[0]?.offsetWidth ?? 0);
         setContentHeight(mount.scrollHeight);
+
+        /*
+          Tagged so a selection can say which page it landed on, and made a
+          containing block so the layer portalled inside can position against
+          the page rather than against whatever ancestor happens to be
+          positioned. Both are written onto DOM this component did not create,
+          which is the price of a renderer that builds its own nodes.
+        */
+        sections.forEach((section, index) => {
+          section.dataset.page = String(index + 1);
+          section.style.position = "relative";
+        });
+        setPages(sections);
+
         setLoading(false);
       } catch {
         if (live) {
@@ -138,6 +186,9 @@ export function DocxViewer({ url }: { url: string }) {
 
     return () => {
       live = false;
+      // Emptied before the nodes go, or the portals below would spend a render
+      // pointing at sections that have been detached from the document.
+      setPages([]);
       // Both are cleared: a re-run appends a fresh copy of the document *and*
       // another copy of its stylesheet, and the second stylesheet would go on
       // styling pages that are no longer there.
@@ -152,6 +203,28 @@ export function DocxViewer({ url }: { url: string }) {
   if (base === null && available > 0 && pageWidth > 0) {
     setBase(available);
   }
+
+  /**
+   * Honours a requested page, once the document has been laid out.
+   *
+   * The same one-shot-per-request rule the PDF viewer uses, and for the same
+   * reason: without it every re-render while the reader scrolls away would drag
+   * them back. `pages` gates it because there is nothing to scroll to until
+   * `docx-preview` has finished.
+   */
+  const honoured = useRef<string | null>(null);
+  useEffect(() => {
+    if (!page || pages.length === 0) return;
+
+    const request = `${pageRequestId ?? 0}:${page}`;
+    if (honoured.current === request) return;
+    honoured.current = request;
+
+    pages[Math.min(page, pages.length) - 1]?.scrollIntoView({
+      block: "start",
+      behavior: "smooth",
+    });
+  }, [page, pageRequestId, pages]);
 
   /** Re-anchors to whatever room there is now, and drops the zoom with it. */
   const fitToPanel = () => {
@@ -226,6 +299,27 @@ export function DocxViewer({ url }: { url: string }) {
               transform: scale > 0 ? `scale(${scale})` : undefined,
             }}
           />
+
+          {/*
+            One layer per page, portalled into the section it belongs to.
+
+            Portalled rather than laid over the stage as a single sheet, so each
+            layer's percentages resolve against its own page — which is what the
+            anchors are fractions of. A single overlay would have to know where
+            every page starts within the stage and recompute it on every zoom.
+
+            The transform on the stage is inherited by these, so a marker scales
+            with the page it is on without any of this arithmetic knowing that
+            the zoom exists.
+          */}
+          {annotations.enabled &&
+            pages.map((section, index) =>
+              createPortal(
+                <AnnotationLayer {...annotations.layerProps(index + 1)} />,
+                section,
+                `annotations-${index + 1}`,
+              ),
+            )}
         </div>
       </div>
 

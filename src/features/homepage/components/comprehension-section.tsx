@@ -42,7 +42,7 @@ const FACETS = [
   {
     icon: Tag,
     title: "It knows its real name.",
-    body: "You called it bio-ch4-final-v2.pdf. It is called Cell Structure and Function, and that is what a citation says.",
+    body: "You called it bio-ch4-final-v2.pdf. It is called Cell Structure and Function, and that is the name it uses when it tells you where an answer came from.",
   },
   {
     icon: Library,
@@ -84,9 +84,9 @@ export function ComprehensionSection() {
               <p className={cn("mt-7 max-w-md text-[14.5px] leading-relaxed", INK_MUTED)}>
                 Most tools stuff your PDF into a prompt and hope. This one pulls
                 the document apart first — what it is, what it covers, how it is
-                laid out, and where every passage sits — and keeps all of it. The
-                answer you get later is built out of that, which is why it can
-                tell you the page.
+                laid out, and where every passage sits — and keeps all of it.
+                Every answer you get later is built out of that, which is why it
+                can always tell you the page if you ask for it.
               </p>
             </Reveal>
           </div>
