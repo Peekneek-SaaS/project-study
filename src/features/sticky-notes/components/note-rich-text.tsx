@@ -403,8 +403,19 @@ export function NoteRichText({
         backgroundColor: "var(--note-bg)",
         color: "var(--note-ink)",
         fontFamily: "var(--note-font-family)",
-        fontSize: "var(--note-font-size)",
-        lineHeight: "var(--note-line-height)",
+        /*
+          The touch-clamped size first, the note's own as the fallback.
+
+          Two variables rather than one because this is an inline style, and an
+          inline style cannot be overridden by a stylesheet — which is how a
+          12px note went on making Safari zoom the page on every tap despite the
+          app-wide rule against exactly that. The override therefore has to
+          arrive as a *value*, and `globals.css` sets `--note-editor-font-size`
+          on touch devices only. Off a touchscreen it is never declared, the
+          fallback applies, and a note is the size it was written at.
+        */
+        fontSize: "var(--note-editor-font-size, var(--note-font-size))",
+        lineHeight: "var(--note-editor-line-height, var(--note-line-height))",
       }}
       className={cn(
         /*

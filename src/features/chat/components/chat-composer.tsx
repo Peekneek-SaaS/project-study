@@ -97,12 +97,23 @@ const MAX_HEIGHT: Record<ComposerSize, number> = {
  * part of that: the base textarea changes size at that breakpoint, and a layer
  * that did not would be misaligned on every desktop.
  *
+ * `text-base` below that breakpoint — 16px — and it is doing two jobs at once.
+ *
+ * The first is the phone: Safari zooms into any field whose text is under 16px
+ * and never zooms back out, so the app raises every field to 16px on a
+ * touchscreen (see `globals.css`). The second is the reason it has to be stated
+ * *here* rather than left to that rule: the rule can only reach real fields,
+ * and the layer behind this one is a `div`. With the textarea raised to 16px
+ * and its mirror left at 14, the two stopped laying text out identically — so
+ * on a phone every mention mark sat a little further from its own word than the
+ * one before it. Both layers ask for 16px, so both get it.
+ *
  * Per size for the same reason they exist at all: the compact box sheds a row
  * of padding, and it has to shed it from both layers at once.
  */
 const FIELD_METRICS: Record<ComposerSize, string> = {
-  default: "px-2 py-1.5 text-sm leading-relaxed md:text-xs/relaxed",
-  compact: "px-2 py-1 text-sm leading-relaxed md:text-xs/relaxed",
+  default: "px-2 py-1.5 text-base leading-relaxed md:text-xs/relaxed",
+  compact: "px-2 py-1 text-base leading-relaxed md:text-xs/relaxed",
 };
 
 export function ChatComposer({

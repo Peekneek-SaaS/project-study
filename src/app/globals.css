@@ -878,15 +878,42 @@
   styles still win, so a canvas that sizes its own editing field — Excalidraw's
   text tool — is untouched.
 
-  Scoped to touch devices with no hover, so a desktop with a fine pointer keeps
-  the smaller text the layouts were drawn around. Only the fields grow, and only
-  where growing them buys something.
+  `any-pointer`, not `pointer`, and this is the part the first attempt at this
+  got wrong. `pointer` describes the *primary* input, so an iPad with a Magic
+  Keyboard or a trackpad reports `pointer: fine` and `hover: hover` — the query
+  stopped matching, while Safari on that same iPad went on zooming into every
+  field you touched. `any-pointer: coarse` asks the question that actually
+  matters: is there a touchscreen here at all. A laptop with a touch screen
+  picks up 16px fields too, which is a fair trade for the config it fixes.
 */
-@media (pointer: coarse) and (hover: none) {
+@media (any-pointer: coarse) {
   input:not([type="checkbox"], [type="radio"], [type="range"]),
   textarea,
   select,
   [contenteditable]:not([contenteditable="false"]) {
     font-size: max(16px, 1em);
+  }
+
+  /*
+    The note editor is the one field the rule above cannot reach.
+
+    It sets `font-size: var(--note-font-size)` as an *inline* style — a note
+    carries its own size, chosen by whoever wrote it — and an inline style beats
+    any stylesheet rule whatever its specificity or layer. So a note written at
+    12px went on zooming the page.
+
+    Redefining the variable is the way in, and it has to be a *second* variable
+    to do it: `--note-font-size` is declared on an ancestor and read here, so
+    redefining it in terms of itself on the same element is a cycle, and the
+    whole declaration would be thrown away. `note-rich-text` reads this one
+    first and falls back to the note's own, so nothing changes off a touchscreen.
+
+    The leading is clamped with it. Left alone, 16px text would be set on
+    spacing worked out for 12px and the lines would collide.
+  */
+  [contenteditable]:not([contenteditable="false"]) {
+    --note-editor-font-size: max(16px, var(--note-font-size));
+    /* 1.6 is `NOTE_LINE_HEIGHT_RATIO` — keep the two in step. */
+    --note-editor-line-height: max(calc(16px * 1.6), var(--note-line-height));
   }
 }
