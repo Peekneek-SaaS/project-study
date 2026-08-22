@@ -151,6 +151,9 @@ const MainSidebar = () => {
         above them, and park the collapsed icons off-centre in the rail.
       */}
       <SidebarFooter className="px-0">
+        <div className="px-2 group-data-[collapsible=icon]:hidden">
+          <CreditMeter />
+        </div>
         <NavItems groupLabel="Others" items={otherRoutes} pathName={pathName} />
         {/*
           The meter sits with the navigation rather than in settings, because a
@@ -159,9 +162,6 @@ const MainSidebar = () => {
           there is room for an icon and nothing that would make the number mean
           anything.
         */}
-        <div className="px-2 group-data-[collapsible=icon]:hidden">
-          <CreditMeter />
-        </div>
       </SidebarFooter>
     </Sidebar>
   );

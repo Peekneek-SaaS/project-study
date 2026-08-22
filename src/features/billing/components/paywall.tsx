@@ -58,7 +58,8 @@ export function Paywall({
       <Lock className="size-5 text-muted-foreground" />
       <div className="space-y-1">
         <p className="text-sm font-medium">
-          {title ?? `${GATED_FEATURES[feature].label} is part of ${required.name}`}
+          {title ??
+            `${GATED_FEATURES[feature].label} is part of ${required.name}`}
         </p>
         <p className="max-w-sm text-xs text-muted-foreground">
           {description ?? required.tagline}
@@ -128,16 +129,13 @@ export function CreditMeter({ className }: { className?: string }) {
     return (
       <div
         aria-hidden
-        className={cn(
-          "flex w-full flex-col gap-1.5 rounded-md px-2 py-1.5",
-          className,
-        )}
+        className={cn("flex w-full flex-col gap-1.5 px-2 py-1.5", className)}
       >
         <span className="flex h-4 items-center justify-between gap-2">
           <span className="h-3 w-16 animate-pulse rounded bg-muted" />
           <span className="h-3 w-10 animate-pulse rounded bg-muted" />
         </span>
-        <span className="h-1 w-full rounded-full bg-muted" />
+        <span className="h-1 w-full  bg-muted" />
       </div>
     );
   }
@@ -152,13 +150,18 @@ export function CreditMeter({ className }: { className?: string }) {
       type="button"
       onClick={() => open(creditsRemaining <= 0 ? "credits" : undefined)}
       className={cn(
-        "flex w-full flex-col gap-1.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted/60",
+        "flex w-full flex-col gap-1.5 px-2 py-1.5 text-left transition-colors hover:bg-muted/60",
         className,
       )}
     >
       <span className="flex h-4 items-center justify-between gap-2 text-xs">
         <span className="flex items-center gap-1.5 text-muted-foreground">
-          <Zap className={cn("size-3.5", low && "text-amber-600")} />
+          <Zap
+            className={cn(
+              "size-3.5 fill-primary stroke-primary",
+              low && "text-amber-600",
+            )}
+          />
           {plan.name}
         </span>
         <span
@@ -181,11 +184,11 @@ export function CreditMeter({ className }: { className?: string }) {
         aria-valuemin={0}
         aria-valuemax={creditsGranted}
         aria-label="Credits remaining this cycle"
-        className="h-1 w-full overflow-hidden rounded-full bg-muted"
+        className="h-2 w-full overflow-hidden bg-muted"
       >
         <span
           className={cn(
-            "block h-full rounded-full transition-[width] duration-500",
+            "block h-full transition-[width] duration-500",
             low ? "bg-amber-500" : "bg-primary",
           )}
           style={{ width: `${Math.max(2, fraction * 100)}%` }}
