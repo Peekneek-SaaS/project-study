@@ -4,6 +4,7 @@ import {
 } from "@/features/main/lib/drive-filters";
 import { deriveDocumentStatus } from "@/features/main/lib/document-status";
 import { MODIFIED_VALUES, modifiedRange } from "@/lib/list-filters";
+import { cursorClause, cursorInput, toPage } from "@/lib/pagination";
 import { prisma } from "@/lib/prisma";
 import { deleteUploadedFiles } from "@/lib/uploadthing-server";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
@@ -294,13 +295,38 @@ export const FolderRouter = createTRPCRouter({
     }),
 
   /**
-   * One folder's contents, narrowed by the toolbar's filters.
+   * One folder's contents, a page at a time, narrowed by the toolbar's filters.
    *
    * The filters are applied here rather than over the returned rows because a
    * listing is only small until it isn't: filtering in the database keeps the
    * response proportional to what is actually shown, and both clauses ride the
    * `[userId, parentId]` / `[userId, folderId]` indexes that already scope the
    * listing to this folder.
+   *
+   * ## One cursor over two tables
+   *
+   * This is the only paginated list in the app that returns two kinds of thing,
+   * and the shape it hands back — `{ folders, documents }` — is the shape the
+   * drive has always rendered: folders above, files below, in both the table
+   * and the grid. Pagination is not allowed to change that, so the two are not
+   * paged independently. They are paged as *one* sequence — every folder, then
+   * every file — and the cursor says which half it is in:
+   *
+   *     "f:<id>"   more folders after this one
+   *     "d:<id>"   folders are done; more files after this one
+   *
+   * A page therefore fills with folders first and tops up with files when the
+   * folders run out, which is why a single page can carry both and why the
+   * boundary between them falls wherever it falls. Two independent cursors
+   * would have been simpler to write and wrong to use: they would interleave
+   * arrivals, so scrolling would grow the folders section in the middle of the
+   * page while the files section grew below it, and the "folders first"
+   * ordering the arrow keys and shift-click walk would stop being an ordering
+   * at all.
+   *
+   * Both halves are ordered by `[name, id]`. The `id` is the tiebreak a cursor
+   * needs — two folders can share a name, and an ordering that cannot decide
+   * between them repeats or skips a row at the page boundary.
    */
   getContents: protectedProcedure
     .input(
@@ -308,49 +334,35 @@ export const FolderRouter = createTRPCRouter({
         folderId: z.string().nullable(),
         type: z.enum(DRIVE_TYPE_VALUES).nullable().default(null),
         modified: z.enum(MODIFIED_VALUES).nullable().default(null),
+        ...cursorInput,
       }),
     )
     .query(async ({ ctx, input }) => {
       const updatedAt = modifiedRange(input.modified);
       const extensions = input.type ? typeExtensions(input.type) : null;
+      const { limit } = input;
 
-      const documentsQuery = prisma.document.findMany({
-        where: {
-          userId: ctx.userId,
-          folderId: input.folderId,
-          ...(updatedAt && { updatedAt }),
-          // `endsWith` per extension rather than one regex, so Prisma keeps it
-          // a plain `LIKE` — and case-insensitive because nothing normalises a
-          // name on the way in, so `.PDF` is as likely as `.pdf`.
-          ...(extensions && {
-            OR: extensions.map((extension) => ({
-              name: { endsWith: extension, mode: "insensitive" as const },
-            })),
-          }),
-        },
-        orderBy: { name: "asc" },
-        // `pdfUrl` is deliberately absent: it is a public UploadThing URL,
-        // and it never leaves the server. The client addresses a document
-        // through our own routes instead — see `lib/document-links.ts`.
-        select: {
-          id: true,
-          name: true,
-          status: true,
-          folderId: true,
-          isLocked: true,
-          createdAt: true,
-          updatedAt: true,
-          // Only the status. The reading itself is large and none of the
-          // listing's business — this is here so the badge can combine the two
-          // jobs into one answer.
-          content: { select: { status: true } },
-        },
-      });
+      // Which half of the sequence the cursor points into. A first page has no
+      // cursor and starts at the top of the folders.
+      const folderCursor = input.cursor?.startsWith("f:")
+        ? input.cursor.slice(2)
+        : null;
+      const documentCursor = input.cursor?.startsWith("d:")
+        ? input.cursor.slice(2)
+        : null;
 
-      // Filtering by type asks a question folders have no answer to, so they
-      // leave the listing rather than sitting there unfiltered above the files.
-      // Not queried at all in that case — the empty listing is known here.
-      const folders = extensions
+      /*
+        Filtering by type asks a question folders have no answer to, so they
+        leave the listing rather than sitting there unfiltered above the files.
+        Not queried at all in that case — the empty listing is known here.
+
+        The second condition is the paging half: once the cursor has moved into
+        the documents there are no folders left to find, and asking again would
+        be a query whose answer is known to be the rows already shown.
+      */
+      const foldersExhausted = Boolean(extensions) || documentCursor !== null;
+
+      const folderRows = foldersExhausted
         ? []
         : await prisma.folder.findMany({
             where: {
@@ -358,8 +370,71 @@ export const FolderRouter = createTRPCRouter({
               parentId: input.folderId,
               ...(updatedAt && { updatedAt }),
             },
-            orderBy: { name: "asc" },
+            orderBy: [{ name: "asc" }, { id: "asc" }],
+            take: limit + 1,
+            ...cursorClause(folderCursor),
           });
+
+      // Only the rows: whether there are more folders is not asked here,
+      // because `remaining` below answers the same question more usefully — a
+      // page with room left over is a page that has reached the files.
+      const { items: folders } = toPage(folderRows, limit);
+
+      /*
+        What is left of the page once the folders have had their share.
+
+        Zero means the folders filled it on their own, and the documents are not
+        queried at all this time round — they are the next page's business.
+      */
+      const remaining = limit - folders.length;
+
+      const documentRows =
+        remaining > 0
+          ? await prisma.document.findMany({
+              where: {
+                userId: ctx.userId,
+                folderId: input.folderId,
+                ...(updatedAt && { updatedAt }),
+                // `endsWith` per extension rather than one regex, so Prisma
+                // keeps it a plain `LIKE` — and case-insensitive because
+                // nothing normalises a name on the way in, so `.PDF` is as
+                // likely as `.pdf`.
+                ...(extensions && {
+                  OR: extensions.map((extension) => ({
+                    name: {
+                      endsWith: extension,
+                      mode: "insensitive" as const,
+                    },
+                  })),
+                }),
+              },
+              orderBy: [{ name: "asc" }, { id: "asc" }],
+              take: remaining + 1,
+              ...cursorClause(documentCursor),
+              // `pdfUrl` is deliberately absent: it is a public UploadThing
+              // URL, and it never leaves the server. The client addresses a
+              // document through our own routes instead — see
+              // `lib/document-links.ts`.
+              select: {
+                id: true,
+                name: true,
+                status: true,
+                folderId: true,
+                isLocked: true,
+                createdAt: true,
+                updatedAt: true,
+                // Only the status. The reading itself is large and none of the
+                // listing's business — this is here so the badge can combine
+                // the two jobs into one answer.
+                content: { select: { status: true } },
+              },
+            })
+          : [];
+
+      const { items: documentPage, nextCursor: afterDocuments } = toPage(
+        documentRows,
+        remaining,
+      );
 
       /**
        * The badge's answer, worked out here rather than in the row.
@@ -370,12 +445,39 @@ export const FolderRouter = createTRPCRouter({
        * `overallStatus` is the combined one, and the only thing the badge and
        * the poll look at.
        */
-      const documents = (await documentsQuery).map(({ content, ...doc }) => ({
+      const documents = documentPage.map(({ content, ...doc }) => ({
         ...doc,
         overallStatus: deriveDocumentStatus(doc.status, content?.status ?? null),
       }));
 
-      return { folders, documents };
+      /*
+        Where the next page picks up, read from the bottom of the sequence
+        upwards.
+
+        The middle case is the one worth naming: `remaining === 0` means the
+        folders filled the page exactly, so the documents were never asked for
+        and the list is *not* over — the cursor stays in the folder half so the
+        next page can find the folders' end and the files beyond it. Returning
+        null there is the bug that stops a drive at its last folder and hides
+        every file in it.
+      */
+      const nextCursor = (() => {
+        // The folders filled the page exactly, so the documents were never
+        // asked for. The list is not over; the cursor stays in the folder half
+        // so the next page can find the folders' end and the files past it.
+        // Returning null here is the bug that stops a drive at its last folder
+        // and hides every file in it.
+        if (remaining === 0) {
+          const last = folders[folders.length - 1];
+          return last ? `f:${last.id}` : null;
+        }
+
+        // The documents were queried, so whatever they said is the answer:
+        // another id means more files, nothing means the whole listing is done.
+        return afterDocuments ? `d:${afterDocuments}` : null;
+      })();
+
+      return { folders, documents, nextCursor };
     }),
 
   getBreadcrumb: protectedProcedure

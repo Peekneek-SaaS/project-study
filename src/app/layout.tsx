@@ -9,6 +9,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
 import { ModalProvider } from "@/components/providers/modal-provider";
+import { PaywallProvider } from "@/features/billing/hooks/use-paywall";
 import { MotionProvider } from "@/components/providers/motion-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -157,8 +158,22 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 */}
                 <Suspense>
                   <NuqsAdapter>
-                    <MotionProvider>{children}</MotionProvider>
-                    <ModalProvider />
+                    {/*
+                      Around the modals as well as the pages, and for the third
+                      time on this stack the reason is the same: `ModalProvider`
+                      mounts here rather than beside whatever opens it, and one
+                      of those modals is now settings — which shows the plan, the
+                      credit meter and the button that opens checkout. Held any
+                      lower, that panel would be the one part of the app unable
+                      to read the entitlements it exists to display.
+
+                      It costs a signed-out visitor nothing: the query inside is
+                      disabled until Clerk says there is somebody to ask about.
+                    */}
+                    <PaywallProvider>
+                      <MotionProvider>{children}</MotionProvider>
+                      <ModalProvider />
+                    </PaywallProvider>
                   </NuqsAdapter>
                 </Suspense>
                 {/* Above the toaster: uploads started from a modal report into it. */}

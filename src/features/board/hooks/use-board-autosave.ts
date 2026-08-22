@@ -69,7 +69,10 @@ export function useBoardAutosave(boardId: string) {
       setState("saved");
       // The table sorts on `updatedAt`, so it is stale the moment this lands.
       // Not awaited: nothing on this page is waiting to render it.
-      void queryClient.invalidateQueries(trpc.board.list.queryFilter());
+      // `pathFilter` rather than `list.queryFilter()` — the list is infinite
+      // now and a plain query filter does not match its key. See the same swap
+      // in `chat-conversation.tsx`.
+      void queryClient.invalidateQueries(trpc.board.pathFilter());
     } catch (error) {
       // Put the work back, so the next edit's debounce retries this scene
       // rather than leaving it stranded. Only if nothing newer arrived while

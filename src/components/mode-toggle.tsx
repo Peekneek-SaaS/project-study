@@ -11,6 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 
 interface ModeToggleProps {
   /**
@@ -23,9 +24,10 @@ interface ModeToggleProps {
    * theme that choice resolved to.
    */
   themeName?: boolean;
+  className?: string;
 }
 
-export function ModeToggle({ themeName }: ModeToggleProps) {
+export function ModeToggle({ themeName, className }: ModeToggleProps) {
   // `theme` rather than `resolvedTheme`: this is the *choice*, and "System" is
   // one of the answers. Reading the resolved value would label the button
   // "Dark" for a reader who asked to follow their system and happens to be in
@@ -36,7 +38,11 @@ export function ModeToggle({ themeName }: ModeToggleProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size={themeName ? "default" : "icon"}>
+        <Button
+          variant="outline"
+          size={themeName ? "default" : "icon"}
+          className={cn("", className)}
+        >
           {/*
             The two icons share one grid cell rather than one being taken out of
             the flow with `absolute`. Same crossfade, but the cell is a real box

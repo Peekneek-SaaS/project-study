@@ -25,7 +25,7 @@ import {
 import { useOpenDocument } from "@/features/main/hooks/use-open-document";
 import type { DriveDocument, DriveFolder } from "@/features/main/types";
 import { documentPreviewPath } from "@/lib/document-links";
-import { useDriveStore } from "@/lib/stores/drive-store";
+import { useDriveNavigation } from "@/features/main/hooks/use-drive-navigation";
 import { useModalStore } from "@/lib/stores/modal-store";
 import { cn } from "@/lib/utils";
 
@@ -165,7 +165,7 @@ function folderItems(
  */
 export function DriveItemActions(props: DriveItemActionsProps) {
   const openModal = useModalStore((state) => state.open);
-  const openFolder = useDriveStore((state) => state.openFolder);
+  const { openFolder } = useDriveNavigation();
   const { open: openDocument, preview: previewDocument } = useOpenDocument();
 
   // Both dialogs live in `ModalProvider`, so they outlive this row being

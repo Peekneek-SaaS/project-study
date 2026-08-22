@@ -28,6 +28,11 @@ import { cn } from "@/lib/utils";
 /**
  * The five surfaces a document gets, behind one rail.
  *
+ * "Note it" carries two features rather than one: the loose notes filed by day,
+ * and the annotations anchored to a place on a page. They are one tab because
+ * they are one intention — writing something down against what you are reading
+ * — and because a sixth tab would make the rail a menu.
+ *
  * The rail is the reference's signature move and it earns its place here for a
  * reason the reference does not have: this product's pitch is that five tools
  * open around *one* file, and five stacked sections would show five products.
@@ -72,9 +77,11 @@ const SURFACES = [
     icon: StickyNote,
     iconClassName: "fill-yellow-400 stroke-yellow-200",
     lead: "Notes that stay with their source.",
-    rest: "Written against the document, filed under the day you wrote them, and still there when you open it three weeks later looking for the one thing you knew you had written down.",
+    rest: "Two kinds, both kept with the file. Notes filed under the day you wrote them — and annotations written onto the page itself: select the sentence, say what you think, and the mark stays on that spot.",
     points: [
       "Rich text, your own paper colour, ink and size",
+      "Annotate the page: select the words, write against them",
+      "The mark finds the same sentence at any zoom, on any screen",
       "Grouped by the day written, so “Yesterday” means yesterday",
       "Kept with the document, not in a pile with everything else",
     ],

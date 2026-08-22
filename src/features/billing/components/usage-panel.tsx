@@ -23,6 +23,14 @@ import { cn } from "@/lib/utils";
  * go. Anything to do with the card, the invoices or cancelling is Polar's own
  * portal — building those here would mean handling payment details, which is
  * most of the reason to be using a merchant of record at all.
+ *
+ * A panel inside the settings dialog rather than a page of its own. Billing is
+ * read in the same breath as the rest of "my account", and a plan is not
+ * something anybody sets out to navigate to — it is something they check while
+ * they are already in settings, usually because a number somewhere else
+ * surprised them. It carries no heading of its own: the dialog draws that from
+ * `settings-sections`, and a second one inside the panel would be the same
+ * word twice.
  */
 
 /** What each priced action is called, for somebody reading their own bill. */
@@ -33,7 +41,7 @@ const USAGE_LABELS: Record<UsageKind, string> = {
   OCR: "Scanned documents transcribed",
 };
 
-export function BillingView() {
+export function UsagePanel() {
   const trpc = useTRPC();
   const params = useSearchParams();
   const { entitlements, isLoading, refetch } = useEntitlements();
@@ -113,10 +121,20 @@ export function BillingView() {
     }),
   );
 
+  /*
+    The same height while it loads as when it has loaded.
+
+    The dialog is a fixed box and the panels swap inside it; a spinner that is
+    two lines tall followed by content that is twenty makes the scrollbar
+    appear, and on a slow connection the whole panel jumps as it settles. So the
+    placeholder holds roughly the room the real thing will need.
+  */
   if (isLoading || !entitlements) {
     return (
-      <div className="flex flex-1 items-center justify-center py-16">
-        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+      <div className="flex min-h-[22rem] flex-col gap-4 pb-5">
+        <div className="h-[6.5rem] animate-pulse rounded-lg bg-muted/60" />
+        <div className="h-[9rem] animate-pulse rounded-lg bg-muted/60" />
+        <div className="h-[7rem] animate-pulse rounded-lg bg-muted/60" />
       </div>
     );
   }
@@ -132,14 +150,7 @@ export function BillingView() {
       : 0;
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 sm:p-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-lg font-semibold">Billing</h1>
-        <p className="text-sm text-muted-foreground">
-          Your plan, what is left of this month&rsquo;s credits, and where they went.
-        </p>
-      </div>
-
+    <div className="flex flex-col gap-4 pb-5">
       {settling && (
         <div className="flex items-center gap-3 rounded-lg border bg-muted/40 p-4">
           <Loader2 className="size-4 animate-spin text-muted-foreground" />

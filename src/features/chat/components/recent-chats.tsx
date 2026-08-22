@@ -1,12 +1,13 @@
 "use client";
 
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useSuspenseInfiniteQuery } from "@tanstack/react-query";
 import { Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useRef, useState } from "react";
 
 import { AnimatePresence } from "motion/react";
 
+import { InfiniteScrollSentinel } from "@/components/infinite-scroll-sentinel";
 import { MotionTableBody } from "@/components/motion/motion-table";
 import { Button } from "@/components/ui/button";
 import { Table, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -17,6 +18,7 @@ import { chatPath, type ChatSummary } from "@/features/chat/types";
 import { ROW_ATTRIBUTE } from "@/hooks/use-row-interaction";
 import { useRowSelection } from "@/hooks/use-row-selection";
 import { listContainer, mountAnimation } from "@/lib/motion";
+import { infiniteOptions } from "@/lib/pagination";
 import { useChatSelectionStore } from "@/lib/stores/chat-selection-store";
 import { useTRPC } from "@/trpc/client";
 import { cn } from "@/lib/utils";
@@ -43,7 +45,17 @@ const STICKY_HEAD =
 export function RecentChats() {
   const trpc = useTRPC();
   const router = useRouter();
-  const { data: chats } = useSuspenseQuery(trpc.chat.list.queryOptions());
+  const { data, hasNextPage, isFetchingNextPage, fetchNextPage } =
+    useSuspenseInfiniteQuery(
+      trpc.chat.list.infiniteQueryOptions(undefined, infiniteOptions),
+    );
+
+  // Flattened once per fetch rather than per render: it is the dependency of
+  // the memo below that builds the keyboard's row map.
+  const chats = useMemo(
+    () => data.pages.flatMap((page) => page.items),
+    [data.pages],
+  );
 
   const selectedIds = useChatSelectionStore((state) => state.ids);
   const clearSelection = useChatSelectionStore((state) => state.clear);
@@ -103,6 +115,9 @@ export function RecentChats() {
   if (isSelecting && shownCount !== selected.length)
     setShownCount(selected.length);
 
+  // Only when the account has no chats at all — with a first page in hand and
+  // nothing in it, there is no second page either, so this cannot flash over a
+  // list that is merely still arriving.
   if (chats.length === 0) {
     return (
       <div className="mx-auto w-full max-w-3xl px-4 pb-10">
@@ -245,6 +260,20 @@ export function RecentChats() {
           </MotionTableBody>
         </Table>
       </div>
+
+      {/*
+        The bottom of the list. Outside the scroll-container override above and
+        after the table rather than inside it, because a `<div>` is not
+        something a `<table>` may contain — dropped into `TableBody` the browser
+        hoists it out and the observer ends up watching an element that is not
+        where the rows end.
+      */}
+      <InfiniteScrollSentinel
+        hasNextPage={hasNextPage}
+        isFetchingNextPage={isFetchingNextPage}
+        fetchNextPage={fetchNextPage}
+        label="Loading more chats"
+      />
 
       <RenameChatDialog chat={renaming} onClose={() => setRenaming(null)} />
 

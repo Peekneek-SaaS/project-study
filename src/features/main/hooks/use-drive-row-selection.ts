@@ -4,13 +4,13 @@ import { useCallback, useEffect, useMemo } from "react";
 
 import type { SelectRow } from "@/features/main/hooks/use-drive-row-interaction";
 import { focusRow } from "@/hooks/use-row-interaction";
+import { useDriveNavigation } from "@/features/main/hooks/use-drive-navigation";
 import { useOpenDocument } from "@/features/main/hooks/use-open-document";
 import type { DriveDocument, DriveFolder } from "@/features/main/types";
 import {
   type DriveItemKey,
   useDriveSelectionStore,
 } from "@/lib/stores/drive-selection-store";
-import { useDriveStore } from "@/lib/stores/drive-store";
 import { useModalStore } from "@/lib/stores/modal-store";
 import { useSearchStore } from "@/lib/stores/search-store";
 
@@ -44,7 +44,7 @@ export function useDriveRowSelection(
   folders: DriveFolder[],
   documents: DriveDocument[],
 ) {
-  const openFolder = useDriveStore((state) => state.openFolder);
+  const { openFolder } = useDriveNavigation();
   const { open: openDocument } = useOpenDocument();
 
   const rows = useMemo<DriveRowEntry[]>(

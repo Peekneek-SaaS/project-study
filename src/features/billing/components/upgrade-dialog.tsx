@@ -47,6 +47,8 @@ const REASONS: Record<GatedFeature, string> = {
     "You have used this cycle's credits. A plan tops them up every month — and gives you room for more documents while it is at it.",
   documents:
     "Your plan is full. A larger one holds more documents, and reads longer ones.",
+  pages:
+    "That document is longer than your plan reads in one go. A larger plan takes it whole.",
   ocr: "Scanned documents have to be read by a model, page by page. That is part of Study and Pro.",
   providerPicker:
     "Choosing which model answers — and getting the frontier models on every answer — is part of Pro.",
@@ -152,7 +154,7 @@ export function PeriodToggle({
       <div
         role="radiogroup"
         aria-label="Billing period"
-        className="inline-flex items-center gap-1 rounded-full border bg-muted/50 p-1"
+        className="inline-flex items-center gap-1  border bg-input/30 dark:bg-muted p-1"
       >
         {(["MONTHLY", "YEARLY"] as const).map((value) => (
           <button
@@ -162,7 +164,7 @@ export function PeriodToggle({
             aria-checked={period === value}
             onClick={() => onChange(value)}
             className={cn(
-              "rounded-full px-4 py-1.5 text-xs font-medium transition-colors",
+              "px-4 py-1.5 text-xs font-medium transition-colors",
               "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
               period === value
                 ? "bg-background text-foreground shadow-sm"

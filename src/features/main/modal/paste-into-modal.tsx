@@ -34,6 +34,7 @@ import {
   useModalStore,
 } from "@/lib/stores/modal-store";
 import { cn } from "@/lib/utils";
+import { MAX_PAGE_SIZE } from "@/lib/pagination";
 import { useTRPC } from "@/trpc/client";
 
 /**
@@ -147,14 +148,17 @@ function NotesPasteBody({ text, placeholder, onDone }: PasteBodyProps) {
     wall nor a work page is refetched because this dialog opened.
   */
   const { data: standalone, isLoading: isLoadingStandalone } = useQuery(
-    trpc.stickyNote.list.queryOptions(),
+    trpc.stickyNote.list.queryOptions({ limit: MAX_PAGE_SIZE }),
   );
   const { data: inDocuments, isLoading: isLoadingInDocuments } = useQuery(
     trpc.stickyNote.listInDocuments.queryOptions(),
   );
 
   const isLoading = isLoadingStandalone || isLoadingInDocuments;
-  const notes = standalone ?? [];
+  // `.items`: `stickyNote.list` is paged now, and this picker takes one page of
+  // it rather than scrolling — a plain query, so it keeps its own cache entry
+  // and does not disturb the wall's infinite one.
+  const notes = standalone?.items ?? [];
   const documentNotes = inDocuments ?? [];
   const isEmpty = notes.length === 0 && documentNotes.length === 0;
 

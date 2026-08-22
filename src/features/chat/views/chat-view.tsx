@@ -6,7 +6,8 @@ import {
   RecentChats,
   RecentChatsSkeleton,
 } from "@/features/chat/components/recent-chats";
-import { HydrateClient, prefetchAwaited, trpc } from "@/trpc/server";
+import { infiniteOptions } from "@/lib/pagination";
+import { HydrateClient, prefetchInfiniteAwaited, trpc } from "@/trpc/server";
 
 /**
  * The chat page.
@@ -22,12 +23,15 @@ import { HydrateClient, prefetchAwaited, trpc } from "@/trpc/server";
  * makes `vh` taller than the visible page, which would push the heading back
  * under the fold on exactly the devices with least room to spare.
  *
- * `prefetchAwaited` rather than bare `prefetch`, as everywhere else that warms a
- * query from a server component with nothing else to await — the long version
- * is in `trpc/server.tsx`.
+ * `prefetchInfiniteAwaited` rather than bare `prefetch`, as everywhere else that
+ * warms a query from a server component with nothing else to await — the long
+ * version is in `trpc/server.tsx`. It warms the first page of the recents only;
+ * the rest arrive as the table is scrolled.
  */
 export async function ChatView() {
-  await prefetchAwaited(trpc.chat.list.queryOptions());
+  await prefetchInfiniteAwaited(
+    trpc.chat.list.infiniteQueryOptions(undefined, infiniteOptions),
+  );
 
   return (
     <div

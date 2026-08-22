@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { NotebookPen, SearchXIcon } from "lucide-react";
+import { NotebookPen, SearchXIcon, StickyNote } from "lucide-react";
 import { useQueryStates } from "nuqs";
 
 import { Button } from "@/components/ui/button";
@@ -58,8 +58,8 @@ export function NotesEmptyState({ isFiltering }: { isFiltering: boolean }) {
   return (
     <MotionEmpty {...mountAnimation} variants={popIn}>
       <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <NotebookPen />
+        <EmptyMedia>
+          <StickyNote className="size-24 fill-yellow-400 stroke-yellow-200 opacity-30" />
         </EmptyMedia>
         <EmptyTitle>No notes yet</EmptyTitle>
         <EmptyDescription>

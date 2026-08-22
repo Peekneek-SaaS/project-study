@@ -10,6 +10,7 @@ import {
   randomNoteColor,
 } from "@/features/sticky-notes/lib/note-appearance";
 import { stripExtension } from "@/lib/document-file-types";
+import { cleanPlanError } from "@/features/billing/lib/plan-errors";
 import {
   documentCredits,
   getEntitlements,
@@ -421,7 +422,11 @@ export const processDocumentContent = schemaTask({
       ) {
         await prisma.documentContent.update({
           where: { id: content.id },
-          data: { status: "FAILED", error: error.message },
+          // Cleaned, not raw. This message is *stored* and then shown against
+          // the document in the drive, and a machine tag has no business in the
+          // database or on that row — the tag exists for errors that are
+          // thrown at a browser, which this one is not.
+          data: { status: "FAILED", error: cleanPlanError(error.message) },
         });
 
         logger.warn("Document refused by plan limits", {

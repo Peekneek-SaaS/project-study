@@ -14,7 +14,7 @@ import {
   SquareMousePointer,
   StickyNote,
 } from "lucide-react";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 import {
   Command,
@@ -31,7 +31,6 @@ import { DriveStatusBadge } from "@/features/main/components/drive-status-badge"
 import { boardPath } from "@/features/board/types";
 import { chatPath } from "@/features/chat/types";
 import { useOpenDocument } from "@/features/main/hooks/use-open-document";
-import { DRIVE_PATH } from "@/features/main/types";
 import {
   searchBoardsOptions,
   searchChatsOptions,
@@ -42,7 +41,7 @@ import {
 import { noteDisplayTitle } from "@/features/sticky-notes/lib/note-content";
 import { stickyNotePath } from "@/features/sticky-notes/types";
 import { todoDatePath } from "@/features/todo/types";
-import { useDriveStore } from "@/lib/stores/drive-store";
+import { useDriveNavigation } from "@/features/main/hooks/use-drive-navigation";
 import { useSearchStore } from "@/lib/stores/search-store";
 import { useTRPC } from "@/trpc/client";
 import { cn } from "@/lib/utils";
@@ -111,11 +110,7 @@ export function SearchModal() {
   const closeSearch = useSearchStore((state) => state.close);
 
   const router = useRouter();
-  // Compared rather than pushed blindly: pushing the route you are already on
-  // stacks a duplicate history entry, which costs the back button a press.
-  const pathname = usePathname();
-  const openFolder = useDriveStore((state) => state.openFolder);
-  const goToCrumb = useDriveStore((state) => state.goToCrumb);
+  const { openTrail } = useDriveNavigation();
   const { open: openDocument } = useOpenDocument();
 
   const trpc = useTRPC();
@@ -153,9 +148,12 @@ export function SearchModal() {
     isLoadingTodos;
   const folders = data?.folders ?? [];
   const documents = data?.documents ?? [];
-  const boards = boardData ?? [];
-  const notes = noteData ?? [];
-  const chats = chatData ?? [];
+  // `.items` because these three procedures are paged — the palette takes a
+  // single large page rather than scrolling one, so what comes back is a page
+  // object and not the bare array it used to be. See `use-search-items.ts`.
+  const boards = boardData?.items ?? [];
+  const notes = noteData?.items ?? [];
+  const chats = chatData?.items ?? [];
   const todos = todoData ?? [];
 
   /**
@@ -164,16 +162,12 @@ export function SearchModal() {
    * be — otherwise the crumbs would describe a path that was never walked.
    */
   const handleSelectFolder = (folderId: string) => {
-    const trail = trailTo(folders, folderId);
     closeSearch();
-    goToCrumb(null);
-    for (const crumb of trail) openFolder(crumb);
-
-    // Moving the trail only rearranges the drive; it does not put it on screen.
-    // Searched from a board or the notes page, everything above would happen
-    // correctly and invisibly. The trail survives the navigation — it is a
-    // client store, not route state — so it is set first and travels with us.
-    if (pathname !== DRIVE_PATH) router.push(DRIVE_PATH);
+    // The whole path in one call rather than walked into a step at a time: the
+    // trail is handed over as the crumb names *and* the destination, so the bar
+    // reads correctly on arrival and a search from the boards or the notes page
+    // lands on the drive already inside the folder. See `openTrail`.
+    openTrail(trailTo(folders, folderId));
   };
 
   const handleSelectDocument = (doc: (typeof documents)[number]) => {

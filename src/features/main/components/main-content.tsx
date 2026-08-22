@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { DragDropProvider, DragOverlay } from "@dnd-kit/react";
 import { Trash2, X } from "lucide-react";
 
+import { InfiniteScrollSentinel } from "@/components/infinite-scroll-sentinel";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -23,8 +24,6 @@ import { useDriveRowSelection } from "@/features/main/hooks/use-drive-row-select
 import { driveSensors } from "@/features/main/lib/drive-sensors";
 import { AnimatePresence } from "motion/react";
 
-import { MotionTableBody } from "@/components/motion/motion-table";
-import { listContainer, mountAnimation } from "@/lib/motion";
 import { ROW_ATTRIBUTE } from "@/hooks/use-row-interaction";
 import type { DriveDragData } from "@/features/main/types";
 import { useDriveSelectionStore } from "@/lib/stores/drive-selection-store";
@@ -71,6 +70,9 @@ export function MainContent({ serverView }: { serverView: DriveViewType }) {
     handleDragEnd,
     isMoving,
     isFiltering,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
   } = useDriveBrowser();
 
   const openModal = useModalStore((state) => state.open);
@@ -255,6 +257,10 @@ export function MainContent({ serverView }: { serverView: DriveViewType }) {
               isRoot={isRoot}
               parentFolderId={parentFolderId}
               onSelect={selectRow}
+              // Which listing this is, so the cards' presence can be thrown
+              // away on navigation rather than animated out. See the table's
+              // own key below.
+              listingKey={currentFolderId ?? "root"}
             />
           ) : (
             <Table>
@@ -271,15 +277,45 @@ export function MainContent({ serverView }: { serverView: DriveViewType }) {
                 </TableHeader>
               )}
               {/*
-                The stagger lives on the body, not on the rows: a parent that
-                owns the timing deals its children in one after another, where
-                rows each naming their own delay would have to be told their
-                index and would fall out of step the moment one was filtered
-                away. The rows only say what arriving looks like.
+                A plain body, with no entrance on it.
+
+                It used to carry a staggered mount, and the stagger was the
+                problem rather than the fix: this listing is *replaced* on every
+                navigation, so walking into a folder played an arrival on every
+                row at once, and walking back out played it again. What should
+                feel like a door opening felt like the page loading slowly.
+
+                It has to be removed here as well as on the rows, not instead of
+                them. A motion parent propagates its variants to any child that
+                does not name its own, so leaving `initial="hidden"` on the body
+                would hand the entrance straight back to rows that had just
+                stopped asking for one.
+
+                `AnimatePresence` and the rows' `exit` stay. Deleting is
+                something that happens to a list you are already looking at, and
+                that still deserves to be shown — see the key on it below for
+                how the two are told apart.
               */}
-              <MotionTableBody {...mountAnimation} variants={listContainer}>
+              <TableBody>
                 {!isRoot && <DriveParentRow parentFolderId={parentFolderId} />}
-                <AnimatePresence>
+                {/*
+                  Keyed by the folder, which is the other half of removing the
+                  entrance.
+
+                  Taking the arrival off the rows was not enough on its own: a
+                  navigation replaces every key in this list, so the *outgoing*
+                  folder's rows were still being played out — shrinking away
+                  while the new ones appeared underneath them. Half the movement
+                  being complained about was the folder being left, not the one
+                  being opened.
+
+                  A key here makes React throw the whole `AnimatePresence` away
+                  and build a new one, and a presence component that is itself
+                  unmounted has no chance to animate its children out. So
+                  navigation is an instant swap, while a delete *within* a
+                  folder — same key, one child gone — still plays its exit.
+                */}
+                <AnimatePresence key={currentFolderId ?? "root"}>
                   {folders.map((folder) => (
                     <DriveFolderRow
                       key={folder.id}
@@ -295,11 +331,32 @@ export function MainContent({ serverView }: { serverView: DriveViewType }) {
                     />
                   ))}
                 </AnimatePresence>
-              </MotionTableBody>
+              </TableBody>
             </Table>
           )}
           {!hasItems && (
             <DriveEmptyState isRoot={isRoot} isFiltering={isFiltering} />
+          )}
+
+          {/*
+            The bottom of the listing, and the same element for both views —
+            which is the reason it sits here rather than inside `DriveGrid` and
+            the table. The grid and the table show the same listing in two
+            shapes, and a sentinel per shape is two places for the trigger
+            distance to drift apart.
+
+            Outside the `<Table>` for the table's sake: a `<div>` is not
+            something a table may contain, and dropped into `TableBody` the
+            browser hoists it out of the table entirely — leaving the observer
+            watching an element that is no longer where the rows end.
+          */}
+          {hasItems && (
+            <InfiniteScrollSentinel
+              hasNextPage={hasNextPage}
+              isFetchingNextPage={isFetchingNextPage}
+              fetchNextPage={fetchNextPage}
+              label="Loading more files"
+            />
           )}
         </div>
       </div>

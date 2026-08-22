@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Trash2, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 
+import { InfiniteScrollSentinel } from "@/components/infinite-scroll-sentinel";
 import { Button } from "@/components/ui/button";
 import { DeleteNotesDialog } from "@/features/sticky-notes/components/delete-notes-dialog";
 import { NoteCard } from "@/features/sticky-notes/components/note-card";
@@ -30,7 +31,8 @@ import { cn } from "@/lib/utils";
  * the wall, not a way of dividing it.
  */
 export function NotesGrid() {
-  const { notes, isFiltering } = useNotesBrowser();
+  const { notes, isFiltering, hasNextPage, isFetchingNextPage, fetchNextPage } =
+    useNotesBrowser();
 
   const selectedIds = useNoteSelectionStore((state) => state.ids);
   const clearSelection = useNoteSelectionStore((state) => state.clear);
@@ -177,6 +179,20 @@ export function NotesGrid() {
           ))
         )}
       </div>
+
+      {/*
+        The bottom of the wall. Outside the groups rather than inside the last
+        one: a sentinel within a day's section would be measuring that section's
+        end, and the day the wall happens to end on is not the wall's end.
+      */}
+      {groups.length > 0 && (
+        <InfiniteScrollSentinel
+          hasNextPage={hasNextPage}
+          isFetchingNextPage={isFetchingNextPage}
+          fetchNextPage={fetchNextPage}
+          label="Loading more notes"
+        />
+      )}
 
       <DeleteNotesDialog
         ids={deletingMany}

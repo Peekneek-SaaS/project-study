@@ -4,6 +4,7 @@ import { UploadThingError } from "uploadthing/server";
 import z from "zod";
 
 import { getEntitlements } from "@/features/billing/server/entitlements";
+import { tagPlanError } from "@/features/billing/lib/plan-errors";
 import {
   DOCUMENT_MAX_FILE_COUNT,
   DOCUMENT_MAX_FILE_SIZE,
@@ -71,10 +72,15 @@ export const ourFileRouter = {
 
       if (owned + files.length > entitlements.plan.documentLimit) {
         const room = Math.max(0, entitlements.plan.documentLimit - owned);
+        // Tagged, so the browser can open the offer rather than only reporting
+        // the refusal — see `plan-errors`. The tag is stripped before display.
         throw new UploadThingError(
-          room === 0
-            ? `${entitlements.plan.name} holds ${entitlements.plan.documentLimit} documents and yours is full. Remove one, or move to a larger plan.`
-            : `${entitlements.plan.name} holds ${entitlements.plan.documentLimit} documents — there is room for ${room} more.`,
+          tagPlanError(
+            room === 0
+              ? `${entitlements.plan.name} holds ${entitlements.plan.documentLimit} documents and yours is full. Remove one, or move to a larger plan.`
+              : `${entitlements.plan.name} holds ${entitlements.plan.documentLimit} documents — there is room for ${room} more.`,
+            "documents",
+          ),
         );
       }
 

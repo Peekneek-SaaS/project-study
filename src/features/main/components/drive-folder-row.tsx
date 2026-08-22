@@ -5,7 +5,7 @@ import { Folder as FolderIcon, FolderLock } from "lucide-react";
 
 import { MotionTableRow } from "@/components/motion/motion-table";
 import { TableCell } from "@/components/ui/table";
-import { listItemMotion } from "@/lib/motion";
+import { listItemRemoval } from "@/lib/motion";
 import { DriveItemActions } from "@/features/main/components/drive-item-actions";
 import { DriveRowActions } from "@/features/main/components/drive-row-actions";
 import {
@@ -30,7 +30,7 @@ import {
   selectIsFolderSelected,
   useDriveSelectionStore,
 } from "@/lib/stores/drive-selection-store";
-import { useDriveStore } from "@/lib/stores/drive-store";
+import { useDriveNavigation } from "@/features/main/hooks/use-drive-navigation";
 import { cn } from "@/lib/utils";
 
 export function DriveFolderRow({
@@ -40,7 +40,7 @@ export function DriveFolderRow({
   folder: DriveFolder;
   onSelect: SelectRow;
 }) {
-  const openFolder = useDriveStore((state) => state.openFolder);
+  const { openFolder } = useDriveNavigation();
 
   const isSelected = useDriveSelectionStore(selectIsFolderSelected(folder.id));
   const isDraggingSelection = useDriveSelectionStore(
@@ -70,7 +70,7 @@ export function DriveFolderRow({
 
   return (
     <MotionTableRow
-      {...listItemMotion}
+      {...listItemRemoval}
       ref={(node) => {
         dragRef(node);
         dropRef(node);

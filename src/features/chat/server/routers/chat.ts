@@ -2,6 +2,12 @@ import { TRPCError } from "@trpc/server";
 import z from "zod";
 
 import { queueContentProcessing } from "@/lib/content-jobs";
+import {
+  cursorClause,
+  cursorInput,
+  PAGE_SIZE,
+  toPage,
+} from "@/lib/pagination";
 import { prisma } from "@/lib/prisma";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
@@ -59,8 +65,10 @@ export const ChatRouter = createTRPCRouter({
   list: protectedProcedure
     .input(
       z
-        .object({ limit: z.number().int().min(1).max(100).default(30) })
-        .default({ limit: 30 }),
+        .object(cursorInput)
+        // Restated, because `.default()` on the object replaces the whole value
+        // and the per-field defaults never run for a caller passing nothing.
+        .default({ limit: PAGE_SIZE, cursor: null }),
     )
     .query(async ({ ctx, input }) => {
       const chats = await prisma.chat.findMany({
@@ -78,15 +86,23 @@ export const ChatRouter = createTRPCRouter({
           _count: { select: { messages: true } },
         },
         // Last spoken to, not first created — a conversation returned to after
-        // a week belongs at the top.
-        orderBy: { updatedAt: "desc" },
-        take: input.limit,
+        // a week belongs at the top. `id` breaks the tie beneath it, which a
+        // cursor needs to be a single point in the ordering rather than a place
+        // two rows could both claim; see `board.list` for the whole of why.
+        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+        take: input.limit + 1,
+        ...cursorClause(input.cursor),
       });
 
-      return chats.map(({ _count, ...chat }) => ({
-        ...chat,
-        messageCount: _count.messages,
-      }));
+      const { items, nextCursor } = toPage(chats, input.limit);
+
+      return {
+        items: items.map(({ _count, ...chat }) => ({
+          ...chat,
+          messageCount: _count.messages,
+        })),
+        nextCursor,
+      };
     }),
 
   /**

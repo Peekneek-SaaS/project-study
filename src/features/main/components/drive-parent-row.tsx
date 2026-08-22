@@ -5,7 +5,6 @@ import { CornerLeftUp, CornerUpLeft } from "lucide-react";
 
 import { MotionTableRow } from "@/components/motion/motion-table";
 import { TableCell } from "@/components/ui/table";
-import { listItem } from "@/lib/motion";
 import { DROP_TARGET_ROW_CLASS } from "@/features/main/lib/drive-row-classes";
 import {
   DRAG_TYPE,
@@ -13,7 +12,7 @@ import {
   dropId,
   type DriveDropData,
 } from "@/features/main/types";
-import { useDriveStore } from "@/lib/stores/drive-store";
+import { useDriveNavigation } from "@/features/main/hooks/use-drive-navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -26,7 +25,7 @@ export function DriveParentRow({
 }: {
   parentFolderId: string | null;
 }) {
-  const goToCrumb = useDriveStore((state) => state.goToCrumb);
+  const { goToFolder } = useDriveNavigation();
 
   const { ref, isDropTarget } = useDroppable({
     id: dropId(parentFolderId),
@@ -37,9 +36,13 @@ export function DriveParentRow({
 
   return (
     <MotionTableRow
-      variants={listItem}
+      /*
+        No motion props left on it. Its `variants` were only ever driven by the
+        table body's mount, which has gone — see `main-content.tsx` — and
+        variants with nothing to trigger them animate nothing.
+      */
       ref={ref}
-      onClick={() => goToCrumb(parentFolderId)}
+      onClick={() => goToFolder(parentFolderId)}
       className={cn(
         // A way out rather than a row you can hold: one click, as with any
         // other button on the page.

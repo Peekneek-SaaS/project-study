@@ -9,7 +9,7 @@ import { keepExtension } from "@/lib/document-file-types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useDriveStore } from "@/lib/stores/drive-store";
+import { useDriveNavigation } from "@/features/main/hooks/use-drive-navigation";
 import { selectRenameTarget, useModalStore } from "@/lib/stores/modal-store";
 import { useTRPC } from "@/trpc/client";
 
@@ -50,7 +50,7 @@ function editableLength(kind: "document" | "folder", name: string) {
 export function RenameItemModal() {
   const target = useModalStore(selectRenameTarget);
   const closeModal = useModalStore((state) => state.close);
-  const renameCrumb = useDriveStore((state) => state.renameCrumb);
+  const { renameCrumb } = useDriveNavigation();
 
   const trpc = useTRPC();
   const queryClient = useQueryClient();

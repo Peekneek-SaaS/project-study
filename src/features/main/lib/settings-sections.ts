@@ -2,6 +2,7 @@ import {
   Settings,
   ShieldCheck,
   UserRound,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 
@@ -51,6 +52,15 @@ export const SETTINGS_SECTIONS = [
     label: "Security",
     icon: ShieldCheck,
     description: "Passwords, passkeys and where you are signed in.",
+  },
+  // Billing lives here rather than on a page of its own. It is read in the
+  // same breath as the rest of "my account" — what am I on, how much is left —
+  // and a plan is not something anybody navigates to on purpose.
+  {
+    id: "usage",
+    label: "Usage",
+    icon: Zap,
+    description: "Your plan, this month's credits and what they went on.",
   },
 ] as const satisfies readonly SettingsSectionMeta[];
 

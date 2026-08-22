@@ -5,7 +5,7 @@ import type { AppRouter } from "@/trpc/routers/_app";
 type RouterOutputs = inferRouterOutputs<AppRouter>;
 
 /** A note as the grid renders it. */
-export type StickyNote = RouterOutputs["stickyNote"]["list"][number];
+export type StickyNote = RouterOutputs["stickyNote"]["list"]["items"][number];
 
 export const STICKY_NOTES_PATH = "/sticky-notes";
 

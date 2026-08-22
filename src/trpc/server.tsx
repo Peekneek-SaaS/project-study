@@ -9,7 +9,12 @@ import { createTRPCContext } from "./init";
 import { makeQueryClient } from "./query-client";
 import { appRouter } from "./routers/_app";
 import type { AppRouter } from "./routers/_app";
-import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
+import {
+  dehydrate,
+  type FetchInfiniteQueryOptions,
+  HydrationBoundary,
+  type QueryKey,
+} from "@tanstack/react-query";
 // IMPORTANT: Create a stable getter for the query client that
 //            will return the same client during the same request.
 export const getQueryClient = cache(makeQueryClient);
@@ -66,10 +71,53 @@ export async function prefetchAwaited(
   // different things.
   queryOptions: Parameters<typeof prefetch>[0],
 ) {
-  // No infinite branch: an infinite query is a list being paged through, which
-  // is exactly the case worth streaming rather than waiting for. Reach for
-  // `prefetch` there.
+  // No infinite branch: an infinite query has its own awaited helper below,
+  // because the two take different options objects and calling the wrong
+  // `prefetch*` for the shape hydrates under a key nothing looks up.
   await getQueryClient().prefetchQuery(queryOptions);
+}
+
+/**
+ * `prefetchAwaited`, for a list that is scrolled rather than read whole.
+ *
+ * The same reasoning and the same hazard as the one above — a bare
+ * `prefetchInfiniteQuery` is a floating promise, and `HydrateClient` snapshots
+ * it mid-flight — with one addition worth knowing: this warms the *first page
+ * only*, which is the entire point. The client's `useSuspenseInfiniteQuery`
+ * hydrates that page and renders it without a spinner, and the sentinel at the
+ * bottom asks for the second page when it is actually scrolled to.
+ *
+ * The options must come from `infiniteQueryOptions`, not `queryOptions`: an
+ * infinite query key carries `type: "infinite"` and drops `cursor` from the
+ * input, so a page warmed under a plain query key is a page the list will never
+ * find.
+ */
+export async function prefetchInfiniteAwaited<
+  TQueryFnData,
+  TError,
+  TData,
+  TQueryKey extends QueryKey,
+  TPageParam,
+>(
+  /*
+    Generic straight through rather than widened to one concrete shape.
+
+    Every generic here is inferred from the options object the tRPC proxy built,
+    and that is the whole point: pinning them — to `unknown`, or by reading
+    `Parameters<QueryClient["prefetchInfiniteQuery"]>` — collapses the query key
+    to `readonly unknown[]`, which tRPC's own key type is not assignable *from*.
+    Passing them along keeps the call as well typed as it would be written out
+    at the call site, with no `any` anywhere.
+  */
+  queryOptions: FetchInfiniteQueryOptions<
+    TQueryFnData,
+    TError,
+    TData,
+    TQueryKey,
+    TPageParam
+  >,
+) {
+  await getQueryClient().prefetchInfiniteQuery(queryOptions);
 }
 
 export const caller = appRouter.createCaller(createTRPCContext);

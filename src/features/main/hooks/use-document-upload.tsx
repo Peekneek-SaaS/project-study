@@ -8,10 +8,8 @@ import {
   UploadToastProgress,
   UploadToastTitle,
 } from "@/features/main/components/upload-progress-toast";
-import {
-  selectCurrentFolderId,
-  useDriveStore,
-} from "@/lib/stores/drive-store";
+import { useDriveNavigation } from "@/features/main/hooks/use-drive-navigation";
+import { usePaywall } from "@/features/billing/hooks/use-paywall";
 import { useUploadThing } from "@/lib/uploadthing";
 import { useTRPC } from "@/trpc/client";
 
@@ -31,9 +29,10 @@ const batchLabel = (files: File[]) =>
  * invalidating.
  */
 export function useDocumentUpload() {
+  const { reportError } = usePaywall();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const folderId = useDriveStore(selectCurrentFolderId);
+  const { folderId } = useDriveNavigation();
 
   // The upload outlives the modal that started it, and progress arrives after
   // every render the callbacks were created in — refs keep both stable.
@@ -87,12 +86,31 @@ export function useDocumentUpload() {
     },
 
     onUploadError: (error) => {
+      /*
+        A refusal by the plan is an offer, not just a message.
+
+        `reportError` opens the upgrade dialog when the failure carries a plan
+        tag, and hands back the same sentence with the tag stripped. Everything
+        else — a network drop, a file the storage rejected — comes back null and
+        is reported exactly as before.
+
+        The toast still appears either way. The dialog explains what to do about
+        it; the toast is what says which upload it was about, which the dialog
+        has no way of knowing.
+      */
+      const planError = reportError(error);
+
       // Replaces the bar rather than clearing it, but for the same reason.
-      toast.error(`Could not upload ${label.current}`, {
-        id: toastId.current ?? undefined,
-        description: error.message,
-        duration: 6000,
-      });
+      toast.error(
+        planError
+          ? `${label.current} is more than your plan holds`
+          : `Could not upload ${label.current}`,
+        {
+          id: toastId.current ?? undefined,
+          description: planError?.message ?? error.message,
+          duration: 6000,
+        },
+      );
       toastId.current = null;
     },
   });

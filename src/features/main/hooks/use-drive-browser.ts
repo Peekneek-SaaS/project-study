@@ -1,24 +1,23 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/react";
 import {
   useMutation,
   useQueryClient,
+  useSuspenseInfiniteQuery,
   useSuspenseQuery,
 } from "@tanstack/react-query";
 import { useQueryStates } from "nuqs";
 import { toast } from "sonner";
 
+import { useRefreshEntitlements } from "@/features/billing/hooks/use-entitlements";
 import { isTransientStatus } from "@/features/main/lib/document-status";
+import { useDriveNavigation } from "@/features/main/hooks/use-drive-navigation";
 import { driveFilterParsers } from "@/features/main/lib/params";
 import type { DriveDragData, DriveDropData } from "@/features/main/types";
+import { infiniteOptions } from "@/lib/pagination";
 import { useDriveSelectionStore } from "@/lib/stores/drive-selection-store";
-import {
-  selectCurrentFolderId,
-  selectParentFolderId,
-  useDriveStore,
-} from "@/lib/stores/drive-store";
 import { useTRPC } from "@/trpc/client";
 
 /**
@@ -42,8 +41,25 @@ export function useDriveBrowser() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  const currentFolderId = useDriveStore(selectCurrentFolderId);
-  const parentFolderId = useDriveStore(selectParentFolderId);
+  // Straight off the URL, which is what makes a reload land back in the folder
+  // you were in — see `useDriveNavigation`.
+  const { folderId: currentFolderId } = useDriveNavigation();
+
+  /*
+    The trail, and through it the folder one level up.
+
+    `useSuspenseQuery` rather than a plain one, and this is the read that makes
+    every other reader of this key safe: the drive does not render until the
+    trail is known, so the breadcrumb bar and the Back button never have to draw
+    a half-known path. It costs nothing extra to fetch — the client batches, so
+    this rides in the same HTTP request as the listing beside it, and on a
+    reload both were already prefetched on the server.
+  */
+  const { data: trail } = useSuspenseQuery(
+    trpc.folder.getBreadcrumb.queryOptions({ folderId: currentFolderId }),
+  );
+
+  const parentFolderId = trail.at(-2)?.id ?? null;
 
   // Straight from the URL into the request: the filters are part of what is
   // being asked for, so they belong in the query key rather than in a pass over
@@ -51,27 +67,79 @@ export function useDriveBrowser() {
   // an already-seen one is instant.
   const [filters] = useQueryStates(driveFilterParsers);
 
-  const { data } = useSuspenseQuery({
-    ...trpc.folder.getContents.queryOptions({
-      folderId: currentFolderId,
-      ...filters,
-    }),
-    /**
-     * Workspaces are built by a background job, and nothing tells this listing
-     * when one finishes — so while any row is still queued or building, the
-     * listing asks again.
-     *
-     * A function rather than a number so it reads the *answer* each time: the
-     * polling stops on its own the moment the last row settles, and a folder of
-     * finished documents never polls at all. `refetchIntervalInBackground` is
-     * left off, so a tab nobody is looking at goes quiet and catches up when it
-     * is focused again.
-     */
-    refetchInterval: ({ state }) =>
-      state.data?.documents.some((doc) => isTransientStatus(doc.overallStatus))
-        ? WORKSPACE_POLL_MS
-        : false,
-  });
+  const { data, hasNextPage, isFetchingNextPage, fetchNextPage } =
+    useSuspenseInfiniteQuery({
+      ...trpc.folder.getContents.infiniteQueryOptions(
+        { folderId: currentFolderId, ...filters },
+        infiniteOptions,
+      ),
+      /**
+       * Workspaces are built by a background job, and nothing tells this listing
+       * when one finishes — so while any row is still queued or building, the
+       * listing asks again.
+       *
+       * A function rather than a number so it reads the *answer* each time: the
+       * polling stops on its own the moment the last row settles, and a folder of
+       * finished documents never polls at all. `refetchIntervalInBackground` is
+       * left off, so a tab nobody is looking at goes quiet and catches up when it
+       * is focused again.
+       *
+       * Now that the listing is paged, `state.data` is every page loaded so far
+       * and a refetch refreshes all of them — which is what should happen: an
+       * upload sitting on page three has to be able to finish building while you
+       * are looking at it. The poll still stops the moment nothing anywhere in
+       * the loaded listing is transient, so scrolling further does not keep a
+       * settled drive awake.
+       */
+      refetchInterval: ({ state }) =>
+        state.data?.pages.some((page) =>
+          page.documents.some((doc) => isTransientStatus(doc.overallStatus)),
+        )
+          ? WORKSPACE_POLL_MS
+          : false,
+    });
+
+  /*
+    Both halves of the listing, flattened back into the two arrays the drive has
+    always rendered.
+
+    The router pages folders and files as one sequence — see `getContents` — so
+    a page carries whichever of the two the cursor had reached, and concatenating
+    each kind across pages puts them back in their own order. Folders can only
+    appear in the pages before files start, so nothing here has to re-sort.
+  */
+  const folders = useMemo(
+    () => data.pages.flatMap((page) => page.folders),
+    [data.pages],
+  );
+  const documents = useMemo(
+    () => data.pages.flatMap((page) => page.documents),
+    [data.pages],
+  );
+
+  /*
+    Reading a document costs credits, and the meter finds out here.
+
+    The charge happens inside the background task, so nothing in the browser
+    knows it has been made. What the browser *does* know is the moment the last
+    document stopped being transient — the poll above is already watching for
+    exactly that — so the balance is refreshed on the edge from "something is
+    processing" to "nothing is".
+
+    An edge and not a level: refreshing whenever nothing is processing would
+    mean a request on every render of a settled drive, which is most of them.
+  */
+  const refreshEntitlements = useRefreshEntitlements();
+  const wasProcessing = useRef(false);
+
+  const isProcessing = documents.some((doc) =>
+    isTransientStatus(doc.overallStatus),
+  );
+
+  useEffect(() => {
+    if (wasProcessing.current && !isProcessing) refreshEntitlements();
+    wasProcessing.current = isProcessing;
+  }, [isProcessing, refreshEntitlements]);
 
   // A move rewrites two folders' listings, so refresh them all rather than
   // guessing which ones are cached — and the whole router with them, since the
@@ -185,8 +253,8 @@ export function useDriveBrowser() {
   );
 
   return {
-    folders: data.folders,
-    documents: data.documents,
+    folders,
+    documents,
     currentFolderId,
     parentFolderId,
     // An empty listing means two different things, and only this knows which.
@@ -195,5 +263,8 @@ export function useDriveBrowser() {
     handleDragEnd,
     isMoving:
       moveFolder.isPending || moveDocument.isPending || bulkMove.isPending,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
   };
 }

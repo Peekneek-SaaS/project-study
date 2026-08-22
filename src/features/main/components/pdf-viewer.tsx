@@ -124,8 +124,34 @@ export function PdfViewer({
 }) {
   const [pageCount, setPageCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const [aspect, setAspect] = useState(DEFAULT_ASPECT);
   const [failed, setFailed] = useState(false);
+
+  /**
+   * Each page's own shape, as it reports it, keyed by page number.
+   *
+   * A map rather than the single ratio this used to keep, because the box a
+   * page is laid out in *is* what every annotation on it is a fraction of, and
+   * one ratio taken from page one describes the rest of the document only when
+   * the document is uniform. A landscape page in the middle of a portrait
+   * report — a wide table, a scanned plan — was drawn into a box the shape of
+   * page one, and every highlight on it sat somewhere other than its words.
+   *
+   * It only ever bit on small screens, and that is the layout below rather than
+   * a coincidence: stacked pages are fitted to their width, so their box takes
+   * its height from the page inside it and lands on the page's real shape
+   * whatever this map says. Pages that run across are fitted to their height
+   * and the width is *computed* — from this, which is why it has to be right.
+   */
+  const [aspects, setAspects] = useState<Record<number, number>>({});
+
+  const rememberAspect = (pageNumber: number, value: number) => {
+    if (!Number.isFinite(value) || value <= 0) return;
+    setAspects((current) =>
+      current[pageNumber] === value
+        ? current
+        : { ...current, [pageNumber]: value },
+    );
+  };
 
   const [scale, setScale] = useState(1);
 
@@ -228,10 +254,30 @@ export function PdfViewer({
   const anchor = base ? (isHorizontal ? base.height : base.width) : 0;
   const driving = anchor * scale;
 
-  const boxHeight = isHorizontal ? driving : 0;
-  const boxWidth = isHorizontal ? driving * aspect : driving;
-
   const hasRoom = driving > 0;
+
+  /**
+   * The box one page is laid out in, at that page's own shape.
+   *
+   * This is the box the annotation layer covers and the box every stored
+   * fraction is a fraction of, so "the same size as the page drawn inside it"
+   * is not a detail of appearance — it is the difference between a highlight on
+   * the words and a highlight beside them.
+   *
+   * Stacked, only the width is stated and the height is left to `minHeight`:
+   * the render inside decides it, so the box ends up the page's true height
+   * even for a page this has never measured. Running across, the height is the
+   * fitted one and the width has to be computed, which is what the map is for.
+   * Pages that have not reported yet fall back to page one and then to A4 —
+   * placeholders, in other words, which carry no notes to misplace.
+   */
+  const pageBox = (pageNumber: number) => {
+    const pageAspect = aspects[pageNumber] ?? aspects[1] ?? DEFAULT_ASPECT;
+
+    return isHorizontal
+      ? { width: driving * pageAspect, height: driving }
+      : { width: driving, minHeight: driving / pageAspect };
+  };
 
   /**
    * How that size is split between the canvas and a CSS transform.
@@ -427,11 +473,7 @@ export function PdfViewer({
                   }}
                   // Placeholders hold the scrollbar honest, so scrolling past
                   // unrendered pages does not shuffle everything underneath.
-                  style={
-                    isHorizontal
-                      ? { width: boxWidth, height: boxHeight }
-                      : { width: boxWidth, minHeight: boxWidth / aspect }
-                  }
+                  style={pageBox(pageNumber)}
                   className="relative shrink-0"
                 >
                   <div
@@ -460,14 +502,16 @@ export function PdfViewer({
                       >
                         <Page
                           pageNumber={pageNumber}
-                          // Only ever one of the two — see `boxWidth` above.
+                          // Only ever one of the two — see `pageBox` above.
                           {...(isHorizontal
                             ? { height: renderSize }
                             : { width: renderSize })}
-                          onLoadSuccess={(page) => {
-                            if (pageNumber === 1)
-                              setAspect(page.width / page.height);
-                          }}
+                          // Every page, not just the first: the box this is
+                          // drawn into is sized from what it reports — see
+                          // `aspects`.
+                          onLoadSuccess={(page) =>
+                            rememberAspect(pageNumber, page.width / page.height)
+                          }
                           loading={null}
                         />
                       </div>

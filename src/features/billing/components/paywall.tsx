@@ -114,7 +114,33 @@ export function PaywallButton({
 export function CreditMeter({ className }: { className?: string }) {
   const { entitlements, open } = usePaywall();
 
-  if (!entitlements) return null;
+  /*
+    The same box either way, so nothing moves when the number arrives.
+
+    This used to return null while loading, which on every page load meant the
+    sidebar drew itself, then grew a meter, then pushed everything above it —
+    a flick on a component whose whole job is to sit quietly in the corner. The
+    skeleton is the exact shape of the real thing: the same padding, the same
+    two rows, the same 1px bar. Only the content is unknown, so only the content
+    is greyed.
+  */
+  if (!entitlements) {
+    return (
+      <div
+        aria-hidden
+        className={cn(
+          "flex w-full flex-col gap-1.5 rounded-md px-2 py-1.5",
+          className,
+        )}
+      >
+        <span className="flex h-4 items-center justify-between gap-2">
+          <span className="h-3 w-16 animate-pulse rounded bg-muted" />
+          <span className="h-3 w-10 animate-pulse rounded bg-muted" />
+        </span>
+        <span className="h-1 w-full rounded-full bg-muted" />
+      </div>
+    );
+  }
 
   const { creditsRemaining, creditsGranted, plan } = entitlements;
   const fraction =
@@ -130,7 +156,7 @@ export function CreditMeter({ className }: { className?: string }) {
         className,
       )}
     >
-      <span className="flex items-center justify-between gap-2 text-xs">
+      <span className="flex h-4 items-center justify-between gap-2 text-xs">
         <span className="flex items-center gap-1.5 text-muted-foreground">
           <Zap className={cn("size-3.5", low && "text-amber-600")} />
           {plan.name}

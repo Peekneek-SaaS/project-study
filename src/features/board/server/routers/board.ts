@@ -4,6 +4,12 @@ import z from "zod";
 import { EMPTY_SNAPSHOT, type StoredScene } from "@/features/board/lib/scene";
 import { MODIFIED_VALUES, modifiedRange } from "@/lib/list-filters";
 import { prisma } from "@/lib/prisma";
+import {
+  cursorClause,
+  cursorInput,
+  PAGE_SIZE,
+  toPage,
+} from "@/lib/pagination";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
 /**
@@ -73,23 +79,43 @@ export const BoardRouter = createTRPCRouter({
       z
         .object({
           modified: z.enum(MODIFIED_VALUES).nullable().default(null),
+          ...cursorInput,
         })
-        // Optional so the callers that want every board — the sidebar, a
-        // prefetch with nothing to filter by — can go on calling `list()`.
-        .default({ modified: null }),
+        // Optional so the callers that want the plain first page — the search
+        // palette, a prefetch with nothing to filter by — can go on calling
+        // `list()`. Both defaults have to be restated here: a `.default()` on
+        // the object replaces the whole value, so the per-field defaults above
+        // never run for a caller who passes nothing at all.
+        .default({ modified: null, limit: PAGE_SIZE, cursor: null }),
     )
     .query(async ({ ctx, input }) => {
       const updatedAt = modifiedRange(input.modified);
 
-      return prisma.board.findMany({
+      const rows = await prisma.board.findMany({
         where: {
           userId: ctx.userId,
           documentId: null,
           ...(updatedAt && { updatedAt }),
         },
-        orderBy: { updatedAt: "desc" },
+        /*
+          `id` is the tiebreak, and it is not decoration.
+
+          Two boards saved in the same millisecond — a bulk operation, a seeded
+          account — are in no defined order under `updatedAt` alone, and a
+          cursor is a *position* in an ordering. An order the database is free
+          to shuffle between two queries means page two can repeat a row page
+          one already showed, or skip one entirely. `desc` to match the column
+          above it, so the tiebreak runs the same direction as the sort.
+        */
+        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+        // One more than asked for, which is how `toPage` knows there is a next
+        // page without a second `count` query.
+        take: input.limit + 1,
+        ...cursorClause(input.cursor),
         select: listFields,
       });
+
+      return toPage(rows, input.limit);
     }),
 
   /** One board, with its scene, for the canvas. */

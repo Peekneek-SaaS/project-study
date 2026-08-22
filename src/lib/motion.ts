@@ -201,6 +201,28 @@ export const listItemMotion = {
 } as const;
 
 /**
+ * Everything `listItemMotion` has, except the arrival.
+ *
+ * For lists whose contents are *replaced* rather than added to. The drive is
+ * the case this exists for: walking into a folder swaps every row at once, and
+ * an entrance played per item turns an act of navigation into a wave of things
+ * sliding into place — which reads as the page loading slowly rather than as a
+ * folder having opened. The same animation on a list you have added one item to
+ * is exactly right, which is why this is a second export and not a change to
+ * the first.
+ *
+ * The exit and the layout stay. Deleting is still a thing that happens *to* a
+ * list you are looking at, so an item still shrinks away and the ones below it
+ * still slide up rather than jumping.
+ */
+export const listItemRemoval = {
+  variants: listItem,
+  exit: "exit",
+  layout: "position",
+  transition: { layout: layoutTransition },
+} as const;
+
+/**
  * The same, for anything inside an `AnimatePresence`.
  *
  * The `exit` is a variant *name*, which is the part that is easy to get wrong:

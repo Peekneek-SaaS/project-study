@@ -19,6 +19,8 @@ import { ChatGreeting } from "@/features/chat/components/chat-greeting";
 import ChatSuggestions from "@/features/chat/components/chat-suggestions";
 import { ChatThread } from "@/features/chat/components/chat-thread";
 import { CitationToggle } from "@/features/chat/components/citation-toggle";
+import { usePaywall } from "@/features/billing/hooks/use-paywall";
+import { useRefreshEntitlements } from "@/features/billing/hooks/use-entitlements";
 import { useChatCitations } from "@/features/chat/hooks/use-chat-citations";
 import { useChatProvider } from "@/features/chat/hooks/use-chat-provider";
 import {
@@ -56,6 +58,8 @@ export function ChatConversation({ chatId }: { chatId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [provider, setProvider] = useChatProvider();
+  const refreshEntitlements = useRefreshEntitlements();
+  const { reportError } = usePaywall();
   const [citations] = useChatCitations();
 
   const { data: chat } = useSuspenseQuery(
@@ -171,9 +175,19 @@ export function ChatConversation({ chatId }: { chatId: string }) {
      */
     resume: chat?.isStreaming ?? false,
     onFinish: () => {
+      // An answer costs credits, and the meter has no other way of knowing.
+      // The turn is billed inside the run — see `trigger/chat.ts` — so the
+      // number in the sidebar is one behind until something asks again, and
+      // this is the moment it is certainly worth asking.
+      refreshEntitlements();
+
       // The recents list is now stale twice over — a new chat is missing from
       // it, and an existing one has moved to the top with a new title.
-      void queryClient.invalidateQueries(trpc.chat.list.queryFilter());
+      // `pathFilter`, not `list.queryFilter()`: the recents list is an
+      // infinite query now, and its key carries `type: "infinite"` — which a
+      // plain query filter does not match. The path filter matches every
+      // variant, which also picks up the flat copy the search palette holds.
+      void queryClient.invalidateQueries(trpc.chat.pathFilter());
       // And the transcript has gained a row this page has not read: the turn
       // just recorded says which model answered it. Refetching is what puts the
       // mark under the answer a moment after it lands. It cannot disturb what
@@ -196,6 +210,23 @@ export function ChatConversation({ chatId }: { chatId: string }) {
     const question = takeDraft(chatId);
     if (question) void sendMessage({ text: question });
   }, [chatId, sendMessage, takeDraft]);
+
+  /*
+    A turn refused for want of credits opens the offer, once.
+
+    The run aborts with the reason as its message — see `spendCredits` in
+    `trigger/chat.ts` — and it arrives here as `useChat`'s error. Watching the
+    error object rather than calling from `onError` because a resumed stream
+    that fails reports through this path too, and a question that cannot be
+    answered should raise the same offer however it failed.
+
+    `reportError` returns null for anything that is not a plan refusal, so
+    ordinary failures — a provider outage, a dropped connection — still show as
+    the error they are and open nothing.
+  */
+  useEffect(() => {
+    if (error) reportError(error);
+  }, [error, reportError]);
 
   const isStreaming = status === "streaming" || status === "submitted";
 

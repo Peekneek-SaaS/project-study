@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "motion/react";
 import { Highlighter } from "lucide-react";
 
+import { InfiniteScrollSentinel } from "@/components/infinite-scroll-sentinel";
 import { Button } from "@/components/ui/button";
 import { AnnotationNoteCard } from "@/features/annotations/components/annotation-note-card";
 import { useDocumentAnnotations } from "@/features/annotations/hooks/use-annotations";
@@ -25,7 +27,37 @@ import { cn } from "@/lib/utils";
  * these rows come from a different table and write back through a different
  * router, so they cannot join the tick-and-bulk-delete the notes share — ids
  * fed to `stickyNote.bulkRemove` would simply not be found.
+ *
+ * ## Why this one pages in the browser
+ *
+ * Every other scrolling list in the app asks the server for the next page. This
+ * one cannot, and the reason is the viewer rather than this panel: the same
+ * query feeds the marker layer that paints the dots onto the document's pages,
+ * and it is fetched whole precisely so that a page scrolled to already has its
+ * markers — see `listForDocument` on the router, which sets out the whole
+ * argument. Paging that query would mean a dot on page 40 did not exist until
+ * somebody had scrolled *this list* far enough to load it, which is a marker
+ * layer that depends on a panel the reader may never open.
+ *
+ * So the rows all arrive at once and it is the *rendering* that is paged. That
+ * is the half that actually costs something at this scale — a hundred rich
+ * cards is a hundred editors' worth of DOM — and it is the half the reader
+ * feels. The trade is that revealing more is instant, so the sentinel below
+ * never spins: there is nothing to wait for, and a spinner over a wait that is
+ * not happening is a lie about where the time goes.
  */
+
+/**
+ * How many pages' worth of marks are revealed at a time.
+ *
+ * Counted in page groups rather than in cards so a group is never half-drawn —
+ * a heading reading "Page 12" with three of its seven marks under it, and the
+ * rest arriving on the next scroll, reads as marks going missing. Eight is
+ * roughly the same amount of list as a server page of thirty rows, at the two
+ * or three marks a page most documents actually collect.
+ */
+const GROUPS_PER_REVEAL = 8;
+
 export function AnnotationNotesSection({
   documentId,
   onOpenPage,
@@ -38,6 +70,32 @@ export function AnnotationNotesSection({
   const { annotations } = useDocumentAnnotations(documentId);
 
   const pages = groupByPage(annotations);
+
+  /*
+    How much of the list is drawn, and which document that answer is about.
+
+    The two are one piece of state rather than a count plus an effect that
+    resets it. An effect would reset a render *late* — the panel would draw the
+    new document's whole list once with the old count still in place, which on a
+    heavily marked document is the exact stall this reveal exists to avoid. Held
+    together and corrected during the render that notices the change, as the
+    selection bars elsewhere do with their counts.
+  */
+  const [reveal, setReveal] = useState({
+    documentId,
+    count: GROUPS_PER_REVEAL,
+  });
+  if (reveal.documentId !== documentId) {
+    setReveal({ documentId, count: GROUPS_PER_REVEAL });
+  }
+
+  // Read back through the same check, so the render that notices a new document
+  // already draws the short list rather than waiting for the re-render.
+  const revealed =
+    reveal.documentId === documentId ? reveal.count : GROUPS_PER_REVEAL;
+
+  const visible = pages.slice(0, revealed);
+  const hasMore = revealed < pages.length;
 
   if (pages.length === 0) {
     return (
@@ -56,7 +114,7 @@ export function AnnotationNotesSection({
 
   return (
     <div className={cn("flex flex-col gap-6", className)}>
-      {pages.map((group) => (
+      {visible.map((group) => (
         <section key={group.pageNumber} className="flex flex-col gap-3">
           <div
             className={cn(
@@ -106,6 +164,24 @@ export function AnnotationNotesSection({
           </motion.div>
         </section>
       ))}
+
+      {/*
+        The same sentinel as every other list, so the gesture is identical —
+        scroll to the bottom and more appears. `isFetchingNextPage` is
+        permanently false here because there is no fetch: the rows are already
+        in hand and this only widens the slice of them being drawn. See the note
+        at the top of this file.
+      */}
+      <InfiniteScrollSentinel
+        hasNextPage={hasMore}
+        isFetchingNextPage={false}
+        fetchNextPage={() =>
+          setReveal((current) => ({
+            documentId,
+            count: current.count + GROUPS_PER_REVEAL,
+          }))
+        }
+      />
     </div>
   );
 }

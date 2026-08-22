@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   useMutation,
   useQueryClient,
-  useSuspenseQuery,
+  useSuspenseInfiniteQuery,
 } from "@tanstack/react-query";
 import {
   Highlighter,
@@ -19,6 +19,7 @@ import { motion } from "motion/react";
 import { parseAsInteger, useQueryState } from "nuqs";
 import { toast } from "sonner";
 
+import { InfiniteScrollSentinel } from "@/components/infinite-scroll-sentinel";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AnnotationNotesSection } from "@/features/annotations/components/annotation-notes-section";
@@ -31,6 +32,7 @@ import { groupNotesByDay } from "@/features/sticky-notes/lib/group-notes-by-day"
 import { ROW_ATTRIBUTE } from "@/hooks/use-row-interaction";
 import { useRowSelection } from "@/hooks/use-row-selection";
 import { listContainer, mountAnimation } from "@/lib/motion";
+import { infiniteOptions } from "@/lib/pagination";
 import { useNoteSelectionStore } from "@/lib/stores/note-selection-store";
 import { useTRPC } from "@/trpc/client";
 import { cn } from "@/lib/utils";
@@ -64,9 +66,31 @@ export function WorkNotesPanel({ documentId }: { documentId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  const { data: notes } = useSuspenseQuery(
-    trpc.stickyNote.listForDocument.queryOptions({ documentId }),
+  const { data, hasNextPage, isFetchingNextPage, fetchNextPage } =
+    useSuspenseInfiniteQuery(
+      trpc.stickyNote.listForDocument.infiniteQueryOptions(
+        { documentId },
+        infiniteOptions,
+      ),
+    );
+
+  // Flattened once per fetch rather than per render — it feeds the memo that
+  // builds the keyboard's row map, and a fresh array each render rebuilds it.
+  const notes = useMemo(
+    () => data.pages.flatMap((page) => page.items),
+    [data.pages],
   );
+
+  /*
+    How many notes there *are*, which is not how many are loaded.
+
+    The tab badge is the reason this comes off the server rather than off
+    `notes.length`: a count that climbed as you scrolled would be reporting the
+    scroll position rather than the document. Read off the newest page, because
+    every page carries the count as of when it was fetched and the last one
+    fetched is the least stale.
+  */
+  const totalNotes = data.pages[data.pages.length - 1]?.total ?? notes.length;
 
   // Shared with the marker layer in the viewer through the query cache, so the
   // count here and the dots on the page cannot disagree.
@@ -124,7 +148,11 @@ export function WorkNotesPanel({ documentId }: { documentId: string }) {
     trpc.stickyNote.create.mutationOptions({
       onSuccess: () =>
         queryClient.invalidateQueries(
-          trpc.stickyNote.listForDocument.queryFilter({ documentId }),
+          // The infinite variant, not `queryFilter`: an infinite query's key
+          // carries `type: "infinite"`, and a plain query filter does not match
+          // it — so the list would be left holding the page it had before the
+          // new note was written.
+          trpc.stickyNote.listForDocument.infiniteQueryFilter({ documentId }),
         ),
       onError: (error) => toast.error(error.message),
     }),
@@ -168,8 +196,8 @@ export function WorkNotesPanel({ documentId }: { documentId: string }) {
         <TabsTrigger value="notes" className="gap-1.5">
           <StickyNoteIcon className="size-3.5 fill-yellow-400 stroke-yellow-200" />
           Notes
-          {notes.length > 0 ? (
-            <span className="tabular-nums opacity-60">{notes.length}</span>
+          {totalNotes > 0 ? (
+            <span className="tabular-nums opacity-60">{totalNotes}</span>
           ) : null}
         </TabsTrigger>
         <TabsTrigger value="annotations" className="gap-1.5">
@@ -392,6 +420,21 @@ export function WorkNotesPanel({ documentId }: { documentId: string }) {
                 </section>
               ))}
             </div>
+          )}
+
+          {/*
+            Inside the scroller rather than after it, unlike the full-page
+            lists: this panel's scrollport is that `overflow-y-auto` div and not
+            the page, so a sentinel placed outside it would sit in a box that
+            never scrolls and would either fire once at mount or never at all.
+          */}
+          {groups.length > 0 && (
+            <InfiniteScrollSentinel
+              hasNextPage={hasNextPage}
+              isFetchingNextPage={isFetchingNextPage}
+              fetchNextPage={fetchNextPage}
+              label="Loading more notes"
+            />
           )}
         </div>
       </TabsContent>

@@ -20,7 +20,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DRIVE_PATH } from "@/features/main/types";
-import { useDriveStore } from "@/lib/stores/drive-store";
+import {
+  useDriveNavigation,
+  useDriveTrail,
+} from "@/features/main/hooks/use-drive-navigation";
 
 const SEGMENT_LABELS: Record<string, string> = {
   main: "Dashboard",
@@ -69,8 +72,10 @@ const crumbElement = (crumb: Crumb, className: string) =>
 
 const MainBreadCrumbs = () => {
   const pathName = usePathname();
-  const trail = useDriveStore((state) => state.trail);
-  const goToCrumb = useDriveStore((state) => state.goToCrumb);
+  // The path down to the open folder, off the same query the drive itself
+  // reads — so the bar cannot describe a folder the listing is not showing.
+  const trail = useDriveTrail();
+  const { goToFolder } = useDriveNavigation();
 
   const crumbs = React.useMemo<Crumb[]>(() => {
     const segments = pathName.split("/").filter(Boolean);
@@ -88,15 +93,15 @@ const MainBreadCrumbs = () => {
     return [
       ...routeCrumbs.map((crumb) => ({
         ...crumb,
-        onSelect: () => goToCrumb(null),
+        onSelect: () => goToFolder(null),
       })),
       ...trail.map((folder) => ({
         key: `folder:${folder.id}`,
         label: folder.name,
-        onSelect: () => goToCrumb(folder.id),
+        onSelect: () => goToFolder(folder.id),
       })),
     ];
-  }, [goToCrumb, pathName, trail]);
+  }, [goToFolder, pathName, trail]);
 
   const containerRef = React.useRef<HTMLDivElement>(null);
   const listRef = React.useRef<HTMLOListElement>(null);
@@ -108,14 +113,40 @@ const MainBreadCrumbs = () => {
   // other says where you are.
   const maxHidden = Math.max(0, crumbs.length - 2);
 
-  // Whatever was folded was folded to fit a row that no longer exists, so a
-  // resize starts again from the full trail. Watching the container rather than
-  // the list keeps folding from feeding back in as another resize.
+  /*
+    Whatever was folded was folded to fit a row that no longer exists, so a
+    resize starts again from the full trail.
+
+    Width only, and that is not a nicety — a `ResizeObserver` reports both axes,
+    and folding *changes the height*: the ellipsis trigger is taller than a line
+    of crumb text, so the moment one is added the bar grows and the observer
+    fires. Reacting to that unfolds the row, which shrinks it, which fires
+    again — a loop between folded and unfolded that never settles and shows up
+    as a bar flickering on every long trail.
+
+    The height is pinned below as well, so this guard and that one would each
+    stop it alone. Both are here because they defend against different things:
+    that one keeps the bar from jumping, this one keeps *any* future height
+    change — a taller icon, a badge — from becoming an infinite loop.
+  */
+  const lastWidth = React.useRef<number | null>(null);
+
   React.useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const observer = new ResizeObserver(() => setHiddenCount(0));
+    const observer = new ResizeObserver(([entry]) => {
+      const width = entry?.contentRect.width;
+      if (width === undefined || width === lastWidth.current) return;
+
+      // The observer delivers the current size as soon as it starts watching.
+      // That first report is not a resize — resetting on it would throw away
+      // the fold the layout effect had already worked out, after paint.
+      const isFirstReport = lastWidth.current === null;
+      lastWidth.current = width;
+      if (!isFirstReport) setHiddenCount(0);
+    });
+
     observer.observe(container);
     return () => observer.disconnect();
   }, []);
@@ -182,8 +213,23 @@ const MainBreadCrumbs = () => {
           `nowrap` and a hidden overflow are what make the row measurable: left
           to wrap, a trail that does not fit becomes two lines rather than an
           overflow, and there is nothing to notice.
+
+          The ref is what the folding actually runs on, and leaving it off is
+          not a silent no-op halfway — it disables the whole mechanism: the
+          layout effect below reads `listRef.current`, finds null, and returns
+          before it has measured anything. `hiddenCount` then never leaves zero,
+          no ellipsis is ever rendered, and a trail too long for the bar is
+          simply cut off by the `overflow-hidden` on this element.
+
+          `h-6` pins the row to the height of its tallest possible content — the
+          ellipsis trigger — so the bar does not grow by a few pixels the moment
+          a trail becomes long enough to fold. See the observer above for what
+          that jump used to set off.
         */}
-        <BreadcrumbList className="flex-nowrap overflow-hidden">
+        <BreadcrumbList
+          ref={listRef}
+          className="h-6 flex-nowrap overflow-hidden"
+        >
           {shown.map((crumb, index) => {
             const isLast = index === shown.length - 1;
             // The fold sits between the first crumb and everything kept after

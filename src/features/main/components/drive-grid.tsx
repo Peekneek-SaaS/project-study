@@ -1,13 +1,12 @@
 "use client";
 
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence } from "motion/react";
 
 import { DriveDocumentCard } from "@/features/main/components/drive-document-card";
 import { DriveFolderCard } from "@/features/main/components/drive-folder-card";
 import { DriveParentCard } from "@/features/main/components/drive-parent-card";
 import type { SelectRow } from "@/features/main/hooks/use-drive-row-interaction";
 import type { DriveDocument, DriveFolder } from "@/features/main/types";
-import { listContainer, mountAnimation } from "@/lib/motion";
 
 /**
  * The drive as cards.
@@ -22,12 +21,21 @@ export function DriveGrid({
   isRoot,
   parentFolderId,
   onSelect,
+  listingKey,
 }: {
   folders: DriveFolder[];
   documents: DriveDocument[];
   isRoot: boolean;
   parentFolderId: string | null;
   onSelect: SelectRow;
+  /**
+   * Which listing these cards belong to.
+   *
+   * Used as the key on both `AnimatePresence` blocks below, so that walking
+   * into a folder rebuilds them rather than animating the old cards out. See
+   * `main-content.tsx`, which explains the whole of it.
+   */
+  listingKey: string;
 }) {
   return (
     <div className="flex flex-col gap-6 py-2">
@@ -38,17 +46,16 @@ export function DriveGrid({
           <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
             Folders
           </h2>
-          {/* The stagger lives on the grid, and the cards only say what
-              arriving looks like — see `main-content.tsx`. */}
-          <motion.div
-            {...mountAnimation}
-            variants={listContainer}
+          {/* No entrance on the grid, for the reason the table gives at
+              length — see `main-content.tsx`. The cards still leave, and the
+              ones around them still close the gap. */}
+          <div
             role="listbox"
             aria-multiselectable
             aria-label="Folders"
             className="grid gap-3 grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4"
           >
-            <AnimatePresence>
+            <AnimatePresence key={listingKey}>
               {folders.map((folder) => (
                 <DriveFolderCard
                   key={folder.id}
@@ -57,7 +64,7 @@ export function DriveGrid({
                 />
               ))}
             </AnimatePresence>
-          </motion.div>
+          </div>
         </section>
       )}
 
@@ -66,20 +73,18 @@ export function DriveGrid({
           <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
             Files
           </h2>
-          <motion.div
-            {...mountAnimation}
-            variants={listContainer}
+          <div
             role="listbox"
             aria-multiselectable
             aria-label="Files"
             className="grid gap-4 grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4"
           >
-            <AnimatePresence>
+            <AnimatePresence key={listingKey}>
               {documents.map((doc) => (
                 <DriveDocumentCard key={doc.id} doc={doc} onSelect={onSelect} />
               ))}
             </AnimatePresence>
-          </motion.div>
+          </div>
         </section>
       )}
     </div>

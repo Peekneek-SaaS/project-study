@@ -5,6 +5,10 @@ import type { ReactNode } from "react";
 
 import { UpgradeDialog } from "@/features/billing/components/upgrade-dialog";
 import { useEntitlements } from "@/features/billing/hooks/use-entitlements";
+import {
+  parsePlanError,
+  type PlanErrorFeature,
+} from "@/features/billing/lib/plan-errors";
 import { atLeast, PLANS } from "@/features/billing/lib/plans";
 import type { PlanTier } from "@/generated/prisma/enums";
 
@@ -28,19 +32,46 @@ import type { PlanTier } from "@/generated/prisma/enums";
 export const GATED_FEATURES = {
   /** Uploading beyond the plan's document limit. */
   documents: { tier: "STUDY", label: "More documents" },
+  /** A document longer than the plan reads. */
+  pages: { tier: "STUDY", label: "Longer documents" },
   /** Reading scanned PDFs with a vision model. */
   ocr: { tier: "STUDY", label: "Scanned documents" },
   /** Choosing which provider answers, and with it the frontier models. */
   providerPicker: { tier: "PRO", label: "Model picker" },
   /** Having any credits at all. Not a tier so much as a balance. */
   credits: { tier: "STUDY", label: "More credits" },
-} as const satisfies Record<string, { tier: PlanTier; label: string }>;
+} as const satisfies Record<PlanErrorFeature, { tier: PlanTier; label: string }>;
 
+/**
+ * The gates, which are exactly the refusals the server can raise.
+ *
+ * Typed as `Record<PlanErrorFeature, …>` on purpose: adding a refusal to
+ * `plan-errors` without adding the gate that offers a way out of it is then a
+ * compile error rather than a paywall that reports a problem and does nothing
+ * about it.
+ */
 export type GatedFeature = keyof typeof GATED_FEATURES;
 
 interface PaywallContextValue {
   /** Opens the upgrade dialog, positioned on the plan that unlocks `feature`. */
   open: (feature?: GatedFeature) => void;
+}
+
+/**
+ * Turns a failure into an offer, wherever one lands.
+ *
+ * The counterpart to the tags added on the server. Anything that can fail for a
+ * plan reason — an upload, a chat turn, a mutation — passes its error through
+ * this, and if it was a plan refusal the dialog opens on the right plan and the
+ * caller is handed the message with the machine tag stripped, ready to show.
+ *
+ * Returns null for everything else, which is the signal to handle the failure
+ * however that call site normally would.
+ */
+export interface ReportedPlanError {
+  feature: GatedFeature;
+  /** The sentence to show a person. Tag removed. */
+  message: string;
 }
 
 const PaywallContext = createContext<PaywallContextValue | null>(null);
@@ -128,11 +159,33 @@ export function usePaywall() {
     [can, open],
   );
 
+  /**
+   * "That failed because of your plan" → the offer, opened.
+   *
+   * The reason the gates above are not enough on their own: some refusals can
+   * only happen on the server. Whether a document is 400 pages, whether a
+   * scanned PDF needs transcribing, whether the balance survived two questions
+   * asked at once — none of those are knowable in the browser before trying.
+   * So the client checks what it can up front, and this catches the rest on the
+   * way back.
+   */
+  const reportError = useCallback(
+    (error: unknown): ReportedPlanError | null => {
+      const parsed = parsePlanError(error);
+      if (!parsed) return null;
+
+      open(parsed.feature);
+      return { feature: parsed.feature, message: parsed.message };
+    },
+    [open],
+  );
+
   return {
     entitlements,
     isLoading,
     can,
     require,
+    reportError,
     /** Opens the dialog with nothing in particular in mind — a plain "Upgrade". */
     open,
     /** The plan a feature needs, for a component that wants to name it. */

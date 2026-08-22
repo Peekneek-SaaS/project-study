@@ -26,7 +26,11 @@ export function useCreateNote() {
   const createNote = async (): Promise<StickyNote | null> => {
     try {
       const note = await create.mutateAsync({});
-      await queryClient.invalidateQueries(trpc.stickyNote.list.queryFilter());
+      // `pathFilter` rather than `list.queryFilter()`: the wall is an infinite
+      // query and its key carries `type: "infinite"`, which a plain query
+      // filter will not match — so the new note would not appear until
+      // something else refetched.
+      await queryClient.invalidateQueries(trpc.stickyNote.pathFilter());
       return note;
     } catch (error) {
       toast.error(

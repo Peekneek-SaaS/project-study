@@ -23,6 +23,10 @@ import {
   type ModelTier,
   type Plan,
 } from "@/features/billing/lib/plans";
+import {
+  tagPlanError,
+  type PlanErrorFeature,
+} from "@/features/billing/lib/plan-errors";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -64,9 +68,12 @@ export class InsufficientCreditsError extends Error {
 
   constructor(required: number, remaining: number) {
     super(
-      `This needs ${required} credit${required === 1 ? "" : "s"} and you have ` +
-        `${remaining} left. Your allowance refills at the start of your next ` +
-        `cycle, or you can move to a larger plan for more.`,
+      tagPlanError(
+        `This needs ${required} credit${required === 1 ? "" : "s"} and you ` +
+          `have ${remaining} left. Your allowance refills at the start of ` +
+          `your next cycle, or you can move to a larger plan for more.`,
+        "credits",
+      ),
     );
     this.name = "InsufficientCreditsError";
     this.required = required;
@@ -76,10 +83,10 @@ export class InsufficientCreditsError extends Error {
 
 /** A limit that is not about credits — documents, pages, a gated feature. */
 export class PlanLimitError extends Error {
-  readonly limit: string;
+  readonly limit: PlanErrorFeature;
 
-  constructor(limit: string, message: string) {
-    super(message);
+  constructor(limit: PlanErrorFeature, message: string) {
+    super(tagPlanError(message, limit));
     this.name = "PlanLimitError";
     this.limit = limit;
   }
@@ -331,13 +338,14 @@ export async function recordUsage(event: {
 export function requireTier(
   entitlements: Entitlements,
   minimum: PlanTier,
-  feature: string,
+  feature: PlanErrorFeature,
+  label: string,
 ): void {
   if (atLeast(entitlements.tier, minimum)) return;
 
   throw new PlanLimitError(
     feature,
-    `${feature} is part of ${PLANS[minimum].name}. You are on ${
+    `${label} is part of ${PLANS[minimum].name}. You are on ${
       PLANS[entitlements.tier].name
     }.`,
   );

@@ -24,8 +24,8 @@ import {
   selectIsFolderSelected,
   useDriveSelectionStore,
 } from "@/lib/stores/drive-selection-store";
-import { useDriveStore } from "@/lib/stores/drive-store";
-import { listItemMotion } from "@/lib/motion";
+import { useDriveNavigation } from "@/features/main/hooks/use-drive-navigation";
+import { listItemRemoval } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 /**
@@ -42,7 +42,7 @@ export function DriveFolderCard({
   folder: DriveFolder;
   onSelect: SelectRow;
 }) {
-  const openFolder = useDriveStore((state) => state.openFolder);
+  const { openFolder } = useDriveNavigation();
 
   const isSelected = useDriveSelectionStore(selectIsFolderSelected(folder.id));
   const isDraggingSelection = useDriveSelectionStore(
@@ -72,7 +72,7 @@ export function DriveFolderCard({
 
   return (
     <motion.div
-      {...listItemMotion}
+      {...listItemRemoval}
       ref={(node) => {
         dragRef(node);
         dropRef(node);

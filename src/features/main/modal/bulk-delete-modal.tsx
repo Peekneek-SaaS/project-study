@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Modal } from "@/components/modal";
 import { Button } from "@/components/ui/button";
 import { useDriveSelectionStore } from "@/lib/stores/drive-selection-store";
-import { useDriveStore } from "@/lib/stores/drive-store";
+import { useDriveNavigation } from "@/features/main/hooks/use-drive-navigation";
 import { selectDeleteSelection, useModalStore } from "@/lib/stores/modal-store";
 import { useTRPC } from "@/trpc/client";
 
@@ -29,7 +29,7 @@ function describe(folders: number, documents: number) {
 export function BulkDeleteModal() {
   const selection = useModalStore(selectDeleteSelection);
   const closeModal = useModalStore((state) => state.close);
-  const dropCrumb = useDriveStore((state) => state.dropCrumb);
+  const { leaveFolder } = useDriveNavigation();
   const clearSelection = useDriveSelectionStore((state) => state.clear);
 
   const trpc = useTRPC();
@@ -57,7 +57,7 @@ export function BulkDeleteModal() {
         `Deleted ${describe(result.folders, result.documents)}`.trim(),
       );
       // A deleted folder may have been on the trail, or an ancestor of it.
-      for (const id of selection.folderIds) dropCrumb(id);
+      for (const id of selection.folderIds) leaveFolder(id);
       clearSelection();
       closeModal();
       // Contents, breadcrumb and the move-to tree all just went stale.

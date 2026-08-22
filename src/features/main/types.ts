@@ -12,10 +12,11 @@ export type DocumentStatus = DriveDocument["status"];
 /**
  * Where the drive is drawn.
  *
- * A folder has no URL of its own — which one is open is the trail in
- * `drive-store`, not a route — so anything opening a folder from elsewhere has
- * to move the trail *and* come here. The two halves are easy to separate by
- * accident, and separated they look like nothing happened.
+ * A folder *does* have a URL: it is this path with `?folder=<id>` on it, which
+ * is what lets a reload, a bookmark and the Back button all land in the folder
+ * you were in. Opening one from elsewhere is therefore a single navigation
+ * rather than the two-step it used to be — `useDriveNavigation` owns both
+ * halves, and nothing else should be building this path by hand.
  */
 export const DRIVE_PATH = "/main";
 

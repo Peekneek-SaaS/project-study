@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { SearchXIcon, SquareMousePointer } from "lucide-react";
+import { SearchXIcon, Shapes, SquareMousePointer } from "lucide-react";
 import { useQueryStates } from "nuqs";
 
 import { Button } from "@/components/ui/button";
@@ -58,8 +58,8 @@ export function BoardsEmptyState({ isFiltering }: { isFiltering: boolean }) {
   return (
     <MotionEmpty {...mountAnimation} variants={popIn} className="">
       <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <SquareMousePointer className="text-purple-500" />
+        <EmptyMedia>
+          <Shapes className="fill-purple-500 stroke-purple-500 size-24  opacity-30" />
         </EmptyMedia>
         <EmptyTitle>No boards yet</EmptyTitle>
         <EmptyDescription>

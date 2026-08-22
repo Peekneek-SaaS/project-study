@@ -8,9 +8,15 @@ import { fade, mountAnimation } from "@/lib/motion";
 import { QueryErrorBoundary } from "@/components/query-error-boundary";
 import { DriveTableSkeleton } from "@/features/main/components/drive-table-skeleton";
 import { MainContent } from "@/features/main/components/main-content";
-import { loadDriveFilters } from "@/features/main/lib/params";
+import { loadDriveFilters, loadDriveFolder } from "@/features/main/lib/params";
 import { readDriveViewCookie } from "@/features/main/lib/read-drive-view-cookie";
-import { HydrateClient, prefetchAwaited, trpc } from "@/trpc/server";
+import { infiniteOptions } from "@/lib/pagination";
+import {
+  HydrateClient,
+  prefetchAwaited,
+  prefetchInfiniteAwaited,
+  trpc,
+} from "@/trpc/server";
 
 import CreateDropdown from "../components/create-dropdown";
 import MainViewType from "../components/main-view-type";
@@ -31,17 +37,35 @@ export async function MainView({
   // drive would open on a spinner whenever the URL carried a filter.
   const filters = await loadDriveFilters(searchParams);
 
-  // The drive always opens at the root; deeper folders are fetched on click.
-  // `prefetchAwaited`, never bare `prefetch`. The bare one hands the query to
+  /*
+    Which folder to open, off the URL rather than assumed to be the root.
+
+    This is the half of "remember where I was" that the server has to do. The
+    client could restore the folder on its own, but every listing here would
+    then be warmed for the root and thrown away a moment later — a reload deep
+    in a folder would flash the root's files, or sit on a skeleton, before
+    catching up. Read here, the page hydrates already showing the right folder.
+  */
+  const { folder: folderId } = await loadDriveFolder(searchParams);
+
+  // `prefetchInfiniteAwaited`, never bare `prefetch`. The bare one hands the query to
   // the dehydrator and returns, so `HydrateClient` snapshots it mid-flight —
   // and this app has no streamed-hydration provider to deliver the result
   // afterwards. The client then hydrates a query that claims to be fetching
   // with nothing actually in flight, and `useSuspenseQuery` waits on a promise
   // that will never arrive: the page hangs on its skeleton until a reload,
   // where a full server render resolves it the ordinary way.
-  await prefetchAwaited(
-    trpc.folder.getContents.queryOptions({ folderId: null, ...filters }),
+  await prefetchInfiniteAwaited(
+    trpc.folder.getContents.infiniteQueryOptions(
+      { folderId, ...filters },
+      infiniteOptions,
+    ),
   );
+
+  // The path down to it, warmed alongside. `useDriveBrowser` reads this one
+  // with `useSuspenseQuery`, so without it here a reload inside a folder would
+  // suspend the whole drive on a request for its own breadcrumbs.
+  await prefetchAwaited(trpc.folder.getBreadcrumb.queryOptions({ folderId }));
 
   return (
     /*
@@ -99,9 +123,21 @@ export async function MainView({
             <MainContent serverView={serverView} />
           </Suspense>
         </QueryErrorBoundary>
-      </HydrateClient>
 
-      <MainBreadCrumbs />
+        {/*
+          Inside the boundary, and outside the `<Suspense>`.
+
+          Inside, because the crumb bar renders from the breadcrumb query warmed
+          above — left as a sibling of `HydrateClient` it would be reading a
+          cache it was not handed, and the trail would arrive a round trip late
+          on every reload.
+
+          Outside the `Suspense`, because the bar is furniture: it should stay
+          put while the listing under it is still loading, not disappear into
+          the table's skeleton.
+        */}
+        <MainBreadCrumbs />
+      </HydrateClient>
     </div>
   );
 }

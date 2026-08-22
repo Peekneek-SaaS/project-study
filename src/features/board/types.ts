@@ -4,8 +4,13 @@ import type { AppRouter } from "@/trpc/routers/_app";
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
 
-/** A board as the table sees it — everything but the scene. */
-export type BoardListItem = RouterOutputs["board"]["list"][number];
+/**
+ * A board as the table sees it — everything but the scene.
+ *
+ * Reached through `items` because the list is paged: the procedure returns one
+ * page and the cursor after it, and this is a row inside that page.
+ */
+export type BoardListItem = RouterOutputs["board"]["list"]["items"][number];
 
 /** A board with its scene, as the canvas opens it. */
 export type BoardWithSnapshot = RouterOutputs["board"]["get"];

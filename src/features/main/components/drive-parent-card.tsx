@@ -9,7 +9,7 @@ import {
   dropId,
   type DriveDropData,
 } from "@/features/main/types";
-import { useDriveStore } from "@/lib/stores/drive-store";
+import { useDriveNavigation } from "@/features/main/hooks/use-drive-navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -22,7 +22,7 @@ export function DriveParentCard({
 }: {
   parentFolderId: string | null;
 }) {
-  const goToCrumb = useDriveStore((state) => state.goToCrumb);
+  const { goToFolder } = useDriveNavigation();
 
   const { ref, isDropTarget } = useDroppable({
     id: dropId(parentFolderId),
@@ -34,7 +34,7 @@ export function DriveParentCard({
   return (
     <Button
       ref={ref}
-      onClick={() => goToCrumb(parentFolderId)}
+      onClick={() => goToFolder(parentFolderId)}
       className={cn(
         "w-fit",
         isDropTarget && "border-primary bg-accent text-foreground",

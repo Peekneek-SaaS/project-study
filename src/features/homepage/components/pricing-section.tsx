@@ -87,7 +87,7 @@ export function PricingSection() {
             <div
               role="radiogroup"
               aria-label="Billing period"
-              className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 p-1"
+              className="inline-flex items-center gap-1 border border-border bg-input/30 dark:bg-muted p-1"
             >
               {(["MONTHLY", "YEARLY"] as const).map((value) => (
                 <button
@@ -97,7 +97,7 @@ export function PricingSection() {
                   aria-checked={period === value}
                   onClick={() => setPeriod(value)}
                   className={cn(
-                    "rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors",
+                    "px-4 py-1.5 text-[13px] font-medium transition-colors",
                     "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
                     period === value
                       ? "bg-background text-foreground shadow-sm"
@@ -134,7 +134,7 @@ export function PricingSection() {
                   {plan.name}
                 </h3>
                 {plan.tier === "STUDY" && (
-                  <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 font-mono text-[10px] tracking-[0.1em] text-primary uppercase">
+                  <span className="border border-primary/30 bg-primary/10 px-2 py-0.5 font-mono text-[10px] tracking-[0.1em] text-primary uppercase">
                     Most take this
                   </span>
                 )}
@@ -160,7 +160,7 @@ export function PricingSection() {
               {/* The full charge, always shown. A monthly-equivalent price with
                   the yearly total hidden is the one piece of pricing sleight of
                   hand that reliably turns into a refund request. */}
-              <p className="mt-1 font-mono text-[11px] text-foreground/35">
+              <p className="mt-1 font-mono text-[11px] text-primary">
                 {plan.price[period] === 0
                   ? `${plan.welcomeCredits} credits to start`
                   : period === "YEARLY"

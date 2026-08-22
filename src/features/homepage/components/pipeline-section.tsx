@@ -42,15 +42,35 @@ export function PipelineSection() {
 
         <div className="border-t border-border bg-[radial-gradient(var(--border)_1px,transparent_1px)] px-5 py-12 [background-size:18px_18px] sm:px-8 sm:py-16">
           <Reveal viewport={REVEAL_VIEWPORT_TALL}>
-            {/* Horizontal scroll on small screens rather than a reflow: a node
-                graph that wraps is no longer a node graph. */}
-            <div className="-mx-5 overflow-x-auto px-5 sm:mx-0 sm:px-0 [scrollbar-width:thin]">
+            {/*
+              Two drawings of the same thing, not one drawing that scrolls.
+
+              This used to be a single wide diagram in a horizontal scroller, on
+              the reasoning that a node graph which wraps is no longer a node
+              graph. That is true — but a node graph you can only see a third of
+              is not one either, and on a phone the third you land on is the
+              least informative: two boxes and no sense of the split that is the
+              whole point of the picture.
+
+              So the narrow one is turned through ninety degrees rather than
+              shrunk. It says exactly what the wide one says — one file, two
+              tracks running side by side, both arriving — in a shape a portrait
+              screen can hold whole. Only one is ever in the document's
+              accessibility tree, because `hidden` is `display: none` and takes
+              the other out of it entirely.
+
+              The switch is at `lg`, not `sm`. The wide drawing needs about
+              820px of *content* width, which a 640px viewport does not have
+              once the frame's padding is off it — so the compact one carries
+              everything up to the desktop layout, capped in width so it does
+              not become a giant portrait diagram on a tablet.
+            */}
+            <div className="mx-auto max-w-[380px] lg:hidden">
+              <PipelineDiagramCompact />
+            </div>
+            <div className="hidden lg:block">
               <PipelineDiagram />
             </div>
-            {/* Only where the diagram is actually wider than the screen. */}
-            <p className="mt-3 text-center font-mono text-[10px] tracking-[0.1em] text-foreground/30 uppercase sm:hidden">
-              Scroll the diagram →
-            </p>
           </Reveal>
 
           <Reveal className="mt-10" delay={0.15}>
@@ -112,30 +132,39 @@ const MERGE_X = 790;
 /** Where the joined spine hands off to the terminal dot. */
 const READY_X = 824;
 
+/**
+ * A connector that draws itself, then hands off to the next one.
+ *
+ * At module scope rather than inside a component, because both drawings use
+ * them and a wire that animated differently in the two would be two diagrams
+ * rather than one diagram at two sizes.
+ */
+const wire = (delay: number) => ({
+  initial: { pathLength: 0, opacity: 0 },
+  whileInView: { pathLength: 1, opacity: 1 },
+  viewport: { once: true, amount: 0.2 },
+  transition: {
+    pathLength: { duration: 0.5, ease: EASE_OUT, delay },
+    opacity: { duration: 0.15, delay },
+  },
+});
+
+/** A node that lands once the wire reaching it has arrived. */
+const node = (delay: number) => ({
+  initial: { opacity: 0, y: 8 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, amount: 0.2 },
+  transition: { duration: DURATION.base, ease: EASE_OUT, delay },
+});
+
 function PipelineDiagram() {
-  /** A connector that draws itself, then hands off to the next one. */
-  const wire = (delay: number) => ({
-    initial: { pathLength: 0, opacity: 0 },
-    whileInView: { pathLength: 1, opacity: 1 },
-    viewport: { once: true, amount: 0.2 },
-    transition: {
-      pathLength: { duration: 0.5, ease: EASE_OUT, delay },
-      opacity: { duration: 0.15, delay },
-    },
-  });
-
-  /** A node that lands once the wire reaching it has arrived. */
-  const node = (delay: number) => ({
-    initial: { opacity: 0, y: 8 },
-    whileInView: { opacity: 1, y: 0 },
-    viewport: { once: true, amount: 0.2 },
-    transition: { duration: DURATION.base, ease: EASE_OUT, delay },
-  });
-
   return (
     <svg
       viewBox="0 0 860 280"
-      className="h-auto w-full min-w-[820px]"
+      // No minimum width any more: this only renders at `lg` and above, where
+      // the frame is wider than the drawing's natural size, so it scales up
+      // rather than being clipped. The compact version covers everything below.
+      className="h-auto w-full"
       fill="none"
       role="img"
       aria-label="One upload starts two independent jobs: building the workspace, and reading the document."
@@ -256,6 +285,193 @@ function PipelineDiagram() {
         <text
           x={READY_X} y={MID_Y + 26} textAnchor="middle"
           fontSize="9.5" fill="var(--primary)" fontFamily="var(--font-mono)"
+        >
+          READY
+        </text>
+      </motion.g>
+    </svg>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   The same picture, turned through ninety degrees.
+
+   Not a scaled-down copy of the one above: at a phone's width the wide
+   drawing's type would land somewhere around four pixels, which is a diagram
+   nobody can read rather than one they cannot fit. Portrait, the two tracks
+   become two columns running down the page — which keeps the one thing the
+   drawing exists to say, that the jobs are parallel and independent, in the
+   only orientation a narrow screen has room for.
+
+   The geometry is its own set of constants rather than a transform of the wide
+   one's. They describe different arrangements, and deriving one from the other
+   would mean every future change to either having to be reasoned about twice.
+--------------------------------------------------------------------------- */
+
+const C_NODE_W = 130;
+const C_NODE_H = 48;
+
+/** The two columns, and the centre line the file and the merge sit on. */
+const C_COL_L = 10;
+const C_COL_R = 180;
+const C_MID_X = 160;
+const C_CENTRE_L = C_COL_L + C_NODE_W / 2;
+const C_CENTRE_R = C_COL_R + C_NODE_W / 2;
+
+/** Every row the drawing has, top to bottom. */
+const C_FILE_Y = 6;
+/** Where the stem out of the file becomes the fan across to both columns. */
+const C_FAN_Y = 76;
+/** The track captions sit in a gap cut into the two verticals. */
+const C_LABEL_Y = 101;
+/** Node tops, evenly spaced with room for a wire and an arrowhead between. */
+const C_ROWS = [130, 202, 274] as const;
+/** Where the tracks turn back towards the middle, and where they arrive. */
+const C_MERGE_Y = 352;
+const C_DOT_Y = 386;
+
+/** An arrowhead pointing down, arriving at `(x, y)`. */
+const downArrow = (x: number, y: number) =>
+  `M${x - 4} ${y - 6} L${x} ${y} L${x + 4} ${y - 6}`;
+
+function PipelineDiagramCompact() {
+  const columns = [
+    { steps: TRACK_A, cx: C_CENTRE_L, x: C_COL_L, caption: "TRACK 1 · WORKSPACE" },
+    { steps: TRACK_B, cx: C_CENTRE_R, x: C_COL_R, caption: "TRACK 2 · DOCUMENT" },
+  ];
+
+  return (
+    <svg
+      viewBox="0 0 320 420"
+      className="h-auto w-full"
+      fill="none"
+      role="img"
+      aria-label="One upload starts two independent jobs: building the workspace, and reading the document."
+    >
+      {/* ---- The file ---- */}
+      <motion.g {...node(0)}>
+        <rect
+          x={C_MID_X - C_NODE_W / 2} y={C_FILE_Y} width={C_NODE_W} height={C_NODE_H}
+          fill="var(--card)" stroke="var(--foreground)" strokeOpacity="0.85" strokeWidth="1.5"
+        />
+        <foreignObject
+          x={C_MID_X - C_NODE_W / 2} y={C_FILE_Y} width={C_NODE_W} height={C_NODE_H}
+        >
+          <div className="flex h-full flex-col justify-center gap-0.5 px-2.5">
+            <span className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
+              <UploadCloud className="size-3 text-primary" />
+              Your file
+            </span>
+            <span className="truncate font-mono text-[8.5px] text-foreground/40">
+              bio-ch4-final-v2.pdf
+            </span>
+          </div>
+        </foreignObject>
+      </motion.g>
+
+      {/* ---- Stem, then the fan out to both columns ---- */}
+      <motion.path
+        d={`M${C_MID_X} ${C_FILE_Y + C_NODE_H} V${C_FAN_Y} H${C_CENTRE_L} V${C_FAN_Y + 12}`}
+        stroke="var(--foreground)" strokeOpacity="0.28" strokeWidth="1.5"
+        {...wire(0.2)}
+      />
+      <motion.path
+        d={`M${C_MID_X} ${C_FILE_Y + C_NODE_H} V${C_FAN_Y} H${C_CENTRE_R} V${C_FAN_Y + 12}`}
+        stroke="var(--foreground)" strokeOpacity="0.28" strokeWidth="1.5"
+        {...wire(0.2)}
+      />
+
+      {columns.map((column, columnIndex) => (
+        <g key={column.caption}>
+          {/*
+            The caption sits in a deliberate gap in the vertical above it —
+            the wire stops at the fan, the words happen, and it starts again
+            below. Laid over the line instead, mono type at this size becomes
+            unreadable against it.
+          */}
+          <motion.text
+            {...node(0.3)}
+            x={column.cx} y={C_LABEL_Y} textAnchor="middle"
+            fontSize="8.5" letterSpacing="1.1"
+            fill="var(--foreground)" fillOpacity="0.32" fontFamily="var(--font-mono)"
+          >
+            {column.caption}
+          </motion.text>
+
+          {column.steps.map((step, index) => {
+            const top = C_ROWS[index];
+            const delay = 0.45 + index * 0.3 + columnIndex * 0.05;
+
+            return (
+              <g key={step.label}>
+                {/* The wire into this node: out of the caption gap for the
+                    first, out of the node above for the rest. */}
+                <motion.path
+                  d={
+                    index === 0
+                      ? `M${column.cx} ${C_LABEL_Y + 7} V${top - 6}`
+                      : `M${column.cx} ${C_ROWS[index - 1] + C_NODE_H} V${top - 6}`
+                  }
+                  stroke="var(--foreground)" strokeOpacity="0.28" strokeWidth="1.5"
+                  {...wire(delay)}
+                />
+                <motion.path
+                  d={downArrow(column.cx, top - 6)}
+                  stroke="var(--foreground)" strokeOpacity="0.28" strokeWidth="1.5"
+                  {...wire(delay + 0.1)}
+                />
+
+                <motion.g {...node(delay + 0.15)}>
+                  <rect
+                    x={column.x} y={top} width={C_NODE_W} height={C_NODE_H}
+                    fill="var(--card)"
+                    stroke={"accent" in step && step.accent ? "var(--primary)" : "var(--border)"}
+                    strokeWidth={"accent" in step && step.accent ? 1.6 : 1.2}
+                  />
+                  <foreignObject x={column.x} y={top} width={C_NODE_W} height={C_NODE_H}>
+                    <div className="flex h-full flex-col justify-center gap-0.5 px-2.5">
+                      <span
+                        className={
+                          "accent" in step && step.accent
+                            ? "text-[11px] leading-tight font-semibold text-primary"
+                            : "text-[11px] leading-tight font-semibold text-foreground/80"
+                        }
+                      >
+                        {step.label}
+                      </span>
+                      {/* Allowed to wrap to a second line — "title · subject ·
+                          outline" does not fit 130 units on one, and the node
+                          is sized to hold two. */}
+                      <span className="text-[8.5px] leading-tight text-foreground/40">
+                        {step.note}
+                      </span>
+                    </div>
+                  </foreignObject>
+                </motion.g>
+              </g>
+            );
+          })}
+
+          {/* ---- Back towards the middle ---- */}
+          <motion.path
+            d={`M${column.cx} ${C_ROWS[2] + C_NODE_H} V${C_MERGE_Y} H${C_MID_X}`}
+            stroke="var(--primary)" strokeOpacity="0.5" strokeWidth="1.5"
+            {...wire(1.5)}
+          />
+        </g>
+      ))}
+
+      {/* ---- Arriving ---- */}
+      <motion.path
+        d={`M${C_MID_X} ${C_MERGE_Y} V${C_DOT_Y - 8}`}
+        stroke="var(--primary)" strokeOpacity="0.5" strokeWidth="1.5"
+        {...wire(1.7)}
+      />
+      <motion.g {...node(1.85)}>
+        <circle cx={C_MID_X} cy={C_DOT_Y} r="6" fill="var(--primary)" />
+        <text
+          x={C_MID_X} y={C_DOT_Y + 22} textAnchor="middle"
+          fontSize="9" fill="var(--primary)" fontFamily="var(--font-mono)"
         >
           READY
         </text>

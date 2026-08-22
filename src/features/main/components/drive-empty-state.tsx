@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { FolderIcon, SearchXIcon } from "lucide-react";
+import { CloudUpload, FileText, FolderIcon, SearchXIcon } from "lucide-react";
 import { useQueryStates } from "nuqs";
 
 import { Button } from "@/components/ui/button";
@@ -65,8 +65,19 @@ export function DriveEmptyState({
   return (
     <MotionEmpty {...mountAnimation} variants={popIn} className="">
       <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <FolderIcon />
+        {/*
+          The default variant, not `icon`, because this one is an illustration
+          rather than a badge. `icon` is a 32px chip with a fixed size — an
+          icon six times that inside it does not push it open, it hangs out of
+          it and over the title underneath. The default box has no size of its
+          own and takes the icon's.
+
+          `mb-4` rather than the variant's `mb-2`: the tilt is a transform, so
+          the corners swing about eight pixels past the box the layout still
+          thinks is square, and the heading sat inside that overhang.
+        */}
+        <EmptyMedia className="mb-4">
+          <FileText className="size-24 fill-orange-400 stroke-orange-200 opacity-30" />
         </EmptyMedia>
         <EmptyTitle>
           {isRoot ? "No files yet" : "This folder is empty"}
@@ -76,7 +87,10 @@ export function DriveEmptyState({
         </EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
-        <Button onClick={() => openModal("upload-file")}>Upload file</Button>
+        <Button onClick={() => openModal("upload-file")} className="flex items-center gap-2">
+          <CloudUpload />
+          Upload file
+        </Button>
       </EmptyContent>
     </MotionEmpty>
   );

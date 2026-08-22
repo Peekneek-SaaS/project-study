@@ -1,6 +1,11 @@
 "use client";
 
-import { AnimatePresence, motion, useMotionValueEvent, useScroll } from "motion/react";
+import {
+  AnimatePresence,
+  motion,
+  useMotionValueEvent,
+  useScroll,
+} from "motion/react";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { Menu, X } from "lucide-react";
@@ -8,6 +13,8 @@ import { Menu, X } from "lucide-react";
 import Logo from "@/components/logo";
 import { DURATION, EASE_OUT } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { ModeToggle } from "@/components/mode-toggle";
 
 /** In-page anchors. The homepage is one document, so the nav scrolls it. */
 const LINKS = [
@@ -81,15 +88,16 @@ export function HomepageNav({
         <div className="flex items-center gap-2">
           {authCta}
 
-          <button
-            type="button"
+          <Button
+            variant="outline"
             onClick={() => setMenuOpen((open) => !open)}
             aria-label={menuOpen ? "Close menu" : "Open menu"}
             aria-expanded={menuOpen}
-            className="grid size-9 place-items-center rounded-none border border-border bg-card text-foreground transition-colors hover:bg-muted lg:hidden"
+            className="size-9 flex lg:hidden"
           >
-            {menuOpen ? <X className="size-4" /> : <Menu className="size-4" />}
-          </button>
+            {menuOpen ? <X className="size-4" /> : <Menu className="size-4 " />}
+          </Button>
+          <ModeToggle className="size-9" />
         </div>
       </nav>
 

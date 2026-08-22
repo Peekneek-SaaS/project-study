@@ -3,6 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect } from "react";
 
+import { MAX_PAGE_SIZE } from "@/lib/pagination";
 import { useTRPC } from "@/trpc/client";
 
 /**
@@ -34,7 +35,7 @@ export function searchItemsOptions(trpc: ReturnType<typeof useTRPC>) {
  */
 export function searchBoardsOptions(trpc: ReturnType<typeof useTRPC>) {
   return {
-    ...trpc.board.list.queryOptions(),
+    ...trpc.board.list.queryOptions({ limit: MAX_PAGE_SIZE }),
     staleTime: SEARCH_STALE_TIME,
   };
 }
@@ -42,7 +43,7 @@ export function searchBoardsOptions(trpc: ReturnType<typeof useTRPC>) {
 /** Notes, on the same terms as boards — its own router, its own invalidation. */
 export function searchNotesOptions(trpc: ReturnType<typeof useTRPC>) {
   return {
-    ...trpc.stickyNote.list.queryOptions(),
+    ...trpc.stickyNote.list.queryOptions({ limit: MAX_PAGE_SIZE }),
     staleTime: SEARCH_STALE_TIME,
   };
 }
@@ -50,19 +51,25 @@ export function searchNotesOptions(trpc: ReturnType<typeof useTRPC>) {
 /**
  * Conversations, on the same terms again.
  *
- * Asked for with an explicit `limit`, unlike the three above, which is a
- * deliberate second cache entry rather than an oversight: the recents list on
- * the chat page takes the default thirty, because it is a peek under the fold.
- * Search is the opposite — the reason to open it is to find the conversation
- * you cannot see — so it takes as many as the router will give.
+ * A *plain* query against a procedure the recents list reads as an infinite
+ * one, and that is deliberate rather than an oversight. The two want opposite
+ * things: the recents table is scrolled, so it takes a page at a time; the
+ * palette is typed into, and the reason to open it is to find the conversation
+ * you cannot see — so it takes as much as the router will give, in one go,
+ * filtered in the browser with no round trip per keystroke.
  *
- * A hundred is that router's ceiling. Beyond it, an old chat is findable by its
- * own URL and not by this palette; raising it means paginating rather than
- * changing a number, which is not worth doing until someone has that many.
+ * Because an infinite key and a query key are different keys, the two never
+ * fight over one cache entry. This one is kept fresh by the `pathFilter`
+ * invalidations the chat mutations use, which match both.
+ *
+ * `MAX_PAGE_SIZE` is the router's ceiling, and the same reasoning applies to
+ * the boards and notes above. Beyond it an old row is findable by its own URL
+ * and not by this palette — the honest fix there is to search server-side, not
+ * to raise a number.
  */
 export function searchChatsOptions(trpc: ReturnType<typeof useTRPC>) {
   return {
-    ...trpc.chat.list.queryOptions({ limit: 100 }),
+    ...trpc.chat.list.queryOptions({ limit: MAX_PAGE_SIZE }),
     staleTime: SEARCH_STALE_TIME,
   };
 }

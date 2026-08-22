@@ -22,6 +22,7 @@ import { useBoardsBrowser } from "@/features/board/hooks/use-boards-browser";
 import { boardPath, type BoardListItem } from "@/features/board/types";
 import { AnimatePresence } from "motion/react";
 
+import { InfiniteScrollSentinel } from "@/components/infinite-scroll-sentinel";
 import { MotionTableBody } from "@/components/motion/motion-table";
 import { ROW_ATTRIBUTE } from "@/hooks/use-row-interaction";
 import { listContainer, mountAnimation } from "@/lib/motion";
@@ -53,7 +54,13 @@ const STICKY_HEAD =
  */
 export function BoardsTable() {
   const router = useRouter();
-  const { boards, isFiltering } = useBoardsBrowser();
+  const {
+    boards,
+    isFiltering,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = useBoardsBrowser();
 
   const selectedIds = useBoardSelectionStore((state) => state.ids);
   const clearSelection = useBoardSelectionStore((state) => state.clear);
@@ -207,6 +214,21 @@ export function BoardsTable() {
           </Table>
         )}
       </div>
+
+      {/*
+        The bottom of the list. Outside the wrapper above rather than inside the
+        table, because a `<div>` is not something a `<table>` may contain — put
+        in `TableBody` the browser hoists it out, and the observer ends up
+        watching an element that is no longer where the rows end.
+      */}
+      {boards.length > 0 && (
+        <InfiniteScrollSentinel
+          hasNextPage={hasNextPage}
+          isFetchingNextPage={isFetchingNextPage}
+          fetchNextPage={fetchNextPage}
+          label="Loading more boards"
+        />
+      )}
 
       <RenameBoardDialog board={renaming} onClose={() => setRenaming(null)} />
       <DeleteBoardDialog board={deleting} onClose={() => setDeleting(null)} />

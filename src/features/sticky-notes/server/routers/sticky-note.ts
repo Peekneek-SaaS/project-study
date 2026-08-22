@@ -13,6 +13,12 @@ import {
 } from "@/features/sticky-notes/lib/note-appearance";
 import { MODIFIED_VALUES, modifiedRange } from "@/lib/list-filters";
 import { prisma } from "@/lib/prisma";
+import {
+  cursorClause,
+  cursorInput,
+  PAGE_SIZE,
+  toPage,
+} from "@/lib/pagination";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
 /**
@@ -114,23 +120,35 @@ export const StickyNoteRouter = createTRPCRouter({
       z
         .object({
           modified: z.enum(MODIFIED_VALUES).nullable().default(null),
+          ...cursorInput,
         })
         // Optional so the callers with nothing to filter by — the search
-        // palette, a bare prefetch — can go on calling `list()`.
-        .default({ modified: null }),
+        // palette, a bare prefetch — can go on calling `list()`. Every default
+        // restated, because `.default()` on the object replaces the whole value
+        // and the per-field ones never run for a caller who passes nothing.
+        .default({ modified: null, limit: PAGE_SIZE, cursor: null }),
     )
     .query(async ({ ctx, input }) => {
       const updatedAt = modifiedRange(input.modified);
 
-      return prisma.stickyNote.findMany({
+      const rows = await prisma.stickyNote.findMany({
         where: {
           userId: ctx.userId,
           documentId: null,
           ...(updatedAt && { updatedAt }),
         },
-        orderBy: { createdAt: "desc" },
+        // `id` as the tiebreak, for the reason spelled out on `board.list`: two
+        // notes written in the same millisecond are otherwise in no fixed
+        // order, and a cursor into an unstable order repeats or skips rows at
+        // the page boundary. The grouping by day is unaffected — it reads
+        // `createdAt`, which is still what decides the order.
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: input.limit + 1,
+        ...cursorClause(input.cursor),
         select: noteFields,
       });
+
+      return toPage(rows, input.limit);
     }),
 
   /**
@@ -146,13 +164,33 @@ export const StickyNoteRouter = createTRPCRouter({
    * of you, and there is no toolbar there to narrow them with.
    */
   listForDocument: protectedProcedure
-    .input(z.object({ documentId: z.string() }))
+    .input(z.object({ documentId: z.string(), ...cursorInput }))
     .query(async ({ ctx, input }) => {
-      return prisma.stickyNote.findMany({
-        where: { userId: ctx.userId, documentId: input.documentId },
-        orderBy: { createdAt: "desc" },
-        select: noteFields,
-      });
+      const where = { userId: ctx.userId, documentId: input.documentId };
+
+      /*
+        The count comes back with every page, and it is not redundant.
+
+        The panel's tab reads "Notes 47", and with a paged list `items.length`
+        is the number *loaded* rather than the number there are — a badge that
+        climbed as you scrolled would be reporting the scroll position, not the
+        document. The count is over an indexed `[userId, documentId]` and runs
+        beside the page rather than after it, so it costs a round trip's worth
+        of nothing.
+      */
+      const [rows, total] = await Promise.all([
+        prisma.stickyNote.findMany({
+          where,
+          // Tiebroken like the wall's — see `list`.
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: input.limit + 1,
+          ...cursorClause(input.cursor),
+          select: noteFields,
+        }),
+        prisma.stickyNote.count({ where }),
+      ]);
+
+      return { ...toPage(rows, input.limit), total };
     }),
 
   /**

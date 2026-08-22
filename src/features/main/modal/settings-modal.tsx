@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { UsagePanel } from "@/features/billing/components/usage-panel";
 import {
   SETTINGS_SECTIONS,
   type SettingsSection,
@@ -370,6 +371,7 @@ export function SettingsModal() {
               </header>
 
               {active.id === "general" && <GeneralSettings />}
+              {active.id === "usage" && <UsagePanel />}
               {active.id === "account" && (
                 <AccountSettings getContainer={() => portalRef.current} />
               )}

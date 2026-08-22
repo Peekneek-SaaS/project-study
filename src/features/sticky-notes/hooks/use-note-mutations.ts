@@ -8,6 +8,21 @@ import type { NoteAppearancePatch } from "@/features/sticky-notes/lib/note-appea
 import type { StickyNote } from "@/features/sticky-notes/types";
 import { useTRPC } from "@/trpc/client";
 
+/**
+ * A note list as it actually sits in the cache.
+ *
+ * Both lists these mutations write into are infinite queries, so the cached
+ * value is not the array the procedure returns — it is every page fetched so
+ * far, each holding its own `items`. Named once here rather than spelled out at
+ * each `setQueriesData`, which is also what stops one of them being typed as a
+ * flat array again: that compiles, silently matches nothing, and shows up as a
+ * colour that only takes effect after a refresh.
+ */
+interface NotePages {
+  pages: { items: StickyNote[] }[];
+  pageParams: unknown[];
+}
+
 /** Long enough to cover a sentence, short enough that a closed tab keeps it. */
 const CONTENT_DEBOUNCE_MS = 800;
 
@@ -55,10 +70,15 @@ export function useNoteMutations(noteId: string, documentId?: string) {
 
     A filter matches every variant, so the paint reaches the one being looked at
     whatever the wall is currently filtered to.
+
+    `infiniteQueryFilter` and not `queryFilter`, since both of these lists are
+    paged: an infinite key carries `type: "infinite"`, and a plain query filter
+    does not match it. Getting this wrong is the same bug as above wearing a
+    different hat — the paint lands in an entry nobody renders.
   */
   const listFilter = documentId
-    ? trpc.stickyNote.listForDocument.queryFilter({ documentId })
-    : trpc.stickyNote.list.queryFilter();
+    ? trpc.stickyNote.listForDocument.infiniteQueryFilter({ documentId })
+    : trpc.stickyNote.list.infiniteQueryFilter();
 
   const flushContent = async () => {
     if (timer.current !== null) {
@@ -105,12 +125,34 @@ export function useNoteMutations(noteId: string, documentId?: string) {
   }, []);
 
   const patchAppearance = async (patch: NoteAppearancePatch) => {
-    // Painted first: the cached list is what the grid renders from, so writing
-    // through it is what makes the colour land on the click rather than on the
-    // response. Every cached variant, for the reason on `listFilter`.
-    const previous = queryClient.getQueriesData<StickyNote[]>(listFilter);
-    queryClient.setQueriesData<StickyNote[]>(listFilter, (notes) =>
-      notes?.map((note) => (note.id === noteId ? { ...note, ...patch } : note)),
+    /*
+      Painted first: the cached list is what the grid renders from, so writing
+      through it is what makes the colour land on the click rather than on the
+      response. Every cached variant, for the reason on `listFilter`.
+
+      The shape being written is a paged one — `{ pages, pageParams }` — so the
+      note is found by walking every loaded page rather than one flat array. The
+      pages are rebuilt rather than mutated, and only the page holding the note
+      gets a new array: TanStack compares by reference, and replacing all of
+      them would re-render every card on the wall to recolour one.
+    */
+    const previous = queryClient.getQueriesData<NotePages>(listFilter);
+    queryClient.setQueriesData<NotePages>(listFilter, (data) =>
+      data
+        ? {
+            ...data,
+            pages: data.pages.map((page) =>
+              page.items.some((note) => note.id === noteId)
+                ? {
+                    ...page,
+                    items: page.items.map((note) =>
+                      note.id === noteId ? { ...note, ...patch } : note,
+                    ),
+                  }
+                : page,
+            ),
+          }
+        : data,
     );
 
     try {
@@ -131,7 +173,10 @@ export function useNoteMutations(noteId: string, documentId?: string) {
   const removeNote = async () => {
     try {
       await remove.mutateAsync({ id: noteId });
-      await queryClient.invalidateQueries(listFilter);
+      // The whole router rather than just this list: a note deleted from a work
+      // page is also gone from the palette's flat copy, which `listFilter` — an
+      // infinite filter — does not reach.
+      await queryClient.invalidateQueries(trpc.stickyNote.pathFilter());
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Could not delete the note",

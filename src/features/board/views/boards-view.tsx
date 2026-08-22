@@ -9,7 +9,8 @@ import { BoardCreateButton } from "@/features/board/components/board-create-butt
 import { BoardsTable } from "@/features/board/components/boards-table";
 import { BoardsTableSkeleton } from "@/features/board/components/boards-table-skeleton";
 import { loadBoardFilters } from "@/features/board/lib/params";
-import { HydrateClient, prefetchAwaited, trpc } from "@/trpc/server";
+import { infiniteOptions } from "@/lib/pagination";
+import { HydrateClient, prefetchInfiniteAwaited, trpc } from "@/trpc/server";
 
 /**
  * The boards index.
@@ -33,14 +34,16 @@ export async function BoardsView({
   // hydrate under a key nothing looks up.
   const filters = await loadBoardFilters(searchParams);
 
-  // `prefetchAwaited`, never bare `prefetch`. The bare one hands the query to
+  // `prefetchInfiniteAwaited`, never bare `prefetch`. The bare one hands the query to
   // the dehydrator and returns, so `HydrateClient` snapshots it mid-flight —
   // and this app has no streamed-hydration provider to deliver the result
   // afterwards. The client then hydrates a query that claims to be fetching
   // with nothing actually in flight, and `useSuspenseQuery` waits on a promise
   // that will never arrive: the page hangs on its skeleton until a reload,
   // where a full server render resolves it the ordinary way.
-  await prefetchAwaited(trpc.board.list.queryOptions(filters));
+  await prefetchInfiniteAwaited(
+    trpc.board.list.infiniteQueryOptions(filters, infiniteOptions),
+  );
 
   return (
     <div className="relative flex flex-1 flex-col gap-2 px-4 [--drive-sticky-top:4rem] [--drive-title-h:3rem] [--drive-toolbar-h:3rem] md:group-has-data-[collapsible=icon]/sidebar-wrapper:[--drive-sticky-top:3rem]">

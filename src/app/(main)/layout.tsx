@@ -8,7 +8,6 @@ import { Suspense } from "react";
 import { QueryErrorBoundary } from "@/components/query-error-boundary";
 import { Spinner } from "@/components/ui/spinner";
 import { cookies } from "next/headers";
-import { PaywallProvider } from "@/features/billing/hooks/use-paywall";
 import MainBreadCrumbs from "@/features/main/components/main-breadcrumbs";
 import MainFooter from "@/features/main/components/main-footer";
 
@@ -29,18 +28,13 @@ const MainLayout: React.FC<MainLayoutProps> = async ({ children }) => {
   // the filters in the query string, which a layout cannot see, and a prefetch
   // under the wrong key hydrates nothing.
 
-  /*
-    The paywall lives here rather than in the root layout, and the boundary is
-    the point: it holds one upgrade dialog and reads the signed-in account's
-    entitlements, neither of which the marketing pages or the auth screens have
-    any use for. Everything inside `(main)` is behind the `auth()` check above,
-    so every consumer of `usePaywall` is somebody with an account to upgrade.
-  */
+  // The paywall provider is at the root rather than here: the settings dialog
+  // is mounted up there beside the pages, and it shows the plan and the credit
+  // meter. See `app/layout.tsx`.
   return (
-    <PaywallProvider>
-      <SidebarProvider defaultOpen={defaultOpen}>
-        <MainSidebar />
-        {/*
+    <SidebarProvider defaultOpen={defaultOpen}>
+      <MainSidebar />
+      {/*
         `min-w-0` on both, and load-bearing rather than tidy: this inset is a
         flex item beside the sidebar, so its automatic minimum size is whatever
         is inside it. A page with something wider than the screen — the todo
@@ -48,10 +42,10 @@ const MainLayout: React.FC<MainLayoutProps> = async ({ children }) => {
         push the header and the sidebar around, and leave the page scrolling
         sideways instead of the scroller inside it.
       */}
-        <SidebarInset className="min-w-0">
-          <MainHeader />
-          <main className="flex min-w-0 flex-1 flex-col">
-            {/*
+      <SidebarInset className="min-w-0">
+        <MainHeader />
+        <main className="flex min-w-0 flex-1 flex-col">
+          {/*
             No `HydrateClient` here. The layout warms nothing, so it would have
             nothing of its own to hand over — and being an ancestor of the page,
             it dehydrates the shared request cache while the page's prefetch is
@@ -61,21 +55,20 @@ const MainLayout: React.FC<MainLayoutProps> = async ({ children }) => {
             Route-level safety net. The drive draws its own tighter boundaries
             around the table, so this one only catches whatever escapes them.
           */}
-            <QueryErrorBoundary message="Something went wrong loading your files.">
-              <Suspense
-                fallback={
-                  <div className="flex flex-1 items-center justify-center py-16">
-                    <Spinner />
-                  </div>
-                }
-              >
-                {children}
-              </Suspense>
-            </QueryErrorBoundary>
-          </main>
-        </SidebarInset>
-      </SidebarProvider>
-    </PaywallProvider>
+          <QueryErrorBoundary message="Something went wrong loading your files.">
+            <Suspense
+              fallback={
+                <div className="flex flex-1 items-center justify-center py-16">
+                  <Spinner />
+                </div>
+              }
+            >
+              {children}
+            </Suspense>
+          </QueryErrorBoundary>
+        </main>
+      </SidebarInset>
+    </SidebarProvider>
   );
 };
 

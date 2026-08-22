@@ -10,7 +10,7 @@ export interface DriveItemKey {
 /**
  * Rows selected in the drive table.
  *
- * Kept apart from `drive-store`, which only knows where you are: a selection
+ * Kept apart from `useDriveNavigation`, which only knows where you are: a selection
  * belongs to one listing and is dropped the moment you leave it, so the two
  * have opposite lifetimes. Ids live in `Set`s so a row can ask about itself
  * without reading the whole selection.

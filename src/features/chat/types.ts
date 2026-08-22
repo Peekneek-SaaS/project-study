@@ -4,7 +4,8 @@ import type { AppRouter } from "@/trpc/routers/_app";
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
 
-export type ChatSummary = RouterOutputs["chat"]["list"][number];
+/** One conversation in the recents list — a row inside a page of them. */
+export type ChatSummary = RouterOutputs["chat"]["list"]["items"][number];
 export type ChatDetail = RouterOutputs["chat"]["get"];
 export type DocumentChat = RouterOutputs["chat"]["forDocument"];
 export type DocumentChatContent = NonNullable<DocumentChat["content"]>;

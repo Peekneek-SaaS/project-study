@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { Modal } from "@/components/modal";
 import { Button } from "@/components/ui/button";
-import { useDriveStore } from "@/lib/stores/drive-store";
+import { useDriveNavigation } from "@/features/main/hooks/use-drive-navigation";
 import { selectDeleteTarget, useModalStore } from "@/lib/stores/modal-store";
 import { useTRPC } from "@/trpc/client";
 import { Trash } from "lucide-react";
@@ -28,7 +28,7 @@ const DESCRIPTION = {
 export function DeleteModal() {
   const target = useModalStore(selectDeleteTarget);
   const closeModal = useModalStore((state) => state.close);
-  const dropCrumb = useDriveStore((state) => state.dropCrumb);
+  const { leaveFolder } = useDriveNavigation();
 
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -58,8 +58,9 @@ export function DeleteModal() {
 
       toast.success(`Deleted ${name}`);
       // No-op unless the folder was on the trail, which beats browsing into a
-      // breadcrumb that no longer exists.
-      if (kind === "folder") dropCrumb(id);
+      // breadcrumb that no longer exists. Steps out to its parent, so deleting
+      // a subfolder leaves you where you were rather than at the root.
+      if (kind === "folder") leaveFolder(id);
       closeModal();
       // Contents, breadcrumb and the move-to tree all just went stale.
       await queryClient.invalidateQueries(trpc.folder.pathFilter());
